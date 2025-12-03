@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+
+# Session data (sensitive - contains WhatsApp credentials)
+baileys_auth_info*/
+baileys_store*.json
+
+# Database (may contain sensitive data)
+data/*.db
+data/*.db-journal
+
+# Export files
+exports/
+*.xlsx
+
+# Logs
+*.log
+wa-logs.txt
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build
+dist/
+lib/
+*.tsbuildinfo
+
+# Temp
+tmp/
+temp/

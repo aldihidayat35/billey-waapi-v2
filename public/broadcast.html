@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Broadcast - WhatsApp Multi Session</title>
+    
+    <!-- Fonts -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,400,500,600,700" />
+    
+    <!-- Metronic CSS -->
+    <link href="assets/plugins/global/plugins.bundle.css" rel="stylesheet" type="text/css" />
+    <link href="assets/css/style.bundle.css" rel="stylesheet" type="text/css" />
+    
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    
+    <!-- Socket.IO -->
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    
+    <style>
+        /* Phone Tags Input */
+        .phone-input-area {
+            background: #f9f9f9;
+            border: 2px dashed #e4e6ef;
+            border-radius: 8px;
+            padding: 12px;
+            min-height: 100px;
+            transition: all 0.2s;
+        }
+        
+        .phone-input-area:focus-within {
+            border-color: #009ef7;
+            background: white;
+        }
+        
+        .phone-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        
+        .phone-tag {
+            background: #e8fff3;
+            color: #50cd89;
+            padding: 5px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            animation: fadeIn 0.2s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        
+        .phone-tag .remove-tag {
+            cursor: pointer;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: bold;
+            transition: all 0.15s;
+        }
+        
+        .phone-tag .remove-tag:hover {
+            background: #f1416c;
+            color: white;
+        }
+        
+        .phone-input {
+            border: none;
+            background: transparent;
+            outline: none;
+            width: 100%;
+            font-size: 13px;
+            padding: 4px;
+        }
+        
+        /* Media Upload Area */
+        .media-upload-area {
+            border: 2px dashed #e4e6ef;
+            border-radius: 8px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: #f9f9f9;
+        }
+        
+        .media-upload-area:hover {
+            border-color: #009ef7;
+            background: #f1faff;
+        }
+        
+        .media-upload-area.has-file {
+            border-color: #50cd89;
+            background: #e8fff3;
+        }
+        
+        .media-upload-area i {
+            font-size: 40px;
+            color: #b5b5c3;
+        }
+        
+        .media-upload-area.has-file i {
+            color: #50cd89;
+        }
+        
+        .media-preview {
+            max-width: 180px;
+            max-height: 180px;
+            border-radius: 8px;
+            margin-top: 12px;
+        }
+        
+        /* Broadcast Log */
+        .broadcast-log {
+            background: #1e1e2d;
+            border-radius: 8px;
+            padding: 12px;
+            max-height: 250px;
+            overflow-y: auto;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 12px;
+        }
+        
+        .log-entry {
+            padding: 3px 0;
+            border-bottom: 1px solid #2d2d3f;
+        }
+        
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+        
+        .log-entry.success { color: #50cd89; }
+        .log-entry.error { color: #f1416c; }
+        .log-entry.info { color: #009ef7; }
+        .log-entry .time { color: #6b7280; margin-right: 8px; }
+        
+        /* Stats Cards */
+        .stats-mini {
+            text-align: center;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        
+        .stats-mini .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+        }
+        
+        .stats-mini .stat-label {
+            color: #a1a5b7;
+            font-size: 12px;
+            margin-top: 2px;
+        }
+        
+        .stats-mini.success { background: #e8fff3; }
+        .stats-mini.success .stat-value { color: #50cd89; }
+        
+        .stats-mini.error { background: #fff5f8; }
+        .stats-mini.error .stat-value { color: #f1416c; }
+        
+        .stats-mini.pending { background: #fff8dd; }
+        .stats-mini.pending .stat-value { color: #ffc700; }
+    </style>
+</head>
+
+<body id="kt_app_body" data-kt-app-layout="dark-sidebar" data-kt-app-header-fixed="true" data-kt-app-sidebar-enabled="true" data-kt-app-sidebar-fixed="true" data-kt-app-sidebar-hoverable="true" data-kt-app-sidebar-push-header="true" data-kt-app-sidebar-push-toolbar="true" data-kt-app-sidebar-push-footer="true" data-kt-app-toolbar-enabled="true" class="app-default">
+    
+    <div class="d-flex flex-column flex-root app-root" id="kt_app_root">
+        <div class="app-page flex-column flex-column-fluid" id="kt_app_page">
+            
+            <!-- Header -->
+            <div id="header-container"></div>
+            
+            <div class="app-wrapper flex-column flex-row-fluid" id="kt_app_wrapper">
+                
+                <!-- Sidebar -->
+                <div id="sidebar-container"></div>
+                
+                <!-- Main Content -->
+                <div class="app-main flex-column flex-row-fluid" id="kt_app_main">
+                    <div class="d-flex flex-column flex-column-fluid">
+                        
+                        <!-- Toolbar -->
+                        <div id="kt_app_toolbar" class="app-toolbar py-3 py-lg-6">
+                            <div id="kt_app_toolbar_container" class="app-container container-fluid d-flex flex-stack">
+                                <div class="page-title d-flex flex-column justify-content-center flex-wrap me-3">
+                                    <h1 class="page-heading d-flex text-dark fw-bold fs-3 flex-column justify-content-center my-0">
+                                        Broadcast Message
+                                    </h1>
+                                    <ul class="breadcrumb breadcrumb-separatorless fw-semibold fs-7 my-0 pt-1">
+                                        <li class="breadcrumb-item text-muted">
+                                            <a href="index.html" class="text-muted text-hover-primary">Home</a>
+                                        </li>
+                                        <li class="breadcrumb-item">
+                                            <span class="bullet bg-gray-400 w-5px h-2px"></span>
+                                        </li>
+                                        <li class="breadcrumb-item text-muted">Broadcast</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Content -->
+                        <div id="kt_app_content" class="app-content flex-column-fluid">
+                            <div id="kt_app_content_container" class="app-container container-fluid">
+                                
+                                <div class="row g-5 g-xl-8">
+                                    
+                                    <!-- Main Form -->
+                                    <div class="col-xl-8">
+                                        <div class="card card-flush shadow-sm">
+                                            <div class="card-header border-0 pt-6" style="background: linear-gradient(135deg, #009ef7, #0095e8);">
+                                                <h3 class="card-title text-white">
+                                                    <i class="bi bi-broadcast fs-2 me-2 text-white"></i>
+                                                    Compose Broadcast
+                                                </h3>
+                                                <div class="card-toolbar">
+                                                    <span class="badge badge-light-white text-white">
+                                                        Kirim pesan ke banyak nomor
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="card-body">
+                                                <!-- Session Selection -->
+                                                <div class="mb-7">
+                                                    <label class="form-label fw-semibold fs-6">
+                                                        <i class="bi bi-phone text-primary me-1"></i>Pilih Session
+                                                    </label>
+                                                    <select class="form-select form-select-solid" id="session-select">
+                                                        <option value="">-- Pilih Session --</option>
+                                                    </select>
+                                                </div>
+                                                
+                                                <!-- Phone Numbers Input -->
+                                                <div class="mb-7">
+                                                    <label class="form-label fw-semibold fs-6">
+                                                        <i class="bi bi-people text-success me-1"></i>Nomor Tujuan
+                                                    </label>
+                                                    <div class="phone-input-area">
+                                                        <div class="phone-tags" id="phone-tags"></div>
+                                                        <input type="text" class="phone-input" id="phone-input" 
+                                                               placeholder="Ketik nomor dan tekan Enter (contoh: 628123456789)">
+                                                    </div>
+                                                    <div class="d-flex justify-content-between align-items-center mt-3">
+                                                        <span class="text-muted fs-7">
+                                                            <span class="fw-bold text-primary" id="phone-count">0</span> nomor ditambahkan
+                                                        </span>
+                                                        <div>
+                                                            <button type="button" class="btn btn-sm btn-light-primary me-2" onclick="importFromFile()">
+                                                                <i class="bi bi-upload me-1"></i>Import
+                                                            </button>
+                                                            <button type="button" class="btn btn-sm btn-light-danger" onclick="clearAllPhones()">
+                                                                <i class="bi bi-trash me-1"></i>Clear
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    <input type="file" id="import-file" accept=".txt,.csv" style="display:none" onchange="handleFileImport(event)">
+                                                </div>
+                                                
+                                                <!-- Template Info -->
+                                                <div class="notice d-flex bg-light-warning rounded border-warning border border-dashed p-6 mb-7">
+                                                    <i class="bi bi-info-circle fs-2x text-warning me-4"></i>
+                                                    <div class="d-flex flex-stack flex-grow-1">
+                                                        <div class="fw-semibold">
+                                                            <h4 class="text-gray-900 fw-bold">Template Variabel</h4>
+                                                            <div class="fs-6 text-gray-700">
+                                                                Gunakan <code class="fs-6">{name}</code> untuk nama kontak dan 
+                                                                <code class="fs-6">{phone}</code> untuk nomor telepon.
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                
+                                                <!-- Message Input -->
+                                                <div class="mb-7">
+                                                    <label class="form-label fw-semibold fs-6">
+                                                        <i class="bi bi-chat-text text-info me-1"></i>Pesan
+                                                    </label>
+                                                    <textarea class="form-control form-control-solid" id="message-input" rows="4"
+                                                              placeholder="Tulis pesan broadcast Anda di sini..."></textarea>
+                                                </div>
+                                                
+                                                <!-- Media Upload -->
+                                                <div class="mb-7">
+                                                    <label class="form-label fw-semibold fs-6">
+                                                        <i class="bi bi-image text-danger me-1"></i>Gambar (Opsional)
+                                                    </label>
+                                                    <div class="media-upload-area" id="media-upload" onclick="document.getElementById('media-input').click()">
+                                                        <i class="bi bi-cloud-arrow-up d-block mb-2"></i>
+                                                        <span class="fs-6 text-gray-700" id="media-label">Klik atau drag gambar ke sini</span>
+                                                        <br><small class="text-muted">JPG, PNG, WebP (Max 5MB)</small>
+                                                        <br>
+                                                        <img id="media-preview" class="media-preview d-none">
+                                                    </div>
+                                                    <input type="file" id="media-input" accept="image/*" style="display:none" onchange="handleMediaSelect(event)">
+                                                    <button type="button" class="btn btn-sm btn-light-danger mt-3 d-none" id="clear-media-btn" onclick="clearMedia()">
+                                                        <i class="bi bi-x me-1"></i>Hapus Gambar
+                                                    </button>
+                                                </div>
+                                                
+                                                <!-- Delay Setting -->
+                                                <div class="mb-7">
+                                                    <label class="form-label fw-semibold fs-6">
+                                                        <i class="bi bi-clock text-warning me-1"></i>Delay Antar Pesan (detik)
+                                                    </label>
+                                                    <div class="row g-4">
+                                                        <div class="col-6">
+                                                            <input type="number" class="form-control form-control-solid" id="delay-min" value="3" min="1" max="60">
+                                                            <span class="form-text text-muted">Minimum</span>
+                                                        </div>
+                                                        <div class="col-6">
+                                                            <input type="number" class="form-control form-control-solid" id="delay-max" value="7" min="1" max="60">
+                                                            <span class="form-text text-muted">Maksimum</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                
+                                                <!-- Send Button -->
+                                                <div class="d-grid">
+                                                    <button type="button" class="btn btn-primary btn-lg" id="send-btn" onclick="startBroadcast()">
+                                                        <i class="bi bi-send me-2"></i>Mulai Broadcast
+                                                    </button>
+                                                </div>
+                                                
+                                                <!-- Progress Section -->
+                                                <div class="d-none mt-10 pt-10 border-top" id="progress-section">
+                                                    <h4 class="mb-5">
+                                                        <i class="bi bi-activity text-primary me-2"></i>Progress Broadcast
+                                                    </h4>
+                                                    
+                                                    <div class="row g-4 mb-5">
+                                                        <div class="col-4">
+                                                            <div class="stats-mini success">
+                                                                <div class="stat-value" id="stat-success">0</div>
+                                                                <div class="stat-label">Berhasil</div>
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-4">
+                                                            <div class="stats-mini error">
+                                                                <div class="stat-value" id="stat-failed">0</div>
+                                                                <div class="stat-label">Gagal</div>
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-4">
+                                                            <div class="stats-mini pending">
+                                                                <div class="stat-value" id="stat-pending">0</div>
+                                                                <div class="stat-label">Menunggu</div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div class="d-flex align-items-center mb-2">
+                                                        <span class="fs-7 text-muted me-auto">
+                                                            <span id="progress-current">0</span> / <span id="progress-total">0</span>
+                                                        </span>
+                                                        <span class="fs-7 text-muted" id="progress-status">Menunggu...</span>
+                                                    </div>
+                                                    <div class="progress h-6px mb-5">
+                                                        <div class="progress-bar bg-primary" id="progress-bar" style="width: 0%"></div>
+                                                    </div>
+                                                    
+                                                    <div class="broadcast-log" id="broadcast-log"></div>
+                                                    
+                                                    <div class="d-flex gap-2 mt-5">
+                                                        <button type="button" class="btn btn-light-danger btn-sm" id="stop-btn" onclick="stopBroadcast()" disabled>
+                                                            <i class="bi bi-stop-circle me-1"></i>Stop
+                                                        </button>
+                                                        <button type="button" class="btn btn-light-secondary btn-sm" onclick="clearLog()">
+                                                            <i class="bi bi-trash me-1"></i>Clear Log
+                                                        </button>
+                                                        <button type="button" class="btn btn-light-success btn-sm" id="export-btn" onclick="exportLog()" disabled>
+                                                            <i class="bi bi-download me-1"></i>Export Log
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Right Sidebar -->
+                                    <div class="col-xl-4">
+                                        <!-- Tips Card -->
+                                        <div class="card card-flush shadow-sm mb-5">
+                                            <div class="card-header border-0 pt-5">
+                                                <h3 class="card-title align-items-start flex-column">
+                                                    <span class="card-label fw-bold fs-4">
+                                                        <i class="bi bi-lightbulb text-warning me-2"></i>Tips Broadcast
+                                                    </span>
+                                                </h3>
+                                            </div>
+                                            <div class="card-body pt-0">
+                                                <ul class="list-unstyled mb-0">
+                                                    <li class="d-flex align-items-center py-2">
+                                                        <span class="bullet bullet-dot bg-success me-3"></span>
+                                                        <span class="text-gray-700 fs-7">Gunakan delay 3-10 detik untuk menghindari blokir</span>
+                                                    </li>
+                                                    <li class="d-flex align-items-center py-2">
+                                                        <span class="bullet bullet-dot bg-success me-3"></span>
+                                                        <span class="text-gray-700 fs-7">Jangan kirim ke lebih dari 100 nomor sekaligus</span>
+                                                    </li>
+                                                    <li class="d-flex align-items-center py-2">
+                                                        <span class="bullet bullet-dot bg-success me-3"></span>
+                                                        <span class="text-gray-700 fs-7">Pastikan nomor dalam format internasional (62xxx)</span>
+                                                    </li>
+                                                    <li class="d-flex align-items-center py-2">
+                                                        <span class="bullet bullet-dot bg-success me-3"></span>
+                                                        <span class="text-gray-700 fs-7">Gambar akan dikompresi otomatis jika terlalu besar</span>
+                                                    </li>
+                                                    <li class="d-flex align-items-center py-2">
+                                                        <span class="bullet bullet-dot bg-warning me-3"></span>
+                                                        <span class="text-gray-700 fs-7">Hindari pesan spam atau promosi berlebihan</span>
+                                                    </li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Import Format Card -->
+                                        <div class="card card-flush shadow-sm">
+                                            <div class="card-header border-0 pt-5">
+                                                <h3 class="card-title align-items-start flex-column">
+                                                    <span class="card-label fw-bold fs-4">
+                                                        <i class="bi bi-file-earmark-text text-info me-2"></i>Format Import
+                                                    </span>
+                                                </h3>
+                                            </div>
+                                            <div class="card-body pt-0">
+                                                <p class="text-gray-600 fs-7 mb-3">File TXT atau CSV dengan format:</p>
+                                                <div class="bg-light-dark rounded p-3 mb-4">
+                                                    <code class="text-gray-800 fs-7">
+                                                        628123456789<br>
+                                                        628234567890<br>
+                                                        628345678901
+                                                    </code>
+                                                </div>
+                                                <p class="text-gray-600 fs-7 mb-3">Atau dengan nama:</p>
+                                                <div class="bg-light-dark rounded p-3">
+                                                    <code class="text-gray-800 fs-7">
+                                                        628123456789,John<br>
+                                                        628234567890,Jane<br>
+                                                        628345678901,Bob
+                                                    </code>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                </div>
+                                
+                            </div>
+                        </div>
+                        
+                    </div>
+                    
+                    <!-- Footer -->
+                    <div id="footer-container"></div>
+                    
+                </div>
+                
+            </div>
+            
+        </div>
+    </div>
+    
+    <!-- Metronic JS -->
+    <script src="assets/plugins/global/plugins.bundle.js"></script>
+    <script src="assets/js/scripts.bundle.js"></script>
+    
+    <!-- Broadcast JS -->
+    <script src="broadcast.js"></script>
+    
+</body>
+</html>

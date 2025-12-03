@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Database Viewer - WhatsApp Multi Session</title>
+    
+    <!-- Fonts -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,400,500,600,700" />
+    
+    <!-- Metronic CSS -->
+    <link href="assets/plugins/global/plugins.bundle.css" rel="stylesheet" type="text/css" />
+    <link href="assets/css/style.bundle.css" rel="stylesheet" type="text/css" />
+    
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    
+    <style>
+        /* SQL Editor */
+        .sql-editor {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+            background: #1e1e2d;
+            color: #a9b7d0;
+            border: none;
+            border-radius: 8px;
+            padding: 15px;
+            resize: vertical;
+            min-height: 100px;
+        }
+        
+        .sql-editor:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(0, 158, 247, 0.3);
+        }
+        
+        .sql-editor::placeholder {
+            color: #5e6278;
+        }
+        
+        /* Table Styles */
+        .table-container {
+            overflow-x: auto;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        
+        .db-table {
+            font-size: 12px;
+        }
+        
+        .db-table th {
+            background: #f4f6fa;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            white-space: nowrap;
+            padding: 10px 12px;
+            font-weight: 600;
+            color: #3f4254;
+            border-bottom: 2px solid #e4e6ef;
+        }
+        
+        .db-table td {
+            padding: 8px 12px;
+            vertical-align: middle;
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .db-table td.expandable {
+            cursor: pointer;
+        }
+        
+        .db-table td.expandable:hover {
+            background: #f1faff;
+        }
+        
+        .db-table tr:hover {
+            background: #f9f9f9;
+        }
+        
+        /* Table List */
+        .table-list-item {
+            padding: 10px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .table-list-item:hover {
+            background: #f1faff;
+        }
+        
+        .table-list-item.active {
+            background: #009ef7;
+            color: white;
+        }
+        
+        .table-list-item .table-name {
+            font-weight: 500;
+        }
+        
+        .table-list-item .row-count {
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            background: rgba(0,0,0,0.1);
+        }
+        
+        .table-list-item.active .row-count {
+            background: rgba(255,255,255,0.2);
+        }
+        
+        /* Schema View */
+        .schema-col {
+            padding: 6px 0;
+            border-bottom: 1px solid #f4f6fa;
+        }
+        
+        .schema-col:last-child {
+            border-bottom: none;
+        }
+        
+        .schema-col .col-name {
+            font-weight: 600;
+            color: #3f4254;
+        }
+        
+        .schema-col .col-type {
+            font-size: 11px;
+            color: #009ef7;
+            background: #f1faff;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-left: 8px;
+        }
+        
+        .schema-col .col-pk {
+            font-size: 10px;
+            color: #ffc700;
+            background: #fff8dd;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-left: 4px;
+        }
+        
+        /* Stats Cards Mini */
+        .stat-mini {
+            text-align: center;
+            padding: 15px;
+        }
+        
+        .stat-mini .stat-icon {
+            width: 45px;
+            height: 45px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 10px;
+        }
+        
+        .stat-mini .stat-value {
+            font-size: 20px;
+            font-weight: 700;
+            color: #3f4254;
+        }
+        
+        .stat-mini .stat-label {
+            font-size: 12px;
+            color: #a1a5b7;
+        }
+        
+        /* Cell Detail Modal */
+        .cell-content {
+            background: #f9f9f9;
+            border-radius: 8px;
+            padding: 15px;
+            max-height: 400px;
+            overflow: auto;
+            font-family: 'Consolas', monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        
+        /* Query History */
+        .query-history-item {
+            padding: 10px;
+            background: #f9f9f9;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        
+        .query-history-item:hover {
+            background: #f1faff;
+        }
+        
+        .query-history-item .query-text {
+            font-family: 'Consolas', monospace;
+            font-size: 11px;
+            color: #5e6278;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .query-history-item .query-time {
+            font-size: 10px;
+            color: #a1a5b7;
+        }
+        
+        /* Media Preview */
+        .media-preview-thumb {
+            max-width: 50px;
+            max-height: 50px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        /* Row Selection */
+        .db-table .row-checkbox {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+        
+        .db-table tr.selected {
+            background-color: #f1faff !important;
+        }
+        
+        .db-table th.checkbox-col,
+        .db-table td.checkbox-col {
+            width: 40px;
+            text-align: center;
+        }
+        
+        /* Delete Actions */
+        .delete-btn {
+            padding: 4px 8px;
+            font-size: 11px;
+        }
+        
+        .row-actions {
+            white-space: nowrap;
+        }
+    </style>
+</head>
+
+<body id="kt_app_body" data-kt-app-layout="dark-sidebar" data-kt-app-header-fixed="true" data-kt-app-sidebar-enabled="true" data-kt-app-sidebar-fixed="true" data-kt-app-sidebar-hoverable="true" data-kt-app-sidebar-push-header="true" data-kt-app-sidebar-push-toolbar="true" data-kt-app-sidebar-push-footer="true" data-kt-app-toolbar-enabled="true" class="app-default">
+    
+    <div class="d-flex flex-column flex-root app-root" id="kt_app_root">
+        <div class="app-page flex-column flex-column-fluid" id="kt_app_page">
+            
+            <!-- Header -->
+            <div id="header-container"></div>
+            
+            <div class="app-wrapper flex-column flex-row-fluid" id="kt_app_wrapper">
+                
+                <!-- Sidebar -->
+                <div id="sidebar-container"></div>
+                
+                <!-- Main Content -->
+                <div class="app-main flex-column flex-row-fluid" id="kt_app_main">
+                    <div class="d-flex flex-column flex-column-fluid">
+                        
+                        <!-- Toolbar -->
+                        <div id="kt_app_toolbar" class="app-toolbar py-3 py-lg-6">
+                            <div id="kt_app_toolbar_container" class="app-container container-fluid d-flex flex-stack">
+                                <div class="page-title d-flex flex-column justify-content-center flex-wrap me-3">
+                                    <h1 class="page-heading d-flex text-dark fw-bold fs-3 flex-column justify-content-center my-0">
+                                        Database Viewer
+                                    </h1>
+                                    <ul class="breadcrumb breadcrumb-separatorless fw-semibold fs-7 my-0 pt-1">
+                                        <li class="breadcrumb-item text-muted">
+                                            <a href="index.html" class="text-muted text-hover-primary">Home</a>
+                                        </li>
+                                        <li class="breadcrumb-item">
+                                            <span class="bullet bg-gray-400 w-5px h-2px"></span>
+                                        </li>
+                                        <li class="breadcrumb-item text-muted">Database</li>
+                                    </ul>
+                                </div>
+                                <div class="d-flex align-items-center gap-2">
+                                    <button class="btn btn-sm btn-light-primary" onclick="refreshAll()">
+                                        <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+                                    </button>
+                                    <button class="btn btn-sm btn-light-success" onclick="exportDatabase()">
+                                        <i class="bi bi-download me-1"></i>Export
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Content -->
+                        <div id="kt_app_content" class="app-content flex-column-fluid">
+                            <div id="kt_app_content_container" class="app-container container-fluid">
+                                
+                                <!-- Stats Row -->
+                                <div class="row g-5 g-xl-8 mb-5">
+                                    <div class="col-xl-3 col-md-6">
+                                        <div class="card card-flush h-100">
+                                            <div class="card-body stat-mini">
+                                                <div class="stat-icon bg-light-primary">
+                                                    <i class="bi bi-table fs-2 text-primary"></i>
+                                                </div>
+                                                <div class="stat-value" id="stat-tables">0</div>
+                                                <div class="stat-label">Total Tables</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-xl-3 col-md-6">
+                                        <div class="card card-flush h-100">
+                                            <div class="card-body stat-mini">
+                                                <div class="stat-icon bg-light-success">
+                                                    <i class="bi bi-chat-dots fs-2 text-success"></i>
+                                                </div>
+                                                <div class="stat-value" id="stat-messages">0</div>
+                                                <div class="stat-label">Total Messages</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-xl-3 col-md-6">
+                                        <div class="card card-flush h-100">
+                                            <div class="card-body stat-mini">
+                                                <div class="stat-icon bg-light-info">
+                                                    <i class="bi bi-phone fs-2 text-info"></i>
+                                                </div>
+                                                <div class="stat-value" id="stat-sessions">0</div>
+                                                <div class="stat-label">Session Logs</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-xl-3 col-md-6">
+                                        <div class="card card-flush h-100">
+                                            <div class="card-body stat-mini">
+                                                <div class="stat-icon bg-light-warning">
+                                                    <i class="bi bi-hdd fs-2 text-warning"></i>
+                                                </div>
+                                                <div class="stat-value" id="stat-size">0 KB</div>
+                                                <div class="stat-label">Database Size</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="row g-5 g-xl-8">
+                                    
+                                    <!-- Left: Tables List -->
+                                    <div class="col-xl-3">
+                                        <div class="card card-flush shadow-sm mb-5">
+                                            <div class="card-header border-0 pt-5">
+                                                <h3 class="card-title align-items-start flex-column">
+                                                    <span class="card-label fw-bold fs-4">
+                                                        <i class="bi bi-database text-primary me-2"></i>Tables
+                                                    </span>
+                                                </h3>
+                                                <div class="card-toolbar">
+                                                    <button class="btn btn-sm btn-light-danger d-none" id="clear-table-btn" onclick="truncateTable()" title="Delete all records">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div class="card-body pt-0">
+                                                <div id="tables-list">
+                                                    <div class="text-center py-5">
+                                                        <div class="spinner-border spinner-border-sm text-primary"></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Schema Card -->
+                                        <div class="card card-flush shadow-sm d-none" id="schema-card">
+                                            <div class="card-header border-0 pt-5">
+                                                <h3 class="card-title align-items-start flex-column">
+                                                    <span class="card-label fw-bold fs-4">
+                                                        <i class="bi bi-diagram-3 text-info me-2"></i>Schema
+                                                    </span>
+                                                </h3>
+                                            </div>
+                                            <div class="card-body pt-0" id="schema-content">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Right: Data Viewer -->
+                                    <div class="col-xl-9">
+                                        
+                                        <!-- SQL Query Card -->
+                                        <div class="card card-flush shadow-sm mb-5">
+                                            <div class="card-header border-0 pt-5">
+                                                <h3 class="card-title align-items-start flex-column">
+                                                    <span class="card-label fw-bold fs-4">
+                                                        <i class="bi bi-terminal text-success me-2"></i>SQL Query
+                                                    </span>
+                                                </h3>
+                                                <div class="card-toolbar">
+                                                    <button class="btn btn-sm btn-light-info me-2" onclick="showQueryHistory()">
+                                                        <i class="bi bi-clock-history"></i>
+                                                    </button>
+                                                    <button class="btn btn-sm btn-primary" onclick="executeQuery()">
+                                                        <i class="bi bi-play-fill me-1"></i>Execute
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div class="card-body pt-0">
+                                                <textarea class="form-control sql-editor" id="sql-input" rows="3"
+                                                    placeholder="SELECT * FROM message_logs ORDER BY timestamp DESC LIMIT 100"></textarea>
+                                                <div class="d-flex justify-content-between align-items-center mt-3">
+                                                    <div class="text-muted fs-7">
+                                                        <span id="query-status"></span>
+                                                    </div>
+                                                    <div class="btn-group btn-group-sm">
+                                                        <button class="btn btn-light-secondary" onclick="setQuery('SELECT * FROM message_logs ORDER BY timestamp DESC LIMIT 100')">Messages</button>
+                                                        <button class="btn btn-light-secondary" onclick="setQuery('SELECT * FROM session_logs ORDER BY timestamp DESC LIMIT 50')">Sessions</button>
+                                                        <button class="btn btn-light-secondary" onclick="setQuery('SELECT message_type, COUNT(*) as count FROM message_logs GROUP BY message_type')">Stats</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Results Card -->
+                                        <div class="card card-flush shadow-sm">
+                                            <div class="card-header border-0 pt-5">
+                                                <h3 class="card-title align-items-start flex-column">
+                                                    <span class="card-label fw-bold fs-4">
+                                                        <i class="bi bi-grid-3x3 text-warning me-2"></i>Results
+                                                    </span>
+                                                    <span class="text-muted fs-7" id="result-info"></span>
+                                                </h3>
+                                                <div class="card-toolbar">
+                                                    <button class="btn btn-sm btn-light-danger d-none me-2" id="delete-selected-btn" onclick="deleteSelected()">
+                                                        <i class="bi bi-trash me-1"></i>Delete Selected (<span id="selected-count">0</span>)
+                                                    </button>
+                                                    <button class="btn btn-sm btn-light-success d-none" id="export-results-btn" onclick="exportResults()">
+                                                        <i class="bi bi-file-earmark-spreadsheet me-1"></i>Export CSV
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div class="card-body pt-0">
+                                                <div class="table-container" id="results-container">
+                                                    <div class="text-center py-10 text-muted">
+                                                        <i class="bi bi-inbox fs-1 d-block mb-3"></i>
+                                                        <p>Pilih tabel atau jalankan query untuk melihat data</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                    </div>
+                                </div>
+                                
+                            </div>
+                        </div>
+                        
+                    </div>
+                    
+                    <!-- Footer -->
+                    <div id="footer-container"></div>
+                    
+                </div>
+                
+            </div>
+            
+        </div>
+    </div>
+    
+    <!-- Cell Detail Modal -->
+    <div class="modal fade" id="cellModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="bi bi-eye me-2"></i>Cell Detail
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Column:</label>
+                        <span id="cell-column" class="badge bg-primary"></span>
+                    </div>
+                    <div>
+                        <label class="form-label fw-semibold">Value:</label>
+                        <div class="cell-content" id="cell-value"></div>
+                    </div>
+                    <div class="mt-3 d-none" id="media-preview-container">
+                        <label class="form-label fw-semibold">Media Preview:</label>
+                        <div id="media-preview-content"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" onclick="copyToClipboard()">
+                        <i class="bi bi-clipboard me-1"></i>Copy
+                    </button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Query History Modal -->
+    <div class="modal fade" id="historyModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="bi bi-clock-history me-2"></i>Query History
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="query-history-list">
+                        <p class="text-muted text-center">No query history</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light-danger btn-sm" onclick="clearHistory()">
+                        <i class="bi bi-trash me-1"></i>Clear
+                    </button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Metronic JS -->
+    <script src="assets/plugins/global/plugins.bundle.js"></script>
+    <script src="assets/js/scripts.bundle.js"></script>
+    
+    <!-- Database Viewer JS -->
+    <script src="database.js"></script>
+    
+</body>
+</html>

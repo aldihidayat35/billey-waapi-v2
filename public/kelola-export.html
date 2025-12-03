@@ -1,0 +1,1014 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Kelola Export Grup - WhatsApp Multi Session</title>
+    
+    <!-- Fonts -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,400,500,600,700" />
+    
+    <!-- Metronic CSS -->
+    <link href="assets/plugins/global/plugins.bundle.css" rel="stylesheet" type="text/css" />
+    <link href="assets/css/style.bundle.css" rel="stylesheet" type="text/css" />
+    
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    
+    <style>
+        /* Export Card Grid */
+        .export-card {
+            background: #fff;
+            border-radius: 12px;
+            border: 1px solid #f1f1f4;
+            transition: all 0.3s ease;
+            overflow: hidden;
+        }
+        
+        .export-card:hover {
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+            transform: translateY(-2px);
+        }
+        
+        .export-card-header {
+            background: linear-gradient(135deg, #1e7e34 0%, #28a745 100%);
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .export-card-header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -30%;
+            width: 150px;
+            height: 150px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+        }
+        
+        .export-card-header .file-icon {
+            width: 60px;
+            height: 60px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 15px;
+        }
+        
+        .export-card-header .file-icon i {
+            font-size: 28px;
+            color: #fff;
+        }
+        
+        .export-card-header .file-name {
+            color: #fff;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 5px;
+            word-break: break-all;
+        }
+        
+        .export-card-header .file-date {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 12px;
+        }
+        
+        .export-card-body {
+            padding: 20px;
+        }
+        
+        .export-stat-row {
+            display: flex;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #f5f5f5;
+        }
+        
+        .export-stat-row:last-child {
+            border-bottom: none;
+        }
+        
+        .export-stat-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
+        }
+        
+        .export-stat-icon.green { background: #e8f5e9; color: #28a745; }
+        .export-stat-icon.blue { background: #e3f2fd; color: #2196f3; }
+        .export-stat-icon.purple { background: #f3e5f5; color: #9c27b0; }
+        .export-stat-icon.orange { background: #fff3e0; color: #ff9800; }
+        
+        .export-stat-info {
+            flex: 1;
+        }
+        
+        .export-stat-label {
+            font-size: 12px;
+            color: #a1a5b7;
+            margin-bottom: 2px;
+        }
+        
+        .export-stat-value {
+            font-size: 15px;
+            font-weight: 600;
+            color: #181c32;
+        }
+        
+        .export-card-footer {
+            padding: 15px 20px;
+            background: #fafafa;
+            border-top: 1px solid #f1f1f4;
+            display: flex;
+            gap: 8px;
+        }
+        
+        .export-card-footer .btn {
+            flex: 1;
+            padding: 8px 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        /* Session Badge */
+        .session-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 12px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            font-size: 11px;
+            color: #fff;
+            margin-top: 10px;
+        }
+        
+        .session-badge i {
+            margin-right: 5px;
+        }
+        
+        /* Stats Summary */
+        .summary-card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #f1f1f4;
+            text-align: center;
+        }
+        
+        .summary-card .summary-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 12px;
+        }
+        
+        .summary-card .summary-icon i {
+            font-size: 24px;
+        }
+        
+        .summary-card .summary-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #181c32;
+            margin-bottom: 4px;
+        }
+        
+        .summary-card .summary-label {
+            font-size: 13px;
+            color: #a1a5b7;
+        }
+        
+        /* Table View */
+        .export-table {
+            width: 100%;
+        }
+        
+        .export-table th {
+            background: #f9f9f9;
+            padding: 12px 15px;
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: #7e8299;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .export-table td {
+            padding: 15px;
+            vertical-align: middle;
+            border-bottom: 1px solid #f5f5f5;
+        }
+        
+        .export-table tr:hover {
+            background: #fafafa;
+        }
+        
+        .file-info-cell {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .file-info-cell .file-icon {
+            width: 42px;
+            height: 42px;
+            background: linear-gradient(135deg, #1e7e34, #28a745);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+        }
+        
+        .file-info-cell .file-details h6 {
+            margin: 0;
+            font-size: 13px;
+            font-weight: 600;
+            color: #181c32;
+        }
+        
+        .file-info-cell .file-details span {
+            font-size: 11px;
+            color: #a1a5b7;
+        }
+        
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+        }
+        
+        .empty-state-icon {
+            width: 100px;
+            height: 100px;
+            background: #f5f8fa;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+        }
+        
+        .empty-state-icon i {
+            font-size: 40px;
+            color: #a1a5b7;
+        }
+        
+        .empty-state h4 {
+            color: #181c32;
+            margin-bottom: 8px;
+        }
+        
+        .empty-state p {
+            color: #a1a5b7;
+            margin-bottom: 20px;
+        }
+        
+        /* View Toggle */
+        .view-toggle {
+            display: flex;
+            background: #f5f8fa;
+            border-radius: 8px;
+            padding: 4px;
+        }
+        
+        .view-toggle .btn {
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: none;
+            background: transparent;
+            color: #7e8299;
+            font-size: 13px;
+        }
+        
+        .view-toggle .btn.active {
+            background: #fff;
+            color: #009ef7;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
+        }
+        
+        /* Modal Detail */
+        .detail-modal-header {
+            background: linear-gradient(135deg, #1e7e34 0%, #28a745 100%);
+            padding: 30px;
+            color: #fff;
+        }
+        
+        .detail-modal-header h4 {
+            margin: 0;
+            font-size: 18px;
+            margin-bottom: 5px;
+        }
+        
+        .detail-modal-header p {
+            margin: 0;
+            opacity: 0.8;
+            font-size: 13px;
+        }
+        
+        .detail-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            padding: 20px;
+        }
+        
+        .detail-stat-item {
+            background: #f9f9f9;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+        }
+        
+        .detail-stat-item i {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+        
+        .detail-stat-item .value {
+            font-size: 20px;
+            font-weight: 700;
+            color: #181c32;
+        }
+        
+        .detail-stat-item .label {
+            font-size: 12px;
+            color: #a1a5b7;
+        }
+    </style>
+</head>
+
+<body id="kt_app_body" data-kt-app-layout="dark-sidebar" data-kt-app-header-fixed="true" data-kt-app-sidebar-enabled="true" data-kt-app-sidebar-fixed="true" data-kt-app-sidebar-hoverable="true" data-kt-app-sidebar-push-header="true" data-kt-app-sidebar-push-toolbar="true" data-kt-app-sidebar-push-footer="true" data-kt-app-toolbar-enabled="true" class="app-default">
+    
+    <div class="d-flex flex-column flex-root app-root" id="kt_app_root">
+        <div class="app-page flex-column flex-column-fluid" id="kt_app_page">
+            
+            <!-- Header -->
+            <div id="header-container"></div>
+            
+            <div class="app-wrapper flex-column flex-row-fluid" id="kt_app_wrapper">
+                
+                <!-- Sidebar -->
+                <div id="sidebar-container"></div>
+                
+                <!-- Main Content -->
+                <div class="app-main flex-column flex-row-fluid" id="kt_app_main">
+                    <div class="d-flex flex-column flex-column-fluid">
+                        
+                        <!-- Toolbar -->
+                        <div id="kt_app_toolbar" class="app-toolbar py-3 py-lg-6">
+                            <div id="kt_app_toolbar_container" class="app-container container-fluid d-flex flex-stack">
+                                <div class="page-title d-flex flex-column justify-content-center flex-wrap me-3">
+                                    <h1 class="page-heading d-flex text-dark fw-bold fs-3 flex-column justify-content-center my-0">
+                                        <i class="bi bi-folder-check text-success me-2"></i>
+                                        Kelola Export Grup
+                                    </h1>
+                                    <ul class="breadcrumb breadcrumb-separatorless fw-semibold fs-7 my-0 pt-1">
+                                        <li class="breadcrumb-item text-muted">
+                                            <a href="index.html" class="text-muted text-hover-primary">Home</a>
+                                        </li>
+                                        <li class="breadcrumb-item">
+                                            <span class="bullet bg-gray-400 w-5px h-2px"></span>
+                                        </li>
+                                        <li class="breadcrumb-item text-muted">Kelola Export</li>
+                                    </ul>
+                                </div>
+                                <div class="d-flex align-items-center gap-3">
+                                    <div class="view-toggle">
+                                        <button class="btn active" onclick="switchView('grid')" id="btn-grid-view">
+                                            <i class="bi bi-grid-3x3-gap"></i>
+                                        </button>
+                                        <button class="btn" onclick="switchView('table')" id="btn-table-view">
+                                            <i class="bi bi-list-ul"></i>
+                                        </button>
+                                    </div>
+                                    <button class="btn btn-sm btn-light-primary" onclick="refreshExports()">
+                                        <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Content -->
+                        <div id="kt_app_content" class="app-content flex-column-fluid">
+                            <div id="kt_app_content_container" class="app-container container-fluid">
+                                
+                                <!-- Summary Stats -->
+                                <div class="row g-5 g-xl-8 mb-5">
+                                    <div class="col-xl-3 col-md-6">
+                                        <div class="summary-card">
+                                            <div class="summary-icon bg-light-success">
+                                                <i class="bi bi-file-earmark-excel text-success"></i>
+                                            </div>
+                                            <div class="summary-value" id="stat-total-exports">0</div>
+                                            <div class="summary-label">Total Export</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-xl-3 col-md-6">
+                                        <div class="summary-card">
+                                            <div class="summary-icon bg-light-primary">
+                                                <i class="bi bi-people text-primary"></i>
+                                            </div>
+                                            <div class="summary-value" id="stat-total-groups">0</div>
+                                            <div class="summary-label">Total Grup</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-xl-3 col-md-6">
+                                        <div class="summary-card">
+                                            <div class="summary-icon bg-light-info">
+                                                <i class="bi bi-phone text-info"></i>
+                                            </div>
+                                            <div class="summary-value" id="stat-total-phones">0</div>
+                                            <div class="summary-label">Nomor HP</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-xl-3 col-md-6">
+                                        <div class="summary-card">
+                                            <div class="summary-icon bg-light-warning">
+                                                <i class="bi bi-hdd text-warning"></i>
+                                            </div>
+                                            <div class="summary-value" id="stat-total-size">0 KB</div>
+                                            <div class="summary-label">Total Size</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Filter Section -->
+                                <div class="card mb-5">
+                                    <div class="card-body py-4">
+                                        <div class="row align-items-center">
+                                            <div class="col-md-4">
+                                                <div class="input-group input-group-solid">
+                                                    <span class="input-group-text">
+                                                        <i class="bi bi-search"></i>
+                                                    </span>
+                                                    <input type="text" class="form-control" id="search-input" placeholder="Cari file atau session..." oninput="filterExports()">
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <select class="form-select form-select-solid" id="filter-session" onchange="filterExports()">
+                                                    <option value="">Semua Session</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <select class="form-select form-select-solid" id="filter-date" onchange="filterExports()">
+                                                    <option value="">Semua Tanggal</option>
+                                                    <option value="today">Hari Ini</option>
+                                                    <option value="week">Minggu Ini</option>
+                                                    <option value="month">Bulan Ini</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-2 text-end">
+                                                <button class="btn btn-light-danger btn-sm" onclick="deleteSelected()" id="btn-delete-selected" style="display: none;">
+                                                    <i class="bi bi-trash me-1"></i>Hapus Terpilih
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Grid View -->
+                                <div id="grid-view">
+                                    <div class="row g-5" id="exports-grid">
+                                        <!-- Export cards will be loaded here -->
+                                    </div>
+                                </div>
+                                
+                                <!-- Table View -->
+                                <div id="table-view" style="display: none;">
+                                    <div class="card">
+                                        <div class="card-body p-0">
+                                            <div class="table-responsive">
+                                                <table class="export-table">
+                                                    <thead>
+                                                        <tr>
+                                                            <th width="30">
+                                                                <input type="checkbox" class="form-check-input" id="select-all" onchange="toggleSelectAll()">
+                                                            </th>
+                                                            <th>File</th>
+                                                            <th>Session</th>
+                                                            <th>Tanggal</th>
+                                                            <th>Total Grup</th>
+                                                            <th>Peserta</th>
+                                                            <th>Nomor HP</th>
+                                                            <th>LID</th>
+                                                            <th>Size</th>
+                                                            <th width="150">Aksi</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody id="exports-table-body">
+                                                        <!-- Table rows will be loaded here -->
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Empty State -->
+                                <div id="empty-state" style="display: none;">
+                                    <div class="card">
+                                        <div class="card-body">
+                                            <div class="empty-state">
+                                                <div class="empty-state-icon">
+                                                    <i class="bi bi-folder2-open"></i>
+                                                </div>
+                                                <h4>Belum Ada Export</h4>
+                                                <p>Data export grup akan muncul di sini setelah user mengexport dari halaman frontend.</p>
+                                                <a href="/frontend/" class="btn btn-primary">
+                                                    <i class="bi bi-plus-lg me-1"></i>Buka Frontend
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                            </div>
+                        </div>
+                        
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Detail Modal -->
+    <div class="modal fade" id="detailModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="detail-modal-header">
+                    <h4 id="modal-filename">groups_export.xlsx</h4>
+                    <p id="modal-session">Session: -</p>
+                </div>
+                <div class="detail-stats-grid">
+                    <div class="detail-stat-item">
+                        <i class="bi bi-people text-primary"></i>
+                        <div class="value" id="modal-groups">0</div>
+                        <div class="label">Total Grup</div>
+                    </div>
+                    <div class="detail-stat-item">
+                        <i class="bi bi-person text-success"></i>
+                        <div class="value" id="modal-members">0</div>
+                        <div class="label">Total Peserta</div>
+                    </div>
+                    <div class="detail-stat-item">
+                        <i class="bi bi-phone text-info"></i>
+                        <div class="value" id="modal-phones">0</div>
+                        <div class="label">Nomor HP</div>
+                    </div>
+                    <div class="detail-stat-item">
+                        <i class="bi bi-fingerprint text-warning"></i>
+                        <div class="value" id="modal-lid">0</div>
+                        <div class="label">LID</div>
+                    </div>
+                </div>
+                <div class="p-4 border-top">
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-calendar3 text-muted me-2"></i>
+                                <div>
+                                    <small class="text-muted d-block">Tanggal Export</small>
+                                    <span id="modal-date">-</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-hdd text-muted me-2"></i>
+                                <div>
+                                    <small class="text-muted d-block">Ukuran File</small>
+                                    <span id="modal-size">-</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Tutup</button>
+                    <a href="#" class="btn btn-success" id="modal-download-btn">
+                        <i class="bi bi-download me-1"></i>Download
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Delete Confirm Modal -->
+    <div class="modal fade" id="deleteModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title">Konfirmasi Hapus</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <div class="mb-4">
+                        <i class="bi bi-exclamation-triangle text-warning" style="font-size: 50px;"></i>
+                    </div>
+                    <p>Apakah Anda yakin ingin menghapus file export ini?</p>
+                    <input type="hidden" id="delete-export-id">
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
+                    <button type="button" class="btn btn-danger" onclick="confirmDelete()">
+                        <i class="bi bi-trash me-1"></i>Hapus
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Scripts -->
+    <script src="assets/plugins/global/plugins.bundle.js"></script>
+    <script src="assets/js/scripts.bundle.js"></script>
+    
+    <script>
+        // Global state
+        let exportsData = [];
+        let currentView = 'grid';
+        let selectedIds = [];
+        
+        // Load components
+        document.addEventListener('DOMContentLoaded', async () => {
+            await Promise.all([
+                fetch('components/header.html').then(r => r.text()).then(html => {
+                    document.getElementById('header-container').innerHTML = html;
+                }),
+                fetch('components/sidebar.html').then(r => r.text()).then(html => {
+                    document.getElementById('sidebar-container').innerHTML = html;
+                    // Set active menu
+                    document.querySelectorAll('.menu-link').forEach(link => {
+                        link.classList.remove('active');
+                        if (link.getAttribute('href') === 'kelola-export.html') {
+                            link.classList.add('active');
+                        }
+                    });
+                })
+            ]);
+            
+            // Load data
+            refreshExports();
+        });
+        
+        // Refresh exports data
+        async function refreshExports() {
+            try {
+                const response = await fetch('/api/group-exports');
+                const result = await response.json();
+                
+                console.log('API Response:', result);
+                
+                if (result.success) {
+                    exportsData = result.exports || [];
+                    updateStats();
+                    populateFilters();
+                    renderView();
+                } else {
+                    console.error('API Error:', result.error);
+                    exportsData = [];
+                    renderView();
+                }
+            } catch (error) {
+                console.error('Error loading exports:', error);
+                Swal.fire('Error', 'Gagal memuat data export', 'error');
+            }
+        }
+        
+        // Update summary stats
+        function updateStats() {
+            const totalExports = exportsData.length;
+            const totalGroups = exportsData.reduce((sum, e) => sum + (e.total_groups || 0), 0);
+            const totalPhones = exportsData.reduce((sum, e) => sum + (e.phone_numbers || 0), 0);
+            const totalSize = exportsData.reduce((sum, e) => sum + (e.file_size || 0), 0);
+            
+            document.getElementById('stat-total-exports').textContent = totalExports;
+            document.getElementById('stat-total-groups').textContent = totalGroups.toLocaleString();
+            document.getElementById('stat-total-phones').textContent = totalPhones.toLocaleString();
+            document.getElementById('stat-total-size').textContent = formatFileSize(totalSize);
+        }
+        
+        // Populate filter options
+        function populateFilters() {
+            const sessionSelect = document.getElementById('filter-session');
+            const sessions = [...new Set(exportsData.map(e => e.session_id))];
+            
+            sessionSelect.innerHTML = '<option value="">Semua Session</option>';
+            sessions.forEach(session => {
+                sessionSelect.innerHTML += `<option value="${session}">${session}</option>`;
+            });
+        }
+        
+        // Filter exports
+        function filterExports() {
+            const search = document.getElementById('search-input').value.toLowerCase();
+            const sessionFilter = document.getElementById('filter-session').value;
+            const dateFilter = document.getElementById('filter-date').value;
+            
+            let filtered = exportsData.filter(exp => {
+                // Search filter
+                const matchSearch = !search || 
+                    (exp.file_name && exp.file_name.toLowerCase().includes(search)) ||
+                    (exp.session_id && exp.session_id.toLowerCase().includes(search)) ||
+                    (exp.phone_number && exp.phone_number.includes(search));
+                
+                // Session filter
+                const matchSession = !sessionFilter || exp.session_id === sessionFilter;
+                
+                // Date filter
+                let matchDate = true;
+                if (dateFilter && exp.created_at) {
+                    const expDate = new Date(exp.created_at);
+                    const today = new Date();
+                    
+                    if (dateFilter === 'today') {
+                        matchDate = expDate.toDateString() === today.toDateString();
+                    } else if (dateFilter === 'week') {
+                        const weekAgo = new Date(today.setDate(today.getDate() - 7));
+                        matchDate = expDate >= weekAgo;
+                    } else if (dateFilter === 'month') {
+                        const monthAgo = new Date(today.setMonth(today.getMonth() - 1));
+                        matchDate = expDate >= monthAgo;
+                    }
+                }
+                
+                return matchSearch && matchSession && matchDate;
+            });
+            
+            renderView(filtered);
+        }
+        
+        // Switch view
+        function switchView(view) {
+            currentView = view;
+            document.getElementById('btn-grid-view').classList.toggle('active', view === 'grid');
+            document.getElementById('btn-table-view').classList.toggle('active', view === 'table');
+            document.getElementById('grid-view').style.display = view === 'grid' ? 'block' : 'none';
+            document.getElementById('table-view').style.display = view === 'table' ? 'block' : 'none';
+            renderView();
+        }
+        
+        // Render current view
+        function renderView(data = null) {
+            const exports = data || exportsData;
+            
+            if (exports.length === 0) {
+                document.getElementById('grid-view').style.display = 'none';
+                document.getElementById('table-view').style.display = 'none';
+                document.getElementById('empty-state').style.display = 'block';
+                return;
+            }
+            
+            document.getElementById('empty-state').style.display = 'none';
+            
+            if (currentView === 'grid') {
+                renderGridView(exports);
+            } else {
+                renderTableView(exports);
+            }
+        }
+        
+        // Render grid view
+        function renderGridView(exports) {
+            const container = document.getElementById('exports-grid');
+            
+            container.innerHTML = exports.map(exp => `
+                <div class="col-xl-3 col-lg-4 col-md-6">
+                    <div class="export-card">
+                        <div class="export-card-header">
+                            <div class="file-icon">
+                                <i class="bi bi-file-earmark-excel"></i>
+                            </div>
+                            <div class="file-name">${exp.file_name || 'export.xlsx'}</div>
+                            <div class="file-date">${formatDate(exp.created_at)}</div>
+                            <div class="session-badge">
+                                <i class="bi bi-phone"></i>
+                                ${exp.session_id || '-'}
+                            </div>
+                        </div>
+                        <div class="export-card-body">
+                            <div class="export-stat-row">
+                                <div class="export-stat-icon green">
+                                    <i class="bi bi-people"></i>
+                                </div>
+                                <div class="export-stat-info">
+                                    <div class="export-stat-label">Total Grup</div>
+                                    <div class="export-stat-value">${(exp.total_groups || 0).toLocaleString()}</div>
+                                </div>
+                            </div>
+                            <div class="export-stat-row">
+                                <div class="export-stat-icon blue">
+                                    <i class="bi bi-person"></i>
+                                </div>
+                                <div class="export-stat-info">
+                                    <div class="export-stat-label">Total Peserta</div>
+                                    <div class="export-stat-value">${(exp.total_members || 0).toLocaleString()}</div>
+                                </div>
+                            </div>
+                            <div class="export-stat-row">
+                                <div class="export-stat-icon purple">
+                                    <i class="bi bi-phone"></i>
+                                </div>
+                                <div class="export-stat-info">
+                                    <div class="export-stat-label">Nomor HP</div>
+                                    <div class="export-stat-value">${(exp.phone_numbers || 0).toLocaleString()}</div>
+                                </div>
+                            </div>
+                            <div class="export-stat-row">
+                                <div class="export-stat-icon orange">
+                                    <i class="bi bi-fingerprint"></i>
+                                </div>
+                                <div class="export-stat-info">
+                                    <div class="export-stat-label">LID</div>
+                                    <div class="export-stat-value">${(exp.lid_count || 0).toLocaleString()}</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="export-card-footer">
+                            <a href="/api/group-exports/${exp.id}/download" class="btn btn-success btn-sm" download>
+                                <i class="bi bi-download"></i>
+                            </a>
+                            <button class="btn btn-light-primary btn-sm" onclick="showDetail(${exp.id})">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                            <button class="btn btn-light-danger btn-sm" onclick="showDeleteConfirm(${exp.id})">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        // Render table view
+        function renderTableView(exports) {
+            const tbody = document.getElementById('exports-table-body');
+            
+            tbody.innerHTML = exports.map(exp => `
+                <tr>
+                    <td>
+                        <input type="checkbox" class="form-check-input export-checkbox" value="${exp.id}" onchange="updateSelection()">
+                    </td>
+                    <td>
+                        <div class="file-info-cell">
+                            <div class="file-icon">
+                                <i class="bi bi-file-earmark-excel"></i>
+                            </div>
+                            <div class="file-details">
+                                <h6>${exp.file_name || 'export.xlsx'}</h6>
+                                <span>${formatFileSize(exp.file_size || 0)}</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="badge badge-light-primary">${exp.session_id || '-'}</span>
+                    </td>
+                    <td>${formatDate(exp.created_at)}</td>
+                    <td><strong>${(exp.total_groups || 0).toLocaleString()}</strong></td>
+                    <td>${(exp.total_members || 0).toLocaleString()}</td>
+                    <td>${(exp.phone_numbers || 0).toLocaleString()}</td>
+                    <td>${(exp.lid_count || 0).toLocaleString()}</td>
+                    <td>${formatFileSize(exp.file_size || 0)}</td>
+                    <td>
+                        <div class="d-flex gap-1">
+                            <a href="/api/group-exports/${exp.id}/download" class="btn btn-icon btn-sm btn-light-success" download title="Download">
+                                <i class="bi bi-download"></i>
+                            </a>
+                            <button class="btn btn-icon btn-sm btn-light-primary" onclick="showDetail(${exp.id})" title="Detail">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                            <button class="btn btn-icon btn-sm btn-light-danger" onclick="showDeleteConfirm(${exp.id})" title="Hapus">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+        
+        // Show detail modal
+        function showDetail(id) {
+            const exp = exportsData.find(e => e.id === id);
+            if (!exp) return;
+            
+            document.getElementById('modal-filename').textContent = exp.file_name || 'export.xlsx';
+            document.getElementById('modal-session').textContent = `Session: ${exp.session_id || '-'} | ${exp.phone_number || '-'}`;
+            document.getElementById('modal-groups').textContent = (exp.total_groups || 0).toLocaleString();
+            document.getElementById('modal-members').textContent = (exp.total_members || 0).toLocaleString();
+            document.getElementById('modal-phones').textContent = (exp.phone_numbers || 0).toLocaleString();
+            document.getElementById('modal-lid').textContent = (exp.lid_count || 0).toLocaleString();
+            document.getElementById('modal-date').textContent = formatDate(exp.created_at);
+            document.getElementById('modal-size').textContent = formatFileSize(exp.file_size || 0);
+            document.getElementById('modal-download-btn').href = `/api/group-exports/${exp.id}/download`;
+            
+            new bootstrap.Modal(document.getElementById('detailModal')).show();
+        }
+        
+        // Show delete confirmation
+        function showDeleteConfirm(id) {
+            document.getElementById('delete-export-id').value = id;
+            new bootstrap.Modal(document.getElementById('deleteModal')).show();
+        }
+        
+        // Confirm delete
+        async function confirmDelete() {
+            const id = document.getElementById('delete-export-id').value;
+            
+            try {
+                const response = await fetch(`/api/group-exports/${id}`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    bootstrap.Modal.getInstance(document.getElementById('deleteModal')).hide();
+                    Swal.fire('Berhasil', 'File export berhasil dihapus', 'success');
+                    refreshExports();
+                } else {
+                    throw new Error(result.error);
+                }
+            } catch (error) {
+                Swal.fire('Error', 'Gagal menghapus file: ' + error.message, 'error');
+            }
+        }
+        
+        // Toggle select all
+        function toggleSelectAll() {
+            const checked = document.getElementById('select-all').checked;
+            document.querySelectorAll('.export-checkbox').forEach(cb => {
+                cb.checked = checked;
+            });
+            updateSelection();
+        }
+        
+        // Update selection
+        function updateSelection() {
+            selectedIds = Array.from(document.querySelectorAll('.export-checkbox:checked')).map(cb => cb.value);
+            document.getElementById('btn-delete-selected').style.display = selectedIds.length > 0 ? 'inline-flex' : 'none';
+        }
+        
+        // Delete selected
+        async function deleteSelected() {
+            if (selectedIds.length === 0) return;
+            
+            const result = await Swal.fire({
+                title: 'Konfirmasi Hapus',
+                text: `Apakah Anda yakin ingin menghapus ${selectedIds.length} file export?`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Ya, Hapus',
+                cancelButtonText: 'Batal'
+            });
+            
+            if (result.isConfirmed) {
+                try {
+                    for (const id of selectedIds) {
+                        await fetch(`/api/group-exports/${id}`, { method: 'DELETE' });
+                    }
+                    Swal.fire('Berhasil', 'File export berhasil dihapus', 'success');
+                    refreshExports();
+                } catch (error) {
+                    Swal.fire('Error', 'Gagal menghapus file', 'error');
+                }
+            }
+        }
+        
+        // Format file size
+        function formatFileSize(bytes) {
+            if (!bytes) return '0 KB';
+            const units = ['B', 'KB', 'MB', 'GB'];
+            let i = 0;
+            while (bytes >= 1024 && i < units.length - 1) {
+                bytes /= 1024;
+                i++;
+            }
+            return bytes.toFixed(1) + ' ' + units[i];
+        }
+        
+        // Format date
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('id-ID', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+    </script>
+</body>
+</html>

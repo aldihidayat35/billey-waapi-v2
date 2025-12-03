@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - WhatsApp Group Exporter</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- QRCode Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="/frontend/assets/css/frontend.css">
+</head>
+<body class="login-page">
+    
+    <div class="login-container-wide">
+        <div class="login-card-wide">
+            <!-- Left Side - Branding & QR -->
+            <div class="login-left">
+                <div class="login-brand">
+                    <div class="login-logo">
+                        <i class="fab fa-whatsapp"></i>
+                    </div>
+                    <h1>WhatsApp Exporter</h1>
+                    <p>Export grup WhatsApp dengan mudah dan cepat</p>
+                </div>
+                
+                <!-- QR Section (visible when step 2) -->
+                <div id="qr-area" class="qr-area">
+                    <div class="qr-wrapper">
+                        <div id="qr-placeholder" class="qr-placeholder">
+                            <i class="fab fa-whatsapp" style="font-size: 60px; color: var(--gray-300);"></i>
+                            <p class="mt-md">QR Code akan muncul di sini</p>
+                        </div>
+                        <div id="qr-canvas"></div>
+                        <div class="qr-scan-line"></div>
+                    </div>
+                    <div class="qr-info">
+                        <i class="fas fa-info-circle"></i>
+                        Buka WhatsApp di HP → Menu → Perangkat Tertaut → Tautkan Perangkat
+                    </div>
+                </div>
+                
+                <!-- Features -->
+                <div class="login-features" id="features-area">
+                    <div class="feature-item">
+                        <div class="feature-icon"><i class="fas fa-users"></i></div>
+                        <div>
+                            <strong>Export Grup</strong>
+                            <span>Export semua data grup WhatsApp</span>
+                        </div>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon"><i class="fas fa-file-excel"></i></div>
+                        <div>
+                            <strong>Format Excel</strong>
+                            <span>Data tersimpan dalam file Excel</span>
+                        </div>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon"><i class="fas fa-bolt"></i></div>
+                        <div>
+                            <strong>Proses Cepat</strong>
+                            <span>Export otomatis dalam hitungan detik</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Right Side - Form -->
+            <div class="login-right">
+                <!-- Steps Indicator -->
+                <div class="login-steps">
+                    <div class="login-step active" data-step="1">
+                        <div class="step-number">1</div>
+                        <span class="step-label">Data Diri</span>
+                    </div>
+                    <div class="login-step" data-step="2">
+                        <div class="step-number">2</div>
+                        <span class="step-label">Scan QR</span>
+                    </div>
+                    <div class="login-step" data-step="3">
+                        <div class="step-number">3</div>
+                        <span class="step-label">Selesai</span>
+                    </div>
+                </div>
+                
+                <div class="login-form-container">
+                    <!-- Step 1: User Info Form -->
+                    <div id="step-1-section" class="form-section active">
+                        <h2 class="form-title">Masukkan Data Anda</h2>
+                        <p class="form-subtitle">Isi informasi di bawah untuk melanjutkan</p>
+                        
+                        <form onsubmit="submitUserInfo(event)">
+                            <div class="form-group">
+                                <label class="form-label">Nama Lengkap</label>
+                                <div class="input-icon-wrapper">
+                                    <input type="text" id="user-name" class="form-control" placeholder="Masukkan nama Anda" required>
+                                    <i class="fas fa-user input-icon"></i>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Nomor HP</label>
+                                <div class="input-icon-wrapper">
+                                    <input type="tel" id="user-phone" class="form-control" placeholder="Contoh: 08123456789" required>
+                                    <i class="fas fa-phone input-icon"></i>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Pilih Session</label>
+                                <select id="session-select" class="form-control" onchange="toggleNewSession()" required>
+                                    <option value="">-- Pilih Session --</option>
+                                    <option value="new">+ Buat Session Baru</option>
+                                </select>
+                            </div>
+                            
+                            <div id="new-session-group" class="form-group" style="display: none;">
+                                <label class="form-label">Nama Session Baru</label>
+                                <div class="input-icon-wrapper">
+                                    <input type="text" id="new-session-name" class="form-control" placeholder="Contoh: session_utama">
+                                    <i class="fas fa-server input-icon"></i>
+                                </div>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-success btn-block btn-lg">
+                                <i class="fas fa-arrow-right"></i>
+                                Lanjutkan
+                            </button>
+                        </form>
+                    </div>
+                    
+                    <!-- Step 2: QR Code (instructions) -->
+                    <div id="step-2-section" class="form-section">
+                        <h2 class="form-title">Scan QR Code</h2>
+                        <p class="form-subtitle">Scan QR code di sebelah kiri dengan WhatsApp Anda</p>
+                        
+                        <div class="scan-instructions">
+                            <div class="instruction-step">
+                                <span class="instruction-num">1</span>
+                                <span>Buka WhatsApp di HP Anda</span>
+                            </div>
+                            <div class="instruction-step">
+                                <span class="instruction-num">2</span>
+                                <span>Tap Menu (⋮) atau Settings</span>
+                            </div>
+                            <div class="instruction-step">
+                                <span class="instruction-num">3</span>
+                                <span>Pilih "Perangkat Tertaut"</span>
+                            </div>
+                            <div class="instruction-step">
+                                <span class="instruction-num">4</span>
+                                <span>Tap "Tautkan Perangkat"</span>
+                            </div>
+                            <div class="instruction-step">
+                                <span class="instruction-num">5</span>
+                                <span>Arahkan kamera ke QR Code</span>
+                            </div>
+                        </div>
+                        
+                        <div class="waiting-status" id="waiting-status">
+                            <div class="spinner"></div>
+                            <span>Menunggu scan QR Code...</span>
+                        </div>
+                        
+                        <button onclick="updateLoginSteps(1)" class="btn btn-outline btn-block mt-lg">
+                            <i class="fas fa-arrow-left"></i>
+                            Kembali
+                        </button>
+                    </div>
+                    
+                    <!-- Step 3: Success -->
+                    <div id="step-3-section" class="form-section">
+                        <div class="text-center">
+                            <div class="success-icon-large">
+                                <i class="fas fa-check"></i>
+                            </div>
+                            <h2 class="text-success">Berhasil Terhubung!</h2>
+                            <p class="text-muted mt-md mb-xl">WhatsApp Anda berhasil terhubung.<br>Mengalihkan ke halaman utama...</p>
+                            <div class="spinner" style="margin: 0 auto;"></div>
+                        </div>
+                    </div>
+                </div>
+                
+              
+            </div>
+        </div>
+        
+        <!-- Footer -->
+        <div class="frontend-footer">
+            <p>WhatsApp Group Exporter &copy; 2024</p>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/frontend/assets/js/frontend.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Check if already logged in
+            const userData = localStorage.getItem('frontend_user');
+            if (userData) {
+                window.location.href = '/frontend/home';
+                return;
+            }
+            
+            initLoginPage();
+        });
+    </script>
+</body>
+</html>

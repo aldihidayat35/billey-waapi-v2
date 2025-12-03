@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home - WhatsApp Group Exporter</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="/frontend/assets/css/frontend.css">
+</head>
+<body>
+    
+    <div class="home-container">
+        <!-- Header -->
+        <header class="home-header">
+            <div class="user-avatar" id="user-avatar">U</div>
+            <div class="welcome-text">
+                <h1 id="welcome-name">Selamat Datang!</h1>
+                <p>Sistem akan otomatis mengexport semua grup WhatsApp Anda</p>
+            </div>
+            <div class="session-badge">
+                <span class="status-dot"></span>
+                <span id="session-info">Session: -</span>
+            </div>
+        </header>
+        
+        <!-- Processing Section -->
+        <section class="processing-section" id="processing-section">
+            <div class="processing-card">
+                <div class="processing-header">
+                    <h2><i class="fas fa-cog fa-spin"></i> Memproses Export</h2>
+                </div>
+                
+                <div class="processing-body">
+                    <!-- Process Steps -->
+                    <div class="process-steps">
+                        <div class="process-step" data-step="1">
+                            <div class="process-step-icon">
+                                <i class="fas fa-plug"></i>
+                            </div>
+                            <span class="process-step-label">Verifikasi<br>Koneksi</span>
+                        </div>
+                        <div class="process-step" data-step="2">
+                            <div class="process-step-icon">
+                                <i class="fas fa-users"></i>
+                            </div>
+                            <span class="process-step-label">Ambil<br>Grup</span>
+                        </div>
+                        <div class="process-step" data-step="3">
+                            <div class="process-step-icon">
+                                <i class="fas fa-calculator"></i>
+                            </div>
+                            <span class="process-step-label">Hitung<br>Peserta</span>
+                        </div>
+                        <div class="process-step" data-step="4">
+                            <div class="process-step-icon">
+                                <i class="fas fa-file-excel"></i>
+                            </div>
+                            <span class="process-step-label">Buat<br>Excel</span>
+                        </div>
+                        <div class="process-step" data-step="5">
+                            <div class="process-step-icon">
+                                <i class="fas fa-check"></i>
+                            </div>
+                            <span class="process-step-label">Selesai</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Progress Bar -->
+                    <div class="progress-section">
+                        <div class="progress-header">
+                            <span class="progress-title">Progress Export</span>
+                            <span class="progress-percentage"><span id="progress-percent">0</span>%</span>
+                        </div>
+                        <div class="progress-bar-wrapper">
+                            <div class="progress-bar" id="progress-bar" style="width: 0%;"></div>
+                        </div>
+                        <div class="progress-status" id="progress-status">
+                            <i class="fas fa-circle-notch fa-spin"></i>
+                            Memulai proses...
+                        </div>
+                    </div>
+                    
+                    <!-- Stats Grid -->
+                    <div class="stats-grid">
+                        <div class="stat-card highlight">
+                            <div class="stat-icon green">
+                                <i class="fas fa-users"></i>
+                            </div>
+                            <div class="stat-value" id="stat-groups">0</div>
+                            <div class="stat-label">Total Grup</div>
+                        </div>
+                        
+                        <div class="stat-card">
+                            <div class="stat-icon blue">
+                                <i class="fas fa-user-friends"></i>
+                            </div>
+                            <div class="stat-value" id="stat-participants">0</div>
+                            <div class="stat-label">Total Peserta</div>
+                        </div>
+                        
+                        <div class="stat-card">
+                            <div class="stat-icon purple">
+                                <i class="fas fa-phone"></i>
+                            </div>
+                            <div class="stat-value" id="stat-phones">0</div>
+                            <div class="stat-label">Nomor HP</div>
+                        </div>
+                        
+                        <div class="stat-card">
+                            <div class="stat-icon orange">
+                                <i class="fas fa-fingerprint"></i>
+                            </div>
+                            <div class="stat-value" id="stat-lid">0</div>
+                            <div class="stat-label">LID</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Success Section -->
+            <div class="success-section" id="success-section">
+                <div class="success-icon">
+                    <i class="fas fa-check"></i>
+                </div>
+                <h2 class="success-title">Export Berhasil!</h2>
+                <p class="success-message">Semua data grup WhatsApp Anda berhasil di-export ke file Excel.</p>
+                
+                <!-- Export Result Card -->
+                <div class="export-result-card">
+                    <div class="export-result-header">
+                        <div class="export-file-icon">
+                            <i class="fas fa-file-excel"></i>
+                        </div>
+                        <div class="export-file-info">
+                            <h4 id="export-filename">groups_export.xlsx</h4>
+                            <p id="export-date">-</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="export-actions">
+                    <a href="#" id="download-btn" class="btn btn-success btn-lg" download>
+                        <i class="fas fa-download"></i>
+                        Download Excel
+                    </a>
+                    <button onclick="logout()" class="btn btn-outline btn-lg">
+                        <i class="fas fa-sign-out-alt"></i>
+                        Keluar
+                    </button>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Footer -->
+        <footer class="frontend-footer">
+            <p>WhatsApp Group Exporter &copy; 2024 | <a href="/dashboard">Admin Panel</a></p>
+        </footer>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/frontend/assets/js/frontend.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            initHomePage();
+        });
+    </script>
+</body>
+</html>
