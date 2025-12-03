@@ -15,355 +15,676 @@
     <!-- QRCode Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     
-    <!-- Custom Styles -->
-    <link rel="stylesheet" href="/frontend/assets/css/frontend.css">
+    <style>
+        :root {
+            --wa-green: #25D366;
+            --wa-dark-green: #128C7E;
+            --wa-light-green: #dcf8c6;
+        }
+        
+        body {
+            background: #f5f8fa;
+            min-height: 100vh;
+        }
+        
+        .login-container {
+            min-height: 100vh;
+        }
+        
+        /* Left Panel - Brand Side */
+        .brand-panel {
+            background: linear-gradient(135deg, var(--wa-green) 0%, var(--wa-dark-green) 100%);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .brand-panel::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            pointer-events: none;
+        }
+        
+        .brand-panel::after {
+            content: '';
+            position: absolute;
+            bottom: -30%;
+            left: -30%;
+            width: 80%;
+            height: 80%;
+            background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%);
+            pointer-events: none;
+        }
+        
+        .brand-logo {
+            width: 90px;
+            height: 90px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+        
+        .brand-logo i {
+            font-size: 48px;
+            color: white;
+        }
+        
+        .feature-card {
+            background: rgba(255,255,255,0.15);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 16px;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+        
+        .feature-card:hover {
+            background: rgba(255,255,255,0.2);
+            transform: translateY(-2px);
+        }
+        
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        /* Right Panel - Form Side */
+        .form-panel {
+            background: #ffffff;
+        }
+        
+        .form-card {
+            background: #ffffff;
+            border-radius: 20px;
+            box-shadow: 0 4px 30px rgba(0,0,0,0.05);
+            border: 1px solid #f1f3f4;
+        }
+        
+        /* Stepper Styles */
+        .step-indicator {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 32px;
+        }
+        
+        .step-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .step-number {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            background: #f1f3f4;
+            color: #99a1b7;
+        }
+        
+        .step-item.active .step-number {
+            background: var(--wa-green);
+            color: white;
+            box-shadow: 0 4px 15px rgba(37, 211, 102, 0.3);
+        }
+        
+        .step-item.completed .step-number {
+            background: var(--wa-green);
+            color: white;
+        }
+        
+        .step-item.completed .step-number span {
+            display: none;
+        }
+        
+        .step-item.completed .step-number::after {
+            content: '✓';
+            font-size: 14px;
+        }
+        
+        .step-label {
+            font-size: 13px;
+            font-weight: 500;
+            color: #99a1b7;
+        }
+        
+        .step-item.active .step-label,
+        .step-item.completed .step-label {
+            color: #181c32;
+        }
+        
+        .step-connector {
+            width: 40px;
+            height: 2px;
+            background: #f1f3f4;
+            margin: 0 4px;
+        }
+        
+        .step-item.completed + .step-connector,
+        .step-connector.active {
+            background: var(--wa-green);
+        }
+        
+        /* Form Styles */
+        .form-section {
+            display: none;
+        }
+        
+        .form-section.current {
+            display: block;
+            animation: fadeIn 0.4s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .input-group-custom {
+            position: relative;
+        }
+        
+        .input-group-custom .input-icon {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #99a1b7;
+            z-index: 4;
+        }
+        
+        .input-group-custom .form-control {
+            padding-left: 48px;
+            height: 50px;
+            border-radius: 12px;
+            border: 1px solid #e1e3ea;
+            background: #f9f9f9;
+            transition: all 0.3s ease;
+        }
+        
+        .input-group-custom .form-control:focus {
+            border-color: var(--wa-green);
+            background: #fff;
+            box-shadow: 0 0 0 3px rgba(37, 211, 102, 0.1);
+        }
+        
+        .input-group-custom .form-select {
+            height: 50px;
+            border-radius: 12px;
+            border: 1px solid #e1e3ea;
+            background-color: #f9f9f9;
+            padding-right: 40px;
+        }
+        
+        .input-group-custom .form-select:focus {
+            border-color: var(--wa-green);
+            background-color: #fff;
+            box-shadow: 0 0 0 3px rgba(37, 211, 102, 0.1);
+        }
+        
+        .btn-wa {
+            background: linear-gradient(135deg, var(--wa-green) 0%, var(--wa-dark-green) 100%);
+            border: none;
+            color: white;
+            height: 50px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 15px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-wa:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(37, 211, 102, 0.35);
+            color: white;
+        }
+        
+        .btn-wa:active {
+            transform: translateY(0);
+        }
+        
+        /* QR Code Styles */
+        .qr-container {
+            background: white;
+            border-radius: 20px;
+            padding: 24px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .qr-wrapper {
+            position: relative;
+            border-radius: 16px;
+            overflow: hidden;
+            background: #f9f9f9;
+        }
+        
+        .qr-scan-line {
+            position: absolute;
+            width: 100%;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, var(--wa-green), transparent);
+            top: 0;
+            left: 0;
+            animation: scan 2s linear infinite;
+            opacity: 0;
+        }
+        
+        .qr-wrapper.scanning .qr-scan-line {
+            opacity: 1;
+        }
+        
+        @keyframes scan {
+            0% { top: 0; }
+            100% { top: 100%; }
+        }
+        
+        /* Instructions */
+        .instruction-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #f1f3f4;
+        }
+        
+        .instruction-item:last-child {
+            border-bottom: none;
+        }
+        
+        .instruction-number {
+            width: 28px;
+            height: 28px;
+            background: #e8fff0;
+            color: var(--wa-green);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 13px;
+            margin-right: 14px;
+            flex-shrink: 0;
+        }
+        
+        .instruction-text {
+            color: #5e6278;
+            font-size: 14px;
+        }
+        
+        /* Status Badge */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: #e8fff0;
+            color: var(--wa-dark-green);
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-weight: 500;
+            font-size: 14px;
+        }
+        
+        /* Success Animation */
+        .success-icon {
+            width: 100px;
+            height: 100px;
+            background: linear-gradient(135deg, var(--wa-green) 0%, var(--wa-dark-green) 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 24px;
+            animation: successPulse 1.5s ease infinite;
+        }
+        
+        @keyframes successPulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(37, 211, 102, 0.4); }
+            50% { box-shadow: 0 0 0 20px rgba(37, 211, 102, 0); }
+        }
+        
+        /* Mobile Responsive */
+        @media (max-width: 991.98px) {
+            .brand-panel {
+                display: none !important;
+            }
+            
+            .form-panel {
+                width: 100% !important;
+            }
+            
+            .form-card {
+                box-shadow: none;
+                border: none;
+            }
+            
+            .mobile-header {
+                display: flex !important;
+            }
+            
+            .step-label {
+                display: none;
+            }
+            
+            .step-connector {
+                width: 30px;
+            }
+        }
+        
+        @media (min-width: 992px) {
+            .mobile-header {
+                display: none !important;
+            }
+            
+            .qr-mobile-section {
+                display: none !important;
+            }
+        }
+    </style>
 </head>
-<body id="kt_body" class="auth-bg bgi-size-cover bgi-attachment-fixed bgi-position-center">
-    
-    <!--begin::Theme mode setup on page load-->
+<body>
+    <!--begin::Theme mode setup-->
     <script>
         var defaultThemeMode = "light";
-        var themeMode;
-        if (document.documentElement) {
-            if (document.documentElement.hasAttribute("data-bs-theme-mode")) {
-                themeMode = document.documentElement.getAttribute("data-bs-theme-mode");
-            } else {
-                themeMode = localStorage.getItem("data-bs-theme") !== null ? localStorage.getItem("data-bs-theme") : defaultThemeMode;
-            }
-            document.documentElement.setAttribute("data-bs-theme", themeMode);
-        }
+        var themeMode = localStorage.getItem("data-bs-theme") || defaultThemeMode;
+        document.documentElement.setAttribute("data-bs-theme", themeMode);
     </script>
     <!--end::Theme mode setup-->
     
-    <!--begin::Root-->
-    <div class="d-flex flex-column flex-root" id="kt_app_root">
-        <!--begin::Authentication-->
-        <div class="d-flex flex-column flex-lg-row flex-column-fluid">
-            
-            <!--begin::Aside (Left Side - Desktop)-->
-            <div class="d-flex flex-lg-row-fluid w-lg-50 bgi-size-cover bgi-position-center order-1 order-lg-1" style="background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);">
-                <!--begin::Content-->
-                <div class="d-flex flex-column flex-center py-7 py-lg-15 px-5 px-md-15 w-100">
-                    <!--begin::Logo-->
-                    <a href="#" class="mb-0 mb-lg-12">
-                        <div class="d-flex align-items-center justify-content-center bg-white bg-opacity-20 rounded-circle" style="width: 80px; height: 80px;">
-                            <i class="fab fa-whatsapp text-white fs-2x"></i>
-                        </div>
-                    </a>
-                    <!--end::Logo-->
-                    
-                    <!--begin::Title-->
-                    <h1 class="d-none d-lg-block text-white fs-2qx fw-bolder text-center mb-3">
-                        WhatsApp Exporter
-                    </h1>
-                    <div class="d-none d-lg-block text-white fs-6 text-center mb-7">
-                        Export grup WhatsApp dengan mudah dan cepat
-                    </div>
-                    <!--end::Title-->
-                    
-                    <!--begin::QR Area (Desktop) -->
-                    <div id="qr-area-desktop" class="d-none d-lg-flex flex-column align-items-center justify-content-center" style="display: none !important;">
-                        <div class="qr-wrapper bg-white p-5 rounded-3 shadow-lg position-relative">
+    <!--begin::Main Container-->
+    <div class="d-flex flex-column flex-lg-row login-container">
+        
+        <!--begin::Left Panel - Brand (Desktop Only)-->
+        <div class="brand-panel d-none d-lg-flex flex-column flex-center w-lg-50 p-15 position-relative">
+            <div class="position-relative z-index-1 text-center">
+                <!--begin::Logo-->
+                <div class="brand-logo mx-auto mb-10">
+                    <i class="fab fa-whatsapp"></i>
+                </div>
+                <!--end::Logo-->
+                
+                <!--begin::Title-->
+                <h1 class="text-white fw-bold fs-2hx mb-3">WhatsApp Exporter</h1>
+                <p class="text-white text-opacity-75 fs-5 mb-12">Export grup WhatsApp dengan mudah dan cepat</p>
+                <!--end::Title-->
+                
+                <!--begin::QR Area Desktop-->
+                <div id="qr-area-desktop" class="mb-10" style="display: none;">
+                    <div class="qr-container mx-auto" style="max-width: 280px;">
+                        <div class="qr-wrapper p-4">
                             <div id="qr-placeholder-desktop" class="d-flex flex-column align-items-center justify-content-center" style="width: 220px; height: 220px;">
-                                <i class="fab fa-whatsapp text-gray-300" style="font-size: 60px;"></i>
-                                <p class="text-muted mt-4 mb-0 fs-7">QR Code akan muncul di sini</p>
+                                <i class="fab fa-whatsapp text-gray-300" style="font-size: 56px;"></i>
+                                <p class="text-gray-500 mt-4 mb-0 fs-7">QR Code akan muncul di sini</p>
                             </div>
-                            <div id="qr-canvas-desktop"></div>
+                            <div id="qr-canvas-desktop" class="d-flex justify-content-center"></div>
                             <div class="qr-scan-line"></div>
                         </div>
-                        <div class="mt-5 p-3 bg-white bg-opacity-15 rounded-3 text-white fs-7 text-center" style="max-width: 300px;">
-                            <i class="fas fa-info-circle me-2"></i>
+                    </div>
+                    <div class="mt-6 mx-auto" style="max-width: 320px;">
+                        <div class="bg-white bg-opacity-15 rounded-3 p-4 text-white text-opacity-90 fs-7">
+                            <i class="fas fa-mobile-alt me-2"></i>
                             Buka WhatsApp di HP → Menu → Perangkat Tertaut → Tautkan Perangkat
                         </div>
                     </div>
-                    <!--end::QR Area-->
-                    
-                    <!--begin::Features (Desktop) -->
-                    <div id="features-area-desktop" class="d-none d-lg-block w-100" style="max-width: 400px;">
-                        <div class="d-flex align-items-center bg-white bg-opacity-15 rounded-3 p-4 mb-3">
-                            <div class="d-flex align-items-center justify-content-center bg-white bg-opacity-20 rounded-2 me-4" style="width: 45px; height: 45px;">
+                </div>
+                <!--end::QR Area-->
+                
+                <!--begin::Features-->
+                <div id="features-area-desktop" class="w-100" style="max-width: 420px; margin: 0 auto;">
+                    <div class="feature-card mb-4">
+                        <div class="d-flex align-items-center">
+                            <div class="feature-icon me-4">
                                 <i class="fas fa-users text-white fs-4"></i>
                             </div>
-                            <div>
-                                <div class="text-white fw-bold fs-6">Export Grup</div>
-                                <div class="text-white text-opacity-75 fs-7">Export semua data grup WhatsApp</div>
-                            </div>
-                        </div>
-                        <div class="d-flex align-items-center bg-white bg-opacity-15 rounded-3 p-4 mb-3">
-                            <div class="d-flex align-items-center justify-content-center bg-white bg-opacity-20 rounded-2 me-4" style="width: 45px; height: 45px;">
-                                <i class="fas fa-file-excel text-white fs-4"></i>
-                            </div>
-                            <div>
-                                <div class="text-white fw-bold fs-6">Format Excel</div>
-                                <div class="text-white text-opacity-75 fs-7">Data tersimpan dalam file Excel</div>
-                            </div>
-                        </div>
-                        <div class="d-flex align-items-center bg-white bg-opacity-15 rounded-3 p-4">
-                            <div class="d-flex align-items-center justify-content-center bg-white bg-opacity-20 rounded-2 me-4" style="width: 45px; height: 45px;">
-                                <i class="fas fa-bolt text-white fs-4"></i>
-                            </div>
-                            <div>
-                                <div class="text-white fw-bold fs-6">Proses Cepat</div>
-                                <div class="text-white text-opacity-75 fs-7">Export otomatis dalam hitungan detik</div>
+                            <div class="text-start">
+                                <h4 class="text-white fw-bold mb-1 fs-6">Export Grup</h4>
+                                <p class="text-white text-opacity-75 mb-0 fs-7">Export semua data grup WhatsApp ke Excel</p>
                             </div>
                         </div>
                     </div>
-                    <!--end::Features-->
+                    <div class="feature-card mb-4">
+                        <div class="d-flex align-items-center">
+                            <div class="feature-icon me-4">
+                                <i class="fas fa-file-excel text-white fs-4"></i>
+                            </div>
+                            <div class="text-start">
+                                <h4 class="text-white fw-bold mb-1 fs-6">Format Excel</h4>
+                                <p class="text-white text-opacity-75 mb-0 fs-7">Data terformat rapi dalam spreadsheet</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="feature-card">
+                        <div class="d-flex align-items-center">
+                            <div class="feature-icon me-4">
+                                <i class="fas fa-bolt text-white fs-4"></i>
+                            </div>
+                            <div class="text-start">
+                                <h4 class="text-white fw-bold mb-1 fs-6">Proses Cepat</h4>
+                                <p class="text-white text-opacity-75 mb-0 fs-7">Export otomatis dalam hitungan detik</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <!--end::Content-->
+                <!--end::Features-->
             </div>
-            <!--end::Aside-->
-            
-            <!--begin::Body (Right Side - Form)-->
-            <div class="d-flex flex-column flex-lg-row-fluid w-lg-50 p-10 order-2 order-lg-2">
-                <!--begin::Form-->
-                <div class="d-flex flex-center flex-column flex-lg-row-fluid">
-                    <!--begin::Wrapper-->
-                    <div class="w-lg-500px p-10">
-                        
-                        <!--begin::Mobile Logo-->
-                        <div class="d-flex d-lg-none flex-column align-items-center mb-10">
-                            <div class="d-flex align-items-center justify-content-center bg-success rounded-circle mb-4" style="width: 70px; height: 70px;">
-                                <i class="fab fa-whatsapp text-white fs-2x"></i>
-                            </div>
-                            <h2 class="text-gray-900 fw-bolder fs-2">WhatsApp Exporter</h2>
-                            <p class="text-gray-500 fs-7">Export grup WhatsApp dengan mudah</p>
+        </div>
+        <!--end::Left Panel-->
+        
+        <!--begin::Right Panel - Form-->
+        <div class="form-panel d-flex flex-column flex-center w-100 w-lg-50 p-8 p-lg-15">
+            <div class="w-100" style="max-width: 460px;">
+                
+                <!--begin::Mobile Header-->
+                <div class="mobile-header flex-column align-items-center text-center mb-10" style="display: none;">
+                    <div class="brand-logo mx-auto mb-5" style="background: var(--wa-green); width: 70px; height: 70px; border-radius: 18px;">
+                        <i class="fab fa-whatsapp" style="font-size: 36px;"></i>
+                    </div>
+                    <h2 class="text-gray-900 fw-bold fs-2 mb-2">WhatsApp Exporter</h2>
+                    <p class="text-gray-500 fs-7 mb-0">Export grup WhatsApp dengan mudah</p>
+                </div>
+                <!--end::Mobile Header-->
+                
+                <!--begin::Form Card-->
+                <div class="form-card p-8 p-lg-12">
+                    
+                    <!--begin::Stepper-->
+                    <div class="step-indicator">
+                        <div class="step-item active" data-step="1">
+                            <div class="step-number"><span>1</span></div>
+                            <span class="step-label">Data Diri</span>
                         </div>
-                        <!--end::Mobile Logo-->
-                        
-                        <!--begin::Steps Indicator-->
-                        <div class="stepper stepper-pills stepper-column d-flex flex-column flex-xl-row flex-row-fluid gap-5 mb-10" id="kt_stepper_login">
-                            <!--begin::Nav-->
-                            <div class="d-flex justify-content-center justify-content-xl-start flex-row-auto w-100 w-xl-300px">
-                                <div class="stepper-nav d-flex flex-row gap-5">
-                                    <!--begin::Step 1-->
-                                    <div class="stepper-item current" data-kt-stepper-element="nav" data-step="1">
-                                        <div class="stepper-wrapper d-flex align-items-center">
-                                            <div class="stepper-icon w-40px h-40px">
-                                                <i class="stepper-check fas fa-check"></i>
-                                                <span class="stepper-number">1</span>
-                                            </div>
-                                            <div class="stepper-label d-none d-sm-block">
-                                                <h3 class="stepper-title fs-7">Data Diri</h3>
-                                            </div>
-                                        </div>
-                                        <div class="stepper-line h-40px d-none"></div>
-                                    </div>
-                                    <!--end::Step 1-->
-                                    
-                                    <!--begin::Step 2-->
-                                    <div class="stepper-item" data-kt-stepper-element="nav" data-step="2">
-                                        <div class="stepper-wrapper d-flex align-items-center">
-                                            <div class="stepper-icon w-40px h-40px">
-                                                <i class="stepper-check fas fa-check"></i>
-                                                <span class="stepper-number">2</span>
-                                            </div>
-                                            <div class="stepper-label d-none d-sm-block">
-                                                <h3 class="stepper-title fs-7">Scan QR</h3>
-                                            </div>
-                                        </div>
-                                        <div class="stepper-line h-40px d-none"></div>
-                                    </div>
-                                    <!--end::Step 2-->
-                                    
-                                    <!--begin::Step 3-->
-                                    <div class="stepper-item" data-kt-stepper-element="nav" data-step="3">
-                                        <div class="stepper-wrapper d-flex align-items-center">
-                                            <div class="stepper-icon w-40px h-40px">
-                                                <i class="stepper-check fas fa-check"></i>
-                                                <span class="stepper-number">3</span>
-                                            </div>
-                                            <div class="stepper-label d-none d-sm-block">
-                                                <h3 class="stepper-title fs-7">Selesai</h3>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <!--end::Step 3-->
-                                </div>
-                            </div>
-                            <!--end::Nav-->
+                        <div class="step-connector"></div>
+                        <div class="step-item" data-step="2">
+                            <div class="step-number"><span>2</span></div>
+                            <span class="step-label">Scan QR</span>
                         </div>
-                        <!--end::Steps Indicator-->
+                        <div class="step-connector"></div>
+                        <div class="step-item" data-step="3">
+                            <div class="step-number"><span>3</span></div>
+                            <span class="step-label">Selesai</span>
+                        </div>
+                    </div>
+                    <!--end::Stepper-->
+                    
+                    <!--begin::Form Sections-->
+                    <div class="form-sections">
                         
-                        <!--begin::Form Sections-->
-                        <div class="form-sections">
+                        <!--begin::Step 1 - User Info-->
+                        <div id="step-1-section" class="form-section current">
+                            <div class="text-center mb-10">
+                                <h2 class="text-gray-900 fw-bold fs-3 mb-2">Masukkan Data Anda</h2>
+                                <p class="text-gray-500 fs-6 mb-0">Isi informasi di bawah untuk melanjutkan</p>
+                            </div>
                             
-                            <!--begin::Step 1 - User Info Form-->
-                            <div id="step-1-section" class="form-section current" data-kt-stepper-element="content">
-                                <div class="mb-10 text-center">
-                                    <h1 class="text-gray-900 fw-bolder mb-3 fs-2 fs-lg-1">Masukkan Data Anda</h1>
-                                    <div class="text-gray-500 fw-semibold fs-6">Isi informasi di bawah untuk melanjutkan</div>
+                            <form onsubmit="submitUserInfo(event)">
+                                <!--begin::Name Input-->
+                                <div class="mb-6">
+                                    <label class="form-label fw-semibold text-gray-700 fs-6 mb-2">Nama Lengkap</label>
+                                    <div class="input-group-custom">
+                                        <i class="fas fa-user input-icon"></i>
+                                        <input type="text" id="user-name" class="form-control" placeholder="Masukkan nama Anda" required>
+                                    </div>
                                 </div>
+                                <!--end::Name Input-->
                                 
-                                <form onsubmit="submitUserInfo(event)" class="form w-100">
-                                    <!--begin::Input group - Name-->
-                                    <div class="fv-row mb-8">
-                                        <label class="form-label fw-bold text-gray-900 fs-6">Nama Lengkap</label>
-                                        <div class="position-relative">
-                                            <span class="position-absolute top-50 translate-middle-y ms-4">
-                                                <i class="fas fa-user text-gray-400"></i>
-                                            </span>
-                                            <input type="text" id="user-name" class="form-control form-control-lg form-control-solid ps-12" placeholder="Masukkan nama Anda" required>
-                                        </div>
+                                <!--begin::Phone Input-->
+                                <div class="mb-6">
+                                    <label class="form-label fw-semibold text-gray-700 fs-6 mb-2">Nomor HP</label>
+                                    <div class="input-group-custom">
+                                        <i class="fas fa-phone input-icon"></i>
+                                        <input type="tel" id="user-phone" class="form-control" placeholder="Contoh: 08123456789" required>
                                     </div>
-                                    <!--end::Input group-->
-                                    
-                                    <!--begin::Input group - Phone-->
-                                    <div class="fv-row mb-8">
-                                        <label class="form-label fw-bold text-gray-900 fs-6">Nomor HP</label>
-                                        <div class="position-relative">
-                                            <span class="position-absolute top-50 translate-middle-y ms-4">
-                                                <i class="fas fa-phone text-gray-400"></i>
-                                            </span>
-                                            <input type="tel" id="user-phone" class="form-control form-control-lg form-control-solid ps-12" placeholder="Contoh: 08123456789" required>
-                                        </div>
-                                    </div>
-                                    <!--end::Input group-->
-                                    
-                                    <!--begin::Input group - Session-->
-                                    <div class="fv-row mb-8">
-                                        <label class="form-label fw-bold text-gray-900 fs-6">Pilih Session</label>
-                                        <select id="session-select" class="form-select form-select-lg form-select-solid" onchange="toggleNewSession()" required>
+                                </div>
+                                <!--end::Phone Input-->
+                                
+                                <!--begin::Session Select-->
+                                <div class="mb-6">
+                                    <label class="form-label fw-semibold text-gray-700 fs-6 mb-2">Pilih Session</label>
+                                    <div class="input-group-custom">
+                                        <select id="session-select" class="form-select" onchange="toggleNewSession()" required>
                                             <option value="">-- Pilih Session --</option>
                                             <option value="new">+ Buat Session Baru</option>
                                         </select>
                                     </div>
-                                    <!--end::Input group-->
-                                    
-                                    <!--begin::Input group - New Session Name-->
-                                    <div id="new-session-group" class="fv-row mb-8" style="display: none;">
-                                        <label class="form-label fw-bold text-gray-900 fs-6">Nama Session Baru</label>
-                                        <div class="position-relative">
-                                            <span class="position-absolute top-50 translate-middle-y ms-4">
-                                                <i class="fas fa-server text-gray-400"></i>
-                                            </span>
-                                            <input type="text" id="new-session-name" class="form-control form-control-lg form-control-solid ps-12" placeholder="Contoh: session_utama">
-                                        </div>
-                                    </div>
-                                    <!--end::Input group-->
-                                    
-                                    <!--begin::Submit button-->
-                                    <div class="d-grid">
-                                        <button type="submit" class="btn btn-success btn-lg">
-                                            <span class="indicator-label">
-                                                Lanjutkan
-                                                <i class="fas fa-arrow-right ms-2"></i>
-                                            </span>
-                                        </button>
-                                    </div>
-                                    <!--end::Submit button-->
-                                </form>
-                            </div>
-                            <!--end::Step 1-->
-                            
-                            <!--begin::Step 2 - QR Code-->
-                            <div id="step-2-section" class="form-section" data-kt-stepper-element="content">
-                                <div class="mb-10 text-center">
-                                    <h1 class="text-gray-900 fw-bolder mb-3 fs-2 fs-lg-1">Scan QR Code</h1>
-                                    <div class="text-gray-500 fw-semibold fs-6">Scan QR code dengan WhatsApp Anda</div>
                                 </div>
+                                <!--end::Session Select-->
                                 
-                                <!--begin::QR Area (Mobile)-->
-                                <div id="qr-area-mobile" class="d-lg-none text-center mb-8">
-                                    <div class="qr-wrapper bg-light p-5 rounded-3 d-inline-block position-relative shadow-sm">
-                                        <div id="qr-placeholder-mobile" class="d-flex flex-column align-items-center justify-content-center" style="width: 200px; height: 200px;">
-                                            <i class="fab fa-whatsapp text-gray-300" style="font-size: 50px;"></i>
-                                            <p class="text-muted mt-3 mb-0 fs-7">QR Code akan muncul di sini</p>
-                                        </div>
-                                        <div id="qr-canvas-mobile"></div>
-                                        <div class="qr-scan-line"></div>
+                                <!--begin::New Session Name-->
+                                <div id="new-session-group" class="mb-6" style="display: none;">
+                                    <label class="form-label fw-semibold text-gray-700 fs-6 mb-2">Nama Session Baru</label>
+                                    <div class="input-group-custom">
+                                        <i class="fas fa-server input-icon"></i>
+                                        <input type="text" id="new-session-name" class="form-control" placeholder="Contoh: session_utama">
                                     </div>
                                 </div>
-                                <!--end::QR Area-->
+                                <!--end::New Session Name-->
                                 
-                                <!--begin::Instructions-->
-                                <div class="scan-instructions mb-8">
-                                    <div class="d-flex align-items-center py-3 border-bottom border-gray-200">
-                                        <span class="bullet bullet-dot bg-success h-10px w-10px me-3"></span>
-                                        <span class="fw-semibold text-gray-700 fs-6">1. Buka WhatsApp di HP Anda</span>
-                                    </div>
-                                    <div class="d-flex align-items-center py-3 border-bottom border-gray-200">
-                                        <span class="bullet bullet-dot bg-success h-10px w-10px me-3"></span>
-                                        <span class="fw-semibold text-gray-700 fs-6">2. Tap Menu (⋮) atau Settings</span>
-                                    </div>
-                                    <div class="d-flex align-items-center py-3 border-bottom border-gray-200">
-                                        <span class="bullet bullet-dot bg-success h-10px w-10px me-3"></span>
-                                        <span class="fw-semibold text-gray-700 fs-6">3. Pilih "Perangkat Tertaut"</span>
-                                    </div>
-                                    <div class="d-flex align-items-center py-3 border-bottom border-gray-200">
-                                        <span class="bullet bullet-dot bg-success h-10px w-10px me-3"></span>
-                                        <span class="fw-semibold text-gray-700 fs-6">4. Tap "Tautkan Perangkat"</span>
-                                    </div>
-                                    <div class="d-flex align-items-center py-3">
-                                        <span class="bullet bullet-dot bg-success h-10px w-10px me-3"></span>
-                                        <span class="fw-semibold text-gray-700 fs-6">5. Arahkan kamera ke QR Code</span>
-                                    </div>
-                                </div>
-                                <!--end::Instructions-->
-                                
-                                <!--begin::Waiting Status-->
-                                <div id="waiting-status" class="d-flex align-items-center justify-content-center p-5 bg-light-success rounded-3 mb-8">
-                                    <span class="spinner-border spinner-border-sm text-success me-3"></span>
-                                    <span class="fw-semibold text-success">Menunggu scan QR Code...</span>
-                                </div>
-                                <!--end::Waiting Status-->
-                                
-                                <!--begin::Back button-->
-                                <div class="d-grid">
-                                    <button type="button" onclick="updateLoginSteps(1)" class="btn btn-light-primary btn-lg">
-                                        <i class="fas fa-arrow-left me-2"></i>
-                                        Kembali
-                                    </button>
-                                </div>
-                                <!--end::Back button-->
-                            </div>
-                            <!--end::Step 2-->
-                            
-                            <!--begin::Step 3 - Success-->
-                            <div id="step-3-section" class="form-section" data-kt-stepper-element="content">
-                                <div class="text-center">
-                                    <!--begin::Success Icon-->
-                                    <div class="mb-10">
-                                        <div class="d-flex justify-content-center mb-5">
-                                            <div class="symbol symbol-100px symbol-circle">
-                                                <span class="symbol-label bg-success">
-                                                    <i class="fas fa-check text-white fs-2x"></i>
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <h1 class="text-success fw-bolder mb-3 fs-2 fs-lg-1">Berhasil Terhubung!</h1>
-                                        <div class="text-gray-500 fw-semibold fs-6 mb-5">WhatsApp Anda berhasil terhubung.<br>Mengalihkan ke halaman utama...</div>
-                                        <div class="d-flex justify-content-center">
-                                            <span class="spinner-border spinner-border-sm text-success"></span>
-                                        </div>
-                                    </div>
-                                    <!--end::Success Icon-->
-                                </div>
-                            </div>
-                            <!--end::Step 3-->
-                            
+                                <!--begin::Submit-->
+                                <button type="submit" class="btn btn-wa w-100 mt-4">
+                                    Lanjutkan
+                                    <i class="fas fa-arrow-right ms-2"></i>
+                                </button>
+                                <!--end::Submit-->
+                            </form>
                         </div>
-                        <!--end::Form Sections-->
+                        <!--end::Step 1-->
+                        
+                        <!--begin::Step 2 - QR Code-->
+                        <div id="step-2-section" class="form-section">
+                            <div class="text-center mb-8">
+                                <h2 class="text-gray-900 fw-bold fs-3 mb-2">Scan QR Code</h2>
+                                <p class="text-gray-500 fs-6 mb-0">Scan dengan WhatsApp di HP Anda</p>
+                            </div>
+                            
+                            <!--begin::QR Mobile-->
+                            <div id="qr-area-mobile" class="qr-mobile-section text-center mb-8">
+                                <div class="qr-wrapper bg-light rounded-3 p-5 d-inline-block position-relative">
+                                    <div id="qr-placeholder-mobile" class="d-flex flex-column align-items-center justify-content-center" style="width: 200px; height: 200px;">
+                                        <i class="fab fa-whatsapp text-gray-300" style="font-size: 48px;"></i>
+                                        <p class="text-gray-500 mt-3 mb-0 fs-7">QR Code akan muncul di sini</p>
+                                    </div>
+                                    <div id="qr-canvas-mobile" class="d-flex justify-content-center"></div>
+                                    <div class="qr-scan-line"></div>
+                                </div>
+                            </div>
+                            <!--end::QR Mobile-->
+                            
+                            <!--begin::Instructions-->
+                            <div class="bg-light rounded-3 p-5 mb-6">
+                                <h6 class="text-gray-800 fw-bold mb-4 fs-6">Cara Scan:</h6>
+                                <div class="instruction-item">
+                                    <span class="instruction-number">1</span>
+                                    <span class="instruction-text">Buka WhatsApp di HP Anda</span>
+                                </div>
+                                <div class="instruction-item">
+                                    <span class="instruction-number">2</span>
+                                    <span class="instruction-text">Tap Menu (⋮) atau Settings</span>
+                                </div>
+                                <div class="instruction-item">
+                                    <span class="instruction-number">3</span>
+                                    <span class="instruction-text">Pilih "Perangkat Tertaut"</span>
+                                </div>
+                                <div class="instruction-item">
+                                    <span class="instruction-number">4</span>
+                                    <span class="instruction-text">Tap "Tautkan Perangkat"</span>
+                                </div>
+                                <div class="instruction-item">
+                                    <span class="instruction-number">5</span>
+                                    <span class="instruction-text">Arahkan kamera ke QR Code</span>
+                                </div>
+                            </div>
+                            <!--end::Instructions-->
+                            
+                            <!--begin::Status-->
+                            <div id="waiting-status" class="text-center mb-6">
+                                <div class="status-badge">
+                                    <span class="spinner-border spinner-border-sm"></span>
+                                    <span>Menunggu scan QR Code...</span>
+                                </div>
+                            </div>
+                            <!--end::Status-->
+                            
+                            <!--begin::Back Button-->
+                            <button type="button" onclick="updateLoginSteps(1)" class="btn btn-light-primary w-100">
+                                <i class="fas fa-arrow-left me-2"></i>
+                                Kembali
+                            </button>
+                            <!--end::Back Button-->
+                        </div>
+                        <!--end::Step 2-->
+                        
+                        <!--begin::Step 3 - Success-->
+                        <div id="step-3-section" class="form-section">
+                            <div class="text-center py-10">
+                                <div class="success-icon">
+                                    <i class="fas fa-check text-white fs-2x"></i>
+                                </div>
+                                <h2 class="text-gray-900 fw-bold fs-2 mb-3">Berhasil Terhubung!</h2>
+                                <p class="text-gray-500 fs-6 mb-6">WhatsApp Anda berhasil terhubung.<br>Mengalihkan ke halaman utama...</p>
+                                <div class="d-flex justify-content-center">
+                                    <span class="spinner-border spinner-border-sm text-success"></span>
+                                </div>
+                            </div>
+                        </div>
+                        <!--end::Step 3-->
                         
                     </div>
-                    <!--end::Wrapper-->
+                    <!--end::Form Sections-->
+                    
                 </div>
-                <!--end::Form-->
+                <!--end::Form Card-->
                 
                 <!--begin::Footer-->
-                <div class="d-flex flex-center flex-wrap px-5">
-                    <div class="text-gray-500 fw-semibold fs-7">
-                        WhatsApp Group Exporter &copy; 2024
-                    </div>
+                <div class="text-center mt-8">
+                    <span class="text-gray-500 fs-7">WhatsApp Group Exporter &copy; 2024</span>
                 </div>
                 <!--end::Footer-->
+                
             </div>
-            <!--end::Body-->
-            
         </div>
-        <!--end::Authentication-->
+        <!--end::Right Panel-->
+        
     </div>
-    <!--end::Root-->
+    <!--end::Main Container-->
     
     <!--begin::Metronic JS-->
     <script src="/assets/plugins/global/plugins.bundle.js"></script>
@@ -374,6 +695,56 @@
     <script src="/socket.io/socket.io.js"></script>
     <script src="/frontend/assets/js/frontend.js"></script>
     <script>
+        // Override updateLoginSteps for new stepper structure
+        function updateLoginSteps(step) {
+            FrontendState.currentStep = step;
+            
+            // Update stepper items
+            const stepItems = document.querySelectorAll('.step-item');
+            const connectors = document.querySelectorAll('.step-connector');
+            
+            stepItems.forEach((item, index) => {
+                item.classList.remove('active', 'completed');
+                
+                if (index + 1 < step) {
+                    item.classList.add('completed');
+                } else if (index + 1 === step) {
+                    item.classList.add('active');
+                }
+            });
+            
+            connectors.forEach((connector, index) => {
+                connector.classList.remove('active');
+                if (index < step - 1) {
+                    connector.classList.add('active');
+                }
+            });
+            
+            // Show/hide form sections
+            document.querySelectorAll('.form-section').forEach(section => {
+                section.classList.remove('current');
+            });
+            
+            const activeSection = document.getElementById(`step-${step}-section`);
+            if (activeSection) {
+                activeSection.classList.add('current');
+            }
+            
+            // Toggle QR area visibility (Desktop)
+            const qrAreaDesktop = document.getElementById('qr-area-desktop');
+            const featuresAreaDesktop = document.getElementById('features-area-desktop');
+            
+            if (qrAreaDesktop && featuresAreaDesktop) {
+                if (step === 2) {
+                    qrAreaDesktop.style.display = 'block';
+                    featuresAreaDesktop.style.display = 'none';
+                } else {
+                    qrAreaDesktop.style.display = 'none';
+                    featuresAreaDesktop.style.display = 'block';
+                }
+            }
+        }
+        
         document.addEventListener('DOMContentLoaded', () => {
             // Check if already logged in
             const userData = localStorage.getItem('frontend_user');
