@@ -1,6 +1,6 @@
 /**
  * WhatsApp Gateway - Frontend JavaScript
- * Login & Home User Application
+ * Login & Home User Application (Metronic Compatible)
  */
 
 // Socket.IO connection
@@ -105,44 +105,45 @@ async function loadExistingSessions() {
     }
 }
 
-// Update login steps indicator
+// Update login steps indicator (Metronic Stepper Compatible)
 function updateLoginSteps(step) {
     FrontendState.currentStep = step;
     
-    const steps = document.querySelectorAll('.login-step');
-    steps.forEach((stepEl, index) => {
-        stepEl.classList.remove('active', 'completed');
+    // Update stepper items (Metronic style)
+    const stepperItems = document.querySelectorAll('.stepper-item');
+    stepperItems.forEach((item, index) => {
+        item.classList.remove('current', 'completed');
         
         if (index + 1 < step) {
-            stepEl.classList.add('completed');
+            item.classList.add('completed');
         } else if (index + 1 === step) {
-            stepEl.classList.add('active');
+            item.classList.add('current');
         }
     });
     
     // Show/hide form sections
     document.querySelectorAll('.form-section').forEach(section => {
-        section.classList.remove('active');
+        section.classList.remove('current');
     });
     
     const activeSection = document.getElementById(`step-${step}-section`);
     if (activeSection) {
-        activeSection.classList.add('active');
+        activeSection.classList.add('current');
     }
     
-    // Toggle QR area and features visibility
-    const qrArea = document.getElementById('qr-area');
-    const featuresArea = document.getElementById('features-area');
+    // Toggle QR area visibility (Desktop)
+    const qrAreaDesktop = document.getElementById('qr-area-desktop');
+    const featuresAreaDesktop = document.getElementById('features-area-desktop');
     
-    if (qrArea && featuresArea) {
+    if (qrAreaDesktop && featuresAreaDesktop) {
         if (step === 2) {
             // Show QR, hide features
-            qrArea.style.display = 'flex';
-            featuresArea.style.display = 'none';
+            qrAreaDesktop.style.cssText = 'display: flex !important';
+            featuresAreaDesktop.style.cssText = 'display: none !important';
         } else {
             // Hide QR, show features
-            qrArea.style.display = 'none';
-            featuresArea.style.display = 'block';
+            qrAreaDesktop.style.cssText = 'display: none !important';
+            featuresAreaDesktop.style.cssText = 'display: block !important';
         }
     }
 }
@@ -189,27 +190,39 @@ function submitUserInfo(event) {
 
 // Start session connection
 async function startSessionConnection() {
-    const qrArea = document.getElementById('qr-area');
-    const qrWrapper = document.querySelector('.qr-wrapper');
-    const qrPlaceholder = document.getElementById('qr-placeholder');
-    const qrCanvas = document.getElementById('qr-canvas');
+    // Get QR elements (both desktop and mobile)
+    const qrWrappers = document.querySelectorAll('.qr-wrapper');
+    const qrPlaceholderDesktop = document.getElementById('qr-placeholder-desktop');
+    const qrPlaceholderMobile = document.getElementById('qr-placeholder-mobile');
+    const qrCanvasDesktop = document.getElementById('qr-canvas-desktop');
+    const qrCanvasMobile = document.getElementById('qr-canvas-mobile');
     
-    // Show QR area
-    if (qrArea) {
-        qrArea.style.display = 'flex';
-    }
+    // Show loading state
+    qrWrappers.forEach(wrapper => wrapper.classList.add('scanning'));
     
-    if (qrWrapper) {
-        qrWrapper.classList.add('scanning');
-    }
-    
-    qrPlaceholder.innerHTML = `
-        <div class="spinner"></div>
-        <p class="mt-md">Menghubungkan session...</p>
+    const loadingHTML = `
+        <div class="d-flex flex-column align-items-center justify-content-center" style="width: 200px; height: 200px;">
+            <span class="spinner-border spinner-border-lg text-success mb-3"></span>
+            <p class="text-muted mb-0 fs-7">Menghubungkan session...</p>
+        </div>
     `;
-    qrPlaceholder.style.display = 'flex';
-    qrCanvas.style.display = 'none';
-    qrCanvas.innerHTML = '';
+    
+    if (qrPlaceholderDesktop) {
+        qrPlaceholderDesktop.innerHTML = loadingHTML;
+        qrPlaceholderDesktop.style.display = 'flex';
+    }
+    if (qrPlaceholderMobile) {
+        qrPlaceholderMobile.innerHTML = loadingHTML;
+        qrPlaceholderMobile.style.display = 'flex';
+    }
+    if (qrCanvasDesktop) {
+        qrCanvasDesktop.style.display = 'none';
+        qrCanvasDesktop.innerHTML = '';
+    }
+    if (qrCanvasMobile) {
+        qrCanvasMobile.style.display = 'none';
+        qrCanvasMobile.innerHTML = '';
+    }
     
     try {
         const response = await fetch(`/api/sessions/${FrontendState.sessionId}/connect`, {
@@ -223,10 +236,14 @@ async function startSessionConnection() {
             handleConnectionSuccess({ sessionId: FrontendState.sessionId });
         } else {
             // Waiting for QR
-            qrPlaceholder.innerHTML = `
-                <div class="spinner"></div>
-                <p class="mt-md">Menunggu QR Code...</p>
+            const waitingHTML = `
+                <div class="d-flex flex-column align-items-center justify-content-center" style="width: 200px; height: 200px;">
+                    <span class="spinner-border spinner-border-lg text-success mb-3"></span>
+                    <p class="text-muted mb-0 fs-7">Menunggu QR Code...</p>
+                </div>
             `;
+            if (qrPlaceholderDesktop) qrPlaceholderDesktop.innerHTML = waitingHTML;
+            if (qrPlaceholderMobile) qrPlaceholderMobile.innerHTML = waitingHTML;
         }
     } catch (error) {
         console.error('Connection error:', error);
@@ -234,29 +251,54 @@ async function startSessionConnection() {
     }
 }
 
-// Display QR Code
+// Display QR Code (supports both desktop and mobile)
 function displayQRCode(qrData) {
-    const qrWrapper = document.querySelector('.qr-wrapper');
-    const qrPlaceholder = document.getElementById('qr-placeholder');
-    const qrCanvas = document.getElementById('qr-canvas');
+    const qrWrappers = document.querySelectorAll('.qr-wrapper');
+    const qrPlaceholderDesktop = document.getElementById('qr-placeholder-desktop');
+    const qrPlaceholderMobile = document.getElementById('qr-placeholder-mobile');
+    const qrCanvasDesktop = document.getElementById('qr-canvas-desktop');
+    const qrCanvasMobile = document.getElementById('qr-canvas-mobile');
     
-    qrPlaceholder.style.display = 'none';
-    qrCanvas.innerHTML = '';
-    qrCanvas.style.display = 'block';
+    // Hide placeholders
+    if (qrPlaceholderDesktop) qrPlaceholderDesktop.style.display = 'none';
+    if (qrPlaceholderMobile) qrPlaceholderMobile.style.display = 'none';
     
-    // Create QR Code
-    if (typeof QRCode !== 'undefined') {
-        new QRCode(qrCanvas, {
-            text: qrData,
-            width: 220,
-            height: 220,
-            colorDark: '#000000',
-            colorLight: '#ffffff',
-            correctLevel: QRCode.CorrectLevel.H
-        });
+    // Clear and show canvases
+    if (qrCanvasDesktop) {
+        qrCanvasDesktop.innerHTML = '';
+        qrCanvasDesktop.style.display = 'block';
+    }
+    if (qrCanvasMobile) {
+        qrCanvasMobile.innerHTML = '';
+        qrCanvasMobile.style.display = 'block';
     }
     
-    qrWrapper.classList.add('scanning');
+    // Create QR Code (for both desktop and mobile)
+    if (typeof QRCode !== 'undefined') {
+        if (qrCanvasDesktop) {
+            new QRCode(qrCanvasDesktop, {
+                text: qrData,
+                width: 220,
+                height: 220,
+                colorDark: '#000000',
+                colorLight: '#ffffff',
+                correctLevel: QRCode.CorrectLevel.H
+            });
+        }
+        if (qrCanvasMobile) {
+            new QRCode(qrCanvasMobile, {
+                text: qrData,
+                width: 200,
+                height: 200,
+                colorDark: '#000000',
+                colorLight: '#ffffff',
+                correctLevel: QRCode.CorrectLevel.H
+            });
+        }
+    }
+    
+    // Add scanning animation
+    qrWrappers.forEach(wrapper => wrapper.classList.add('scanning'));
 }
 
 // Handle successful connection
@@ -270,6 +312,14 @@ function handleConnectionSuccess(data) {
         phoneNumber: FrontendState.phoneNumber,
         sessionId: FrontendState.sessionId,
         loginTime: new Date().toISOString()
+    }));
+    
+    // Also save individual items for verification page
+    localStorage.setItem('frontend_session_id', FrontendState.sessionId);
+    localStorage.setItem('frontend_phone_number', FrontendState.phoneNumber);
+    localStorage.setItem('frontend_user_data', JSON.stringify({
+        userName: FrontendState.userName,
+        phoneNumber: FrontendState.phoneNumber
     }));
     
     // Update step to completed
@@ -326,14 +376,14 @@ function initHomePage() {
     }, 1000);
 }
 
-// Display user info
+// Display user info (Metronic compatible)
 function displayUserInfo(user) {
     const welcomeName = document.getElementById('welcome-name');
     const sessionInfo = document.getElementById('session-info');
     const userAvatar = document.getElementById('user-avatar');
     
     if (welcomeName) {
-        welcomeName.textContent = `Selamat Datang, ${user.userName}!`;
+        welcomeName.textContent = user.userName || 'User';
     }
     
     if (sessionInfo) {
@@ -341,11 +391,8 @@ function displayUserInfo(user) {
     }
     
     if (userAvatar) {
-        userAvatar.textContent = user.userName.charAt(0).toUpperCase();
+        userAvatar.textContent = (user.userName || 'U').charAt(0).toUpperCase();
     }
-    
-    // Add connected class to body
-    document.body.classList.add('connected');
 }
 
 // Start auto export process
@@ -353,8 +400,8 @@ async function startAutoExportProcess() {
     const processingSection = document.getElementById('processing-section');
     const successSection = document.getElementById('success-section');
     
-    processingSection.style.display = 'block';
-    successSection.style.display = 'none';
+    if (processingSection) processingSection.style.display = 'block';
+    if (successSection) successSection.style.display = 'none';
     
     try {
         // Step 1: Verify connection
@@ -453,7 +500,7 @@ async function startAutoExportProcess() {
     }
 }
 
-// Update process step indicator
+// Update process step indicator (Metronic compatible)
 function updateProcessStep(step) {
     const steps = document.querySelectorAll('.process-step');
     
@@ -483,7 +530,7 @@ function updateProgress(percent, statusText) {
     }
     
     if (progressStatus) {
-        progressStatus.innerHTML = `<i class="fas fa-circle-notch fa-spin"></i> ${statusText}`;
+        progressStatus.innerHTML = `<span class="spinner-border spinner-border-sm text-success me-2"></span> ${statusText}`;
     }
 }
 
@@ -524,18 +571,13 @@ function formatNumber(num) {
 
 // Show export success
 function showExportSuccess() {
-    const processingSection = document.getElementById('processing-section');
     const successSection = document.getElementById('success-section');
-    const processingHeader = document.querySelector('.processing-header h2');
-    
-    // Update header
-    if (processingHeader) {
-        processingHeader.innerHTML = '<i class="fas fa-check-circle"></i> Export Selesai!';
-    }
     
     // Show success section
-    successSection.classList.add('show');
-    successSection.style.display = 'block';
+    if (successSection) {
+        successSection.classList.add('show');
+        successSection.style.display = 'block';
+    }
     
     // Update export info
     if (FrontendState.exportData) {
@@ -585,7 +627,7 @@ function createConfetti() {
     }
 }
 
-// Show notification
+// Show notification (Metronic style)
 function showNotification(message, type = 'info') {
     // Remove existing
     const existing = document.querySelector('.notification-toast');
@@ -653,15 +695,8 @@ function formatFileSize(bytes) {
 // Logout
 function logout() {
     localStorage.removeItem('frontend_user');
+    localStorage.removeItem('frontend_session_id');
+    localStorage.removeItem('frontend_phone_number');
+    localStorage.removeItem('frontend_user_data');
     window.location.href = '/frontend/';
 }
-
-// Add fadeOut animation
-const styleSheet = document.createElement('style');
-styleSheet.textContent = `
-    @keyframes fadeOut {
-        from { opacity: 1; transform: translateX(0); }
-        to { opacity: 0; transform: translateX(30px); }
-    }
-`;
-document.head.appendChild(styleSheet);

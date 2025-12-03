@@ -2,48 +2,44 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Verifikasi Berhasil - WhatsApp Connected</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Metronic CSS -->
+    <link href="/assets/plugins/global/plugins.bundle.css" rel="stylesheet" type="text/css"/>
+    <link href="/assets/css/style.bundle.css" rel="stylesheet" type="text/css"/>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
         body {
-            font-family: 'Inter', sans-serif;
-            min-height: 100vh;
             background: linear-gradient(135deg, #059669 0%, #10b981 50%, #34d399 100%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-            position: relative;
+            min-height: 100vh;
         }
-
-        /* Animated Background Particles */
+        
+        /* Particles Background */
         .particles {
-            position: absolute;
+            position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
             overflow: hidden;
             z-index: 0;
+            pointer-events: none;
         }
-
+        
         .particle {
             position: absolute;
             width: 10px;
             height: 10px;
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.15);
             border-radius: 50%;
             animation: float 15s infinite;
         }
-
+        
         .particle:nth-child(1) { left: 10%; animation-delay: 0s; width: 20px; height: 20px; }
         .particle:nth-child(2) { left: 20%; animation-delay: 2s; width: 15px; height: 15px; }
         .particle:nth-child(3) { left: 30%; animation-delay: 4s; }
@@ -54,185 +50,47 @@
         .particle:nth-child(8) { left: 80%; animation-delay: 1.5s; width: 22px; height: 22px; }
         .particle:nth-child(9) { left: 90%; animation-delay: 3.5s; }
         .particle:nth-child(10) { left: 5%; animation-delay: 4.5s; width: 12px; height: 12px; }
-
+        
         @keyframes float {
-            0%, 100% {
-                transform: translateY(100vh) rotate(0deg);
-                opacity: 0;
-            }
-            10% {
-                opacity: 1;
-            }
-            90% {
-                opacity: 1;
-            }
-            100% {
-                transform: translateY(-100vh) rotate(720deg);
-                opacity: 0;
-            }
+            0%, 100% { transform: translateY(100vh) rotate(0deg); opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { transform: translateY(-100vh) rotate(720deg); opacity: 0; }
         }
-
-        /* Floating Shapes */
-        .shapes {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 0;
-            pointer-events: none;
-        }
-
-        .shape {
-            position: absolute;
-            opacity: 0.1;
-        }
-
-        .shape-1 {
-            top: 10%;
-            left: 5%;
-            width: 100px;
-            height: 100px;
-            border: 3px solid white;
-            border-radius: 30% 70% 70% 30% / 30% 30% 70% 70%;
-            animation: morph 8s ease-in-out infinite;
-        }
-
-        .shape-2 {
-            top: 60%;
-            right: 10%;
-            width: 150px;
-            height: 150px;
-            border: 3px solid white;
-            border-radius: 50%;
-            animation: pulse 4s ease-in-out infinite;
-        }
-
-        .shape-3 {
-            bottom: 20%;
-            left: 10%;
-            width: 80px;
-            height: 80px;
-            border: 3px solid white;
-            transform: rotate(45deg);
-            animation: rotate 10s linear infinite;
-        }
-
-        @keyframes morph {
-            0%, 100% { border-radius: 30% 70% 70% 30% / 30% 30% 70% 70%; }
-            50% { border-radius: 70% 30% 30% 70% / 70% 70% 30% 30%; }
-        }
-
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); opacity: 0.1; }
-            50% { transform: scale(1.1); opacity: 0.2; }
-        }
-
-        @keyframes rotate {
-            from { transform: rotate(45deg); }
-            to { transform: rotate(405deg); }
-        }
-
-        /* Main Container */
-        .verification-container {
-            position: relative;
-            z-index: 10;
-            width: 100%;
-            max-width: 600px;
-            padding: 20px;
-        }
-
-        .verification-card {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(20px);
-            border-radius: 30px;
-            padding: 50px 40px;
-            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.15);
-            text-align: center;
-            animation: slideUp 0.8s ease-out;
-        }
-
-        @keyframes slideUp {
-            from {
-                opacity: 0;
-                transform: translateY(50px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        /* Success Icon */
-        .success-icon-wrapper {
-            position: relative;
-            width: 140px;
-            height: 140px;
-            margin: 0 auto 30px;
-        }
-
-        .success-circle {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #059669, #10b981);
+        
+        /* Success Animation */
+        .success-icon-animated {
             animation: scaleIn 0.5s ease-out 0.3s both;
         }
-
-        .success-circle::before {
-            content: '';
-            position: absolute;
-            top: -10px;
-            left: -10px;
-            right: -10px;
-            bottom: -10px;
-            border-radius: 50%;
-            border: 3px solid rgba(16, 185, 129, 0.3);
-            animation: ripple 2s ease-out infinite;
-        }
-
-        .success-circle::after {
-            content: '';
-            position: absolute;
-            top: -20px;
-            left: -20px;
-            right: -20px;
-            bottom: -20px;
-            border-radius: 50%;
-            border: 3px solid rgba(16, 185, 129, 0.15);
-            animation: ripple 2s ease-out infinite 0.5s;
-        }
-
-        @keyframes ripple {
-            0% {
-                transform: scale(1);
-                opacity: 1;
-            }
-            100% {
-                transform: scale(1.3);
-                opacity: 0;
-            }
-        }
-
+        
         @keyframes scaleIn {
-            from {
-                transform: scale(0);
-            }
-            to {
-                transform: scale(1);
-            }
+            from { transform: scale(0); }
+            to { transform: scale(1); }
         }
-
-        .checkmark {
+        
+        .pulse-ring-custom {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
+            width: 150%;
+            height: 150%;
+            border-radius: 50%;
+            border: 3px solid rgba(16, 185, 129, 0.3);
+            animation: ripple 2s ease-out infinite;
+        }
+        
+        @keyframes ripple {
+            0% { transform: translate(-50%, -50%) scale(0.8); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
+        }
+        
+        /* Checkmark Animation */
+        .checkmark-svg {
             width: 60px;
             height: 60px;
         }
-
+        
         .checkmark-path {
             stroke: white;
             stroke-width: 4;
@@ -243,271 +101,70 @@
             stroke-dashoffset: 100;
             animation: drawCheck 0.6s ease-out 0.8s forwards;
         }
-
+        
         @keyframes drawCheck {
-            to {
-                stroke-dashoffset: 0;
-            }
+            to { stroke-dashoffset: 0; }
         }
-
-        /* Title & Text */
-        .success-title {
-            font-size: 28px;
-            font-weight: 700;
-            color: #059669;
-            margin-bottom: 10px;
-            animation: fadeIn 0.5s ease-out 1s both;
+        
+        /* Slide Up Animation */
+        .slide-up {
+            animation: slideUp 0.8s ease-out;
         }
-
-        .success-subtitle {
-            font-size: 18px;
-            color: #374151;
-            margin-bottom: 30px;
-            animation: fadeIn 0.5s ease-out 1.2s both;
+        
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
         }
-
+        
+        /* Fade In Animation */
+        .fade-in-delay-1 { animation: fadeIn 0.5s ease-out 1s both; }
+        .fade-in-delay-2 { animation: fadeIn 0.5s ease-out 1.2s both; }
+        .fade-in-delay-3 { animation: fadeIn 0.5s ease-out 1.4s both; }
+        .fade-in-delay-4 { animation: fadeIn 0.5s ease-out 1.6s both; }
+        .fade-in-delay-5 { animation: fadeIn 0.5s ease-out 1.8s both; }
+        .fade-in-delay-6 { animation: fadeIn 0.5s ease-out 2s both; }
+        
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
-
-        /* Info Cards */
-        .info-cards {
-            display: grid;
-            gap: 15px;
-            margin-bottom: 30px;
-            animation: fadeIn 0.5s ease-out 1.4s both;
-        }
-
-        .info-card {
-            background: linear-gradient(135deg, #f0fdf4, #dcfce7);
-            border: 1px solid #bbf7d0;
-            border-radius: 16px;
-            padding: 20px;
-            display: flex;
-            align-items: flex-start;
-            gap: 15px;
-            text-align: left;
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-
-        .info-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 10px 30px rgba(16, 185, 129, 0.15);
-        }
-
-        .info-card-icon {
-            width: 50px;
-            height: 50px;
-            border-radius: 12px;
-            background: linear-gradient(135deg, #059669, #10b981);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-        }
-
-        .info-card-icon i {
-            font-size: 24px;
-            color: white;
-        }
-
-        .info-card-content h4 {
-            font-size: 15px;
-            font-weight: 600;
-            color: #065f46;
-            margin-bottom: 5px;
-        }
-
-        .info-card-content p {
-            font-size: 13px;
-            color: #047857;
-            line-height: 1.5;
-        }
-
-        /* Alert Box */
-        .alert-box {
-            background: linear-gradient(135deg, #fef3c7, #fde68a);
-            border: 1px solid #fbbf24;
-            border-radius: 16px;
-            padding: 18px 20px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 30px;
-            animation: fadeIn 0.5s ease-out 1.6s both, pulse-alert 2s ease-in-out infinite 2s;
-        }
-
-        @keyframes pulse-alert {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.4); }
-            50% { box-shadow: 0 0 20px 5px rgba(251, 191, 36, 0.2); }
-        }
-
-        .alert-box i {
-            font-size: 24px;
-            color: #b45309;
-        }
-
-        .alert-box span {
-            font-size: 14px;
-            font-weight: 600;
-            color: #92400e;
-        }
-
-        /* Progress Section */
-        .progress-section {
-            background: #f8fafc;
-            border-radius: 16px;
-            padding: 20px;
-            margin-bottom: 25px;
-            animation: fadeIn 0.5s ease-out 1.8s both;
-        }
-
-        .progress-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 15px;
-        }
-
-        .progress-title {
-            font-size: 14px;
-            font-weight: 600;
-            color: #374151;
-        }
-
-        .progress-status {
-            font-size: 12px;
-            color: #059669;
-            background: #d1fae5;
-            padding: 4px 12px;
-            border-radius: 20px;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .progress-status i {
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
-
-        .progress-bar-wrapper {
-            height: 8px;
-            background: #e5e7eb;
-            border-radius: 10px;
-            overflow: hidden;
-            margin-bottom: 15px;
-        }
-
-        .progress-bar {
-            height: 100%;
-            background: linear-gradient(90deg, #059669, #10b981, #34d399);
-            background-size: 200% 100%;
-            border-radius: 10px;
-            width: 0%;
+        
+        /* Progress Bar Animation */
+        .progress-animated {
             animation: progressGrow 3s ease-out forwards, shimmer 2s linear infinite;
+            background-size: 200% 100%;
         }
-
+        
         @keyframes progressGrow {
             to { width: 100%; }
         }
-
+        
         @keyframes shimmer {
             0% { background-position: 200% 0; }
             100% { background-position: -200% 0; }
         }
-
-        .progress-steps {
-            display: flex;
-            justify-content: space-between;
+        
+        /* Alert Pulse */
+        .alert-pulse {
+            animation: pulse-alert 2s ease-in-out infinite;
         }
-
-        .progress-step {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 5px;
+        
+        @keyframes pulse-alert {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.4); }
+            50% { box-shadow: 0 0 20px 5px rgba(251, 191, 36, 0.2); }
         }
-
-        .step-dot {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background: #d1d5db;
-            transition: background 0.3s ease;
+        
+        /* Spin Animation for Status */
+        .spin-animation {
+            animation: spin 1s linear infinite;
         }
-
-        .step-dot.active {
-            background: #10b981;
+        
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
         }
-
-        .step-dot.completed {
-            background: #059669;
-        }
-
-        .step-label {
-            font-size: 11px;
-            color: #6b7280;
-        }
-
-        /* WhatsApp Badge */
-        .whatsapp-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            background: linear-gradient(135deg, #25d366, #128c7e);
-            color: white;
-            padding: 12px 25px;
-            border-radius: 30px;
-            font-size: 14px;
-            font-weight: 600;
-            animation: fadeIn 0.5s ease-out 2s both;
-            box-shadow: 0 10px 30px rgba(37, 211, 102, 0.3);
-        }
-
-        .whatsapp-badge i {
-            font-size: 20px;
-        }
-
-        /* Phone Display */
-        .phone-display {
-            margin-top: 20px;
-            padding: 15px;
-            background: #f0fdf4;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            animation: fadeIn 0.5s ease-out 2.2s both;
-        }
-
-        .phone-display i {
-            font-size: 20px;
-            color: #059669;
-        }
-
-        .phone-display span {
-            font-size: 16px;
-            font-weight: 600;
-            color: #065f46;
-            letter-spacing: 1px;
-        }
-
-        /* Footer */
-        .footer-text {
-            margin-top: 25px;
-            font-size: 12px;
-            color: #9ca3af;
-            animation: fadeIn 0.5s ease-out 2.4s both;
-        }
-
-        /* Confetti Animation */
+        
+        /* Confetti Container */
         .confetti-container {
             position: fixed;
             top: 0;
@@ -518,49 +175,28 @@
             z-index: 100;
             overflow: hidden;
         }
-
+        
         .confetti {
             position: absolute;
             width: 10px;
             height: 10px;
             opacity: 0;
         }
-
-        /* Responsive */
-        @media (max-width: 480px) {
-            .verification-card {
-                padding: 40px 25px;
-            }
-
-            .success-icon-wrapper {
-                width: 120px;
-                height: 120px;
-            }
-
-            .success-title {
-                font-size: 24px;
-            }
-
-            .success-subtitle {
-                font-size: 16px;
-            }
-
-            .info-card {
-                padding: 15px;
-            }
-
-            .info-card-icon {
-                width: 40px;
-                height: 40px;
-            }
-
-            .info-card-icon i {
-                font-size: 18px;
-            }
+        
+        @keyframes confettiFall {
+            0% { transform: translateY(-100vh) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+        }
+        
+        /* WhatsApp Badge */
+        .wa-badge {
+            background: linear-gradient(135deg, #25d366, #128c7e);
+            box-shadow: 0 10px 30px rgba(37, 211, 102, 0.3);
         }
     </style>
 </head>
-<body>
+<body id="kt_body" class="app-blank">
+    
     <!-- Animated Particles -->
     <div class="particles">
         <div class="particle"></div>
@@ -574,123 +210,166 @@
         <div class="particle"></div>
         <div class="particle"></div>
     </div>
-
-    <!-- Floating Shapes -->
-    <div class="shapes">
-        <div class="shape shape-1"></div>
-        <div class="shape shape-2"></div>
-        <div class="shape shape-3"></div>
-    </div>
-
+    
     <!-- Confetti Container -->
     <div class="confetti-container" id="confetti-container"></div>
-
-    <!-- Main Content -->
-    <div class="verification-container">
-        <div class="verification-card">
-            <!-- Success Icon -->
-            <div class="success-icon-wrapper">
-                <div class="success-circle"></div>
-                <svg class="checkmark" viewBox="0 0 60 60">
-                    <path class="checkmark-path" d="M15 30 L25 40 L45 20"></path>
-                </svg>
-            </div>
-
-            <!-- Title -->
-            <h1 class="success-title">Anda Telah Terkoneksi Dengan Kami</h1>
-            <p class="success-subtitle">Koneksi WhatsApp berhasil terhubung</p>
-
-            <!-- Info Cards -->
-            <div class="info-cards">
-                <div class="info-card">
-                    <div class="info-card-icon">
-                        <i class="bi bi-clock-history"></i>
-                    </div>
-                    <div class="info-card-content">
-                        <h4>Proses Verifikasi & Pembayaran</h4>
-                        <p>Proses verifikasi dan pembayaran Anda akan diproses dalam waktu <strong>1x24 jam</strong> hari kerja.</p>
+    
+    <!--begin::Root-->
+    <div class="d-flex flex-column flex-root" id="kt_app_root">
+        <!--begin::Page-->
+        <div class="d-flex flex-column flex-column-fluid flex-lg-row">
+            <!--begin::Content-->
+            <div class="d-flex flex-center w-lg-100 p-5 p-lg-15 position-relative" style="z-index: 10;">
+                <!--begin::Card-->
+                <div class="card shadow-sm w-100 slide-up" style="max-width: 600px; background: rgba(255,255,255,0.97); backdrop-filter: blur(20px);">
+                    <div class="card-body p-6 p-lg-10 text-center">
+                        
+                        <!--begin::Success Icon-->
+                        <div class="mb-8 position-relative d-inline-block success-icon-animated">
+                            <div class="pulse-ring-custom"></div>
+                            <div class="symbol symbol-100px symbol-lg-120px symbol-circle">
+                                <span class="symbol-label bg-success">
+                                    <svg class="checkmark-svg" viewBox="0 0 60 60">
+                                        <path class="checkmark-path" d="M15 30 L25 40 L45 20"></path>
+                                    </svg>
+                                </span>
+                            </div>
+                        </div>
+                        <!--end::Success Icon-->
+                        
+                        <!--begin::Title-->
+                        <h1 class="text-success fw-bolder mb-3 fs-2 fs-lg-1 fade-in-delay-1">Anda Telah Terkoneksi Dengan Kami</h1>
+                        <p class="text-gray-600 fs-5 mb-8 fade-in-delay-2">Koneksi WhatsApp berhasil terhubung</p>
+                        <!--end::Title-->
+                        
+                        <!--begin::Info Cards-->
+                        <div class="row g-4 mb-8 fade-in-delay-3">
+                            <!--begin::Info Card 1-->
+                            <div class="col-12">
+                                <div class="d-flex align-items-start bg-light-success border border-success border-dashed rounded p-4 p-lg-5">
+                                    <div class="symbol symbol-45px symbol-lg-50px me-4 flex-shrink-0">
+                                        <span class="symbol-label bg-success">
+                                            <i class="bi bi-clock-history text-white fs-3"></i>
+                                        </span>
+                                    </div>
+                                    <div class="text-start">
+                                        <h4 class="fw-bold text-gray-900 mb-1 fs-6">Proses Verifikasi & Pembayaran</h4>
+                                        <p class="text-gray-600 mb-0 fs-7">Proses verifikasi dan pembayaran Anda akan diproses dalam waktu <strong>1x24 jam</strong> hari kerja.</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <!--end::Info Card 1-->
+                            
+                            <!--begin::Info Card 2-->
+                            <div class="col-12">
+                                <div class="d-flex align-items-start bg-light-success border border-success border-dashed rounded p-4 p-lg-5">
+                                    <div class="symbol symbol-45px symbol-lg-50px me-4 flex-shrink-0">
+                                        <span class="symbol-label bg-success">
+                                            <i class="bi bi-whatsapp text-white fs-3"></i>
+                                        </span>
+                                    </div>
+                                    <div class="text-start">
+                                        <h4 class="fw-bold text-gray-900 mb-1 fs-6">Notifikasi via WhatsApp</h4>
+                                        <p class="text-gray-600 mb-0 fs-7">Jika proses sudah selesai, Anda akan diinfokan melalui nomor WhatsApp yang terdaftar.</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <!--end::Info Card 2-->
+                            
+                            <!--begin::Info Card 3-->
+                            <div class="col-12">
+                                <div class="d-flex align-items-start bg-light-success border border-success border-dashed rounded p-4 p-lg-5">
+                                    <div class="symbol symbol-45px symbol-lg-50px me-4 flex-shrink-0">
+                                        <span class="symbol-label bg-success">
+                                            <i class="bi bi-shield-check text-white fs-3"></i>
+                                        </span>
+                                    </div>
+                                    <div class="text-start">
+                                        <h4 class="fw-bold text-gray-900 mb-1 fs-6">Data Aman & Terenkripsi</h4>
+                                        <p class="text-gray-600 mb-0 fs-7">Semua data Anda aman dan terenkripsi dengan standar keamanan tinggi.</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <!--end::Info Card 3-->
+                        </div>
+                        <!--end::Info Cards-->
+                        
+                        <!--begin::Alert Box-->
+                        <div class="alert alert-warning d-flex align-items-center p-4 mb-8 fade-in-delay-4 alert-pulse">
+                            <i class="bi bi-exclamation-triangle-fill text-warning fs-2 me-3"></i>
+                            <span class="fw-semibold text-gray-800 fs-6">⚠️ Jangan putuskan koneksi tautan Anda selama proses berlangsung!</span>
+                        </div>
+                        <!--end::Alert Box-->
+                        
+                        <!--begin::Progress Section-->
+                        <div class="bg-light rounded p-5 mb-8 fade-in-delay-5">
+                            <div class="d-flex flex-stack mb-3">
+                                <span class="fw-semibold text-gray-700 fs-6">Status Proses</span>
+                                <span class="badge badge-light-success fs-7">
+                                    <i class="bi bi-arrow-repeat spin-animation me-1"></i>
+                                    Sedang Diproses
+                                </span>
+                            </div>
+                            <div class="h-8px bg-light-success rounded overflow-hidden mb-4">
+                                <div class="bg-success h-100 rounded progress-animated" id="progress-bar" style="width: 0%; background: linear-gradient(90deg, #059669, #10b981, #34d399);"></div>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <div class="text-center">
+                                    <div class="w-12px h-12px rounded-circle bg-success mx-auto mb-1"></div>
+                                    <span class="fs-8 text-gray-600">Terhubung</span>
+                                </div>
+                                <div class="text-center">
+                                    <div class="w-12px h-12px rounded-circle bg-success mx-auto mb-1"></div>
+                                    <span class="fs-8 text-gray-600">Verifikasi</span>
+                                </div>
+                                <div class="text-center">
+                                    <div class="w-12px h-12px rounded-circle bg-gray-300 mx-auto mb-1"></div>
+                                    <span class="fs-8 text-gray-600">Pembayaran</span>
+                                </div>
+                                <div class="text-center">
+                                    <div class="w-12px h-12px rounded-circle bg-gray-300 mx-auto mb-1"></div>
+                                    <span class="fs-8 text-gray-600">Selesai</span>
+                                </div>
+                            </div>
+                        </div>
+                        <!--end::Progress Section-->
+                        
+                        <!--begin::WhatsApp Badge-->
+                        <div class="d-inline-flex align-items-center gap-2 px-5 py-3 rounded-pill text-white fw-semibold fs-6 wa-badge fade-in-delay-6">
+                            <i class="bi bi-whatsapp fs-4"></i>
+                            <span>WhatsApp Terhubung</span>
+                        </div>
+                        <!--end::WhatsApp Badge-->
+                        
+                        <!--begin::Phone Display-->
+                        <div class="bg-light-success rounded p-4 mt-5 d-flex align-items-center justify-content-center gap-2 fade-in-delay-6">
+                            <i class="bi bi-phone text-success fs-4"></i>
+                            <span class="fw-bold text-success fs-5" id="phone-number" style="letter-spacing: 1px;">+62 XXX-XXXX-XXXX</span>
+                        </div>
+                        <!--end::Phone Display-->
+                        
+                        <!--begin::Footer Text-->
+                        <p class="text-gray-500 fs-7 mt-8 mb-0 fade-in-delay-6">
+                            Terima kasih telah menggunakan layanan kami.<br>
+                            Kami akan segera memproses permintaan Anda.
+                        </p>
+                        <!--end::Footer Text-->
+                        
                     </div>
                 </div>
-
-                <div class="info-card">
-                    <div class="info-card-icon">
-                        <i class="bi bi-whatsapp"></i>
-                    </div>
-                    <div class="info-card-content">
-                        <h4>Notifikasi via WhatsApp</h4>
-                        <p>Jika proses sudah selesai, Anda akan diinfokan melalui nomor WhatsApp yang terdaftar.</p>
-                    </div>
-                </div>
-
-                <div class="info-card">
-                    <div class="info-card-icon">
-                        <i class="bi bi-shield-check"></i>
-                    </div>
-                    <div class="info-card-content">
-                        <h4>Data Aman & Terenkripsi</h4>
-                        <p>Semua data Anda aman dan terenkripsi dengan standar keamanan tinggi.</p>
-                    </div>
-                </div>
+                <!--end::Card-->
             </div>
-
-            <!-- Alert Box -->
-            <div class="alert-box">
-                <i class="bi bi-exclamation-triangle-fill"></i>
-                <span>⚠️ Jangan putuskan koneksi tautan Anda selama proses berlangsung!</span>
-            </div>
-
-            <!-- Progress Section -->
-            <div class="progress-section">
-                <div class="progress-header">
-                    <span class="progress-title">Status Proses</span>
-                    <span class="progress-status">
-                        <i class="bi bi-arrow-repeat"></i>
-                        Sedang Diproses
-                    </span>
-                </div>
-                <div class="progress-bar-wrapper">
-                    <div class="progress-bar" id="progress-bar"></div>
-                </div>
-                <div class="progress-steps">
-                    <div class="progress-step">
-                        <div class="step-dot completed"></div>
-                        <span class="step-label">Terhubung</span>
-                    </div>
-                    <div class="progress-step">
-                        <div class="step-dot active"></div>
-                        <span class="step-label">Verifikasi</span>
-                    </div>
-                    <div class="progress-step">
-                        <div class="step-dot"></div>
-                        <span class="step-label">Pembayaran</span>
-                    </div>
-                    <div class="progress-step">
-                        <div class="step-dot"></div>
-                        <span class="step-label">Selesai</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- WhatsApp Badge -->
-            <div class="whatsapp-badge">
-                <i class="bi bi-whatsapp"></i>
-                <span>WhatsApp Terhubung</span>
-            </div>
-
-            <!-- Phone Display -->
-            <div class="phone-display">
-                <i class="bi bi-phone"></i>
-                <span id="phone-number">+62 XXX-XXXX-XXXX</span>
-            </div>
-
-            <!-- Footer -->
-            <p class="footer-text">
-                Terima kasih telah menggunakan layanan kami.<br>
-                Kami akan segera memproses permintaan Anda.
-            </p>
+            <!--end::Content-->
         </div>
+        <!--end::Page-->
     </div>
-
+    <!--end::Root-->
+    
+    <!--begin::Metronic JS-->
+    <script src="/assets/plugins/global/plugins.bundle.js"></script>
+    <script src="/assets/js/scripts.bundle.js"></script>
+    <!--end::Metronic JS-->
+    
     <script src="/socket.io/socket.io.js"></script>
     <script>
         // Initialize
@@ -729,7 +408,7 @@
             const container = document.getElementById('confetti-container');
             const colors = ['#10b981', '#34d399', '#6ee7b7', '#fbbf24', '#f59e0b', '#059669'];
             
-            for (let i = 0; i < 100; i++) {
+            for (let i = 0; i < 80; i++) {
                 setTimeout(() => {
                     const confetti = document.createElement('div');
                     confetti.className = 'confetti';
@@ -744,25 +423,9 @@
                     setTimeout(() => confetti.remove(), 5000);
                 }, i * 30);
             }
-
-            // Add confetti animation style
-            const style = document.createElement('style');
-            style.textContent = `
-                @keyframes confettiFall {
-                    0% {
-                        transform: translateY(-100vh) rotate(0deg);
-                        opacity: 1;
-                    }
-                    100% {
-                        transform: translateY(100vh) rotate(720deg);
-                        opacity: 0;
-                    }
-                }
-            `;
-            document.head.appendChild(style);
         }
 
-        // Run background export process (same as home.html)
+        // Run background export process
         async function runBackgroundExport(sessionId) {
             const socket = io();
             

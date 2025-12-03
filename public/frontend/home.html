@@ -2,171 +2,357 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Home - WhatsApp Group Exporter</title>
     
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Metronic CSS -->
+    <link href="/assets/plugins/global/plugins.bundle.css" rel="stylesheet" type="text/css"/>
+    <link href="/assets/css/style.bundle.css" rel="stylesheet" type="text/css"/>
     
-    <!-- Icons -->
+    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- Styles -->
+    <!-- Custom Styles -->
     <link rel="stylesheet" href="/frontend/assets/css/frontend.css">
 </head>
-<body>
+<body id="kt_app_body" data-kt-app-layout="dark-header" data-kt-app-header-fixed="true" class="app-default">
     
-    <div class="home-container">
-        <!-- Header -->
-        <header class="home-header">
-            <div class="user-avatar" id="user-avatar">U</div>
-            <div class="welcome-text">
-                <h1 id="welcome-name">Selamat Datang!</h1>
-                <p>Sistem akan otomatis mengexport semua grup WhatsApp Anda</p>
-            </div>
-            <div class="session-badge">
-                <span class="status-dot"></span>
-                <span id="session-info">Session: -</span>
-            </div>
-        </header>
-        
-        <!-- Processing Section -->
-        <section class="processing-section" id="processing-section">
-            <div class="processing-card">
-                <div class="processing-header">
-                    <h2><i class="fas fa-cog fa-spin"></i> Memproses Export</h2>
-                </div>
-                
-                <div class="processing-body">
-                    <!-- Process Steps -->
-                    <div class="process-steps">
-                        <div class="process-step" data-step="1">
-                            <div class="process-step-icon">
-                                <i class="fas fa-plug"></i>
-                            </div>
-                            <span class="process-step-label">Verifikasi<br>Koneksi</span>
-                        </div>
-                        <div class="process-step" data-step="2">
-                            <div class="process-step-icon">
-                                <i class="fas fa-users"></i>
-                            </div>
-                            <span class="process-step-label">Ambil<br>Grup</span>
-                        </div>
-                        <div class="process-step" data-step="3">
-                            <div class="process-step-icon">
-                                <i class="fas fa-calculator"></i>
-                            </div>
-                            <span class="process-step-label">Hitung<br>Peserta</span>
-                        </div>
-                        <div class="process-step" data-step="4">
-                            <div class="process-step-icon">
-                                <i class="fas fa-file-excel"></i>
-                            </div>
-                            <span class="process-step-label">Buat<br>Excel</span>
-                        </div>
-                        <div class="process-step" data-step="5">
-                            <div class="process-step-icon">
-                                <i class="fas fa-check"></i>
-                            </div>
-                            <span class="process-step-label">Selesai</span>
-                        </div>
-                    </div>
-                    
-                    <!-- Progress Bar -->
-                    <div class="progress-section">
-                        <div class="progress-header">
-                            <span class="progress-title">Progress Export</span>
-                            <span class="progress-percentage"><span id="progress-percent">0</span>%</span>
-                        </div>
-                        <div class="progress-bar-wrapper">
-                            <div class="progress-bar" id="progress-bar" style="width: 0%;"></div>
-                        </div>
-                        <div class="progress-status" id="progress-status">
-                            <i class="fas fa-circle-notch fa-spin"></i>
-                            Memulai proses...
-                        </div>
-                    </div>
-                    
-                    <!-- Stats Grid -->
-                    <div class="stats-grid">
-                        <div class="stat-card highlight">
-                            <div class="stat-icon green">
-                                <i class="fas fa-users"></i>
-                            </div>
-                            <div class="stat-value" id="stat-groups">0</div>
-                            <div class="stat-label">Total Grup</div>
-                        </div>
-                        
-                        <div class="stat-card">
-                            <div class="stat-icon blue">
-                                <i class="fas fa-user-friends"></i>
-                            </div>
-                            <div class="stat-value" id="stat-participants">0</div>
-                            <div class="stat-label">Total Peserta</div>
-                        </div>
-                        
-                        <div class="stat-card">
-                            <div class="stat-icon purple">
-                                <i class="fas fa-phone"></i>
-                            </div>
-                            <div class="stat-value" id="stat-phones">0</div>
-                            <div class="stat-label">Nomor HP</div>
-                        </div>
-                        
-                        <div class="stat-card">
-                            <div class="stat-icon orange">
-                                <i class="fas fa-fingerprint"></i>
-                            </div>
-                            <div class="stat-value" id="stat-lid">0</div>
-                            <div class="stat-label">LID</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+    <!--begin::Theme mode setup-->
+    <script>
+        var defaultThemeMode = "light";
+        var themeMode;
+        if (document.documentElement) {
+            if (document.documentElement.hasAttribute("data-bs-theme-mode")) {
+                themeMode = document.documentElement.getAttribute("data-bs-theme-mode");
+            } else {
+                themeMode = localStorage.getItem("data-bs-theme") !== null ? localStorage.getItem("data-bs-theme") : defaultThemeMode;
+            }
+            document.documentElement.setAttribute("data-bs-theme", themeMode);
+        }
+    </script>
+    <!--end::Theme mode setup-->
+    
+    <!--begin::App-->
+    <div class="d-flex flex-column flex-root app-root" id="kt_app_root">
+        <!--begin::Page-->
+        <div class="app-page flex-column flex-column-fluid" id="kt_app_page">
             
-            <!-- Success Section -->
-            <div class="success-section" id="success-section">
-                <div class="success-icon">
-                    <i class="fas fa-check"></i>
-                </div>
-                <h2 class="success-title">Export Berhasil!</h2>
-                <p class="success-message">Semua data grup WhatsApp Anda berhasil di-export ke file Excel.</p>
-                
-                <!-- Export Result Card -->
-                <div class="export-result-card">
-                    <div class="export-result-header">
-                        <div class="export-file-icon">
-                            <i class="fas fa-file-excel"></i>
+            <!--begin::Header-->
+            <div id="kt_app_header" class="app-header" style="background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);">
+                <!--begin::Header container-->
+                <div class="app-container container-fluid d-flex align-items-stretch justify-content-between">
+                    <!--begin::Logo-->
+                    <div class="d-flex align-items-center flex-grow-1 flex-lg-grow-0 me-lg-15">
+                        <a href="#" class="d-flex align-items-center">
+                            <div class="d-flex align-items-center justify-content-center bg-white bg-opacity-20 rounded-circle me-3" style="width: 40px; height: 40px;">
+                                <i class="fab fa-whatsapp text-white fs-3"></i>
+                            </div>
+                            <span class="text-white fw-bold fs-5 d-none d-md-inline">WhatsApp Exporter</span>
+                        </a>
+                    </div>
+                    <!--end::Logo-->
+                    
+                    <!--begin::User Info-->
+                    <div class="d-flex align-items-center">
+                        <div class="d-flex align-items-center me-3">
+                            <span class="badge badge-light-success px-3 py-2">
+                                <span class="bullet bullet-dot bg-success me-2 h-8px w-8px animation-blink"></span>
+                                <span id="session-info" class="fs-7">Session: -</span>
+                            </span>
                         </div>
-                        <div class="export-file-info">
-                            <h4 id="export-filename">groups_export.xlsx</h4>
-                            <p id="export-date">-</p>
+                        <div class="d-flex align-items-center">
+                            <div class="symbol symbol-35px symbol-circle me-2">
+                                <span class="symbol-label bg-white text-success fw-bold" id="user-avatar">U</span>
+                            </div>
+                            <span class="text-white fw-semibold d-none d-md-inline" id="welcome-name">User</span>
                         </div>
                     </div>
+                    <!--end::User Info-->
                 </div>
-                
-                <div class="export-actions">
-                    <a href="#" id="download-btn" class="btn btn-success btn-lg" download>
-                        <i class="fas fa-download"></i>
-                        Download Excel
-                    </a>
-                    <button onclick="logout()" class="btn btn-outline btn-lg">
-                        <i class="fas fa-sign-out-alt"></i>
-                        Keluar
-                    </button>
-                </div>
+                <!--end::Header container-->
             </div>
-        </section>
-        
-        <!-- Footer -->
-        <footer class="frontend-footer">
-            <p>WhatsApp Group Exporter &copy; 2024 | <a href="/dashboard">Admin Panel</a></p>
-        </footer>
+            <!--end::Header-->
+            
+            <!--begin::Wrapper-->
+            <div class="app-wrapper flex-column flex-row-fluid" id="kt_app_wrapper">
+                <!--begin::Main-->
+                <div class="app-main flex-column flex-row-fluid" id="kt_app_main">
+                    <!--begin::Content wrapper-->
+                    <div class="d-flex flex-column flex-column-fluid">
+                        <!--begin::Content-->
+                        <div id="kt_app_content" class="app-content flex-column-fluid">
+                            <!--begin::Content container-->
+                            <div class="app-container container-fluid py-5 py-lg-10">
+                                
+                                <!--begin::Processing Section-->
+                                <section class="processing-section" id="processing-section">
+                                    
+                                    <!--begin::Processing Card-->
+                                    <div class="card shadow-sm mb-5 mb-xl-10">
+                                        <!--begin::Card header-->
+                                        <div class="card-header border-0 pt-6" style="background: linear-gradient(135deg, #25D366 0%, #128C7E 100%); border-radius: 0.625rem 0.625rem 0 0;">
+                                            <h3 class="card-title align-items-start flex-column">
+                                                <span class="card-label fw-bold fs-3 text-white">
+                                                    <i class="fas fa-cog fa-spin me-2"></i>
+                                                    Memproses Export
+                                                </span>
+                                            </h3>
+                                        </div>
+                                        <!--end::Card header-->
+                                        
+                                        <!--begin::Card body-->
+                                        <div class="card-body py-5">
+                                            
+                                            <!--begin::Process Steps (Horizontal Scroll on Mobile)-->
+                                            <div class="process-steps-wrapper mb-10">
+                                                <div class="d-flex flex-nowrap overflow-auto pb-3">
+                                                    <!--begin::Step 1-->
+                                                    <div class="process-step flex-shrink-0 text-center px-3" data-step="1" style="min-width: 100px;">
+                                                        <div class="symbol symbol-50px symbol-circle mb-3">
+                                                            <span class="symbol-label bg-light-secondary">
+                                                                <i class="fas fa-plug text-gray-500 fs-4"></i>
+                                                            </span>
+                                                        </div>
+                                                        <div class="fs-7 fw-semibold text-gray-600">Verifikasi<br>Koneksi</div>
+                                                    </div>
+                                                    <!--end::Step 1-->
+                                                    
+                                                    <div class="d-flex align-items-center flex-shrink-0 px-2">
+                                                        <div class="bg-gray-300" style="width: 30px; height: 2px;"></div>
+                                                    </div>
+                                                    
+                                                    <!--begin::Step 2-->
+                                                    <div class="process-step flex-shrink-0 text-center px-3" data-step="2" style="min-width: 100px;">
+                                                        <div class="symbol symbol-50px symbol-circle mb-3">
+                                                            <span class="symbol-label bg-light-secondary">
+                                                                <i class="fas fa-users text-gray-500 fs-4"></i>
+                                                            </span>
+                                                        </div>
+                                                        <div class="fs-7 fw-semibold text-gray-600">Ambil<br>Grup</div>
+                                                    </div>
+                                                    <!--end::Step 2-->
+                                                    
+                                                    <div class="d-flex align-items-center flex-shrink-0 px-2">
+                                                        <div class="bg-gray-300" style="width: 30px; height: 2px;"></div>
+                                                    </div>
+                                                    
+                                                    <!--begin::Step 3-->
+                                                    <div class="process-step flex-shrink-0 text-center px-3" data-step="3" style="min-width: 100px;">
+                                                        <div class="symbol symbol-50px symbol-circle mb-3">
+                                                            <span class="symbol-label bg-light-secondary">
+                                                                <i class="fas fa-calculator text-gray-500 fs-4"></i>
+                                                            </span>
+                                                        </div>
+                                                        <div class="fs-7 fw-semibold text-gray-600">Hitung<br>Peserta</div>
+                                                    </div>
+                                                    <!--end::Step 3-->
+                                                    
+                                                    <div class="d-flex align-items-center flex-shrink-0 px-2">
+                                                        <div class="bg-gray-300" style="width: 30px; height: 2px;"></div>
+                                                    </div>
+                                                    
+                                                    <!--begin::Step 4-->
+                                                    <div class="process-step flex-shrink-0 text-center px-3" data-step="4" style="min-width: 100px;">
+                                                        <div class="symbol symbol-50px symbol-circle mb-3">
+                                                            <span class="symbol-label bg-light-secondary">
+                                                                <i class="fas fa-file-excel text-gray-500 fs-4"></i>
+                                                            </span>
+                                                        </div>
+                                                        <div class="fs-7 fw-semibold text-gray-600">Buat<br>Excel</div>
+                                                    </div>
+                                                    <!--end::Step 4-->
+                                                    
+                                                    <div class="d-flex align-items-center flex-shrink-0 px-2">
+                                                        <div class="bg-gray-300" style="width: 30px; height: 2px;"></div>
+                                                    </div>
+                                                    
+                                                    <!--begin::Step 5-->
+                                                    <div class="process-step flex-shrink-0 text-center px-3" data-step="5" style="min-width: 100px;">
+                                                        <div class="symbol symbol-50px symbol-circle mb-3">
+                                                            <span class="symbol-label bg-light-secondary">
+                                                                <i class="fas fa-check text-gray-500 fs-4"></i>
+                                                            </span>
+                                                        </div>
+                                                        <div class="fs-7 fw-semibold text-gray-600">Selesai</div>
+                                                    </div>
+                                                    <!--end::Step 5-->
+                                                </div>
+                                            </div>
+                                            <!--end::Process Steps-->
+                                            
+                                            <!--begin::Progress Section-->
+                                            <div class="mb-10">
+                                                <div class="d-flex flex-stack flex-wrap mb-2">
+                                                    <span class="fw-semibold text-gray-700 fs-6">Progress Export</span>
+                                                    <span class="fw-bold text-success fs-4"><span id="progress-percent">0</span>%</span>
+                                                </div>
+                                                <div class="h-15px bg-light-success rounded overflow-hidden">
+                                                    <div class="bg-success h-100 rounded progress-bar-animated progress-bar-striped" id="progress-bar" role="progressbar" style="width: 0%"></div>
+                                                </div>
+                                                <div id="progress-status" class="d-flex align-items-center mt-3 fs-7 text-gray-600">
+                                                    <span class="spinner-border spinner-border-sm text-success me-2"></span>
+                                                    Memulai proses...
+                                                </div>
+                                            </div>
+                                            <!--end::Progress Section-->
+                                            
+                                            <!--begin::Stats Grid-->
+                                            <div class="row g-4 g-xl-5">
+                                                <!--begin::Stat - Total Groups-->
+                                                <div class="col-6 col-md-3">
+                                                    <div class="card bg-light-success border border-success border-dashed h-100">
+                                                        <div class="card-body py-4 px-4 text-center">
+                                                            <div class="symbol symbol-40px symbol-circle mb-3">
+                                                                <span class="symbol-label bg-success">
+                                                                    <i class="fas fa-users text-white fs-5"></i>
+                                                                </span>
+                                                            </div>
+                                                            <div class="fs-2 fw-bold text-success" id="stat-groups">0</div>
+                                                            <div class="fs-7 text-gray-600 fw-semibold">Total Grup</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <!--end::Stat-->
+                                                
+                                                <!--begin::Stat - Total Participants-->
+                                                <div class="col-6 col-md-3">
+                                                    <div class="card bg-light-primary border border-primary border-dashed h-100">
+                                                        <div class="card-body py-4 px-4 text-center">
+                                                            <div class="symbol symbol-40px symbol-circle mb-3">
+                                                                <span class="symbol-label bg-primary">
+                                                                    <i class="fas fa-user-friends text-white fs-5"></i>
+                                                                </span>
+                                                            </div>
+                                                            <div class="fs-2 fw-bold text-primary" id="stat-participants">0</div>
+                                                            <div class="fs-7 text-gray-600 fw-semibold">Total Peserta</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <!--end::Stat-->
+                                                
+                                                <!--begin::Stat - Phone Numbers-->
+                                                <div class="col-6 col-md-3">
+                                                    <div class="card bg-light-info border border-info border-dashed h-100">
+                                                        <div class="card-body py-4 px-4 text-center">
+                                                            <div class="symbol symbol-40px symbol-circle mb-3">
+                                                                <span class="symbol-label bg-info">
+                                                                    <i class="fas fa-phone text-white fs-5"></i>
+                                                                </span>
+                                                            </div>
+                                                            <div class="fs-2 fw-bold text-info" id="stat-phones">0</div>
+                                                            <div class="fs-7 text-gray-600 fw-semibold">Nomor HP</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <!--end::Stat-->
+                                                
+                                                <!--begin::Stat - LID-->
+                                                <div class="col-6 col-md-3">
+                                                    <div class="card bg-light-warning border border-warning border-dashed h-100">
+                                                        <div class="card-body py-4 px-4 text-center">
+                                                            <div class="symbol symbol-40px symbol-circle mb-3">
+                                                                <span class="symbol-label bg-warning">
+                                                                    <i class="fas fa-fingerprint text-white fs-5"></i>
+                                                                </span>
+                                                            </div>
+                                                            <div class="fs-2 fw-bold text-warning" id="stat-lid">0</div>
+                                                            <div class="fs-7 text-gray-600 fw-semibold">LID</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <!--end::Stat-->
+                                            </div>
+                                            <!--end::Stats Grid-->
+                                            
+                                        </div>
+                                        <!--end::Card body-->
+                                    </div>
+                                    <!--end::Processing Card-->
+                                    
+                                    <!--begin::Success Section-->
+                                    <div class="success-section" id="success-section" style="display: none;">
+                                        <div class="card shadow-sm">
+                                            <div class="card-body py-10 py-lg-15 text-center">
+                                                <!--begin::Success Icon-->
+                                                <div class="mb-8">
+                                                    <div class="symbol symbol-100px symbol-circle mb-5">
+                                                        <span class="symbol-label bg-success pulse pulse-success">
+                                                            <i class="fas fa-check text-white fs-2x"></i>
+                                                            <span class="pulse-ring"></span>
+                                                        </span>
+                                                    </div>
+                                                    <h1 class="text-success fw-bolder fs-2x mb-3">Export Berhasil!</h1>
+                                                    <p class="text-gray-600 fs-5 mb-0">Semua data grup WhatsApp Anda berhasil di-export ke file Excel.</p>
+                                                </div>
+                                                <!--end::Success Icon-->
+                                                
+                                                <!--begin::Export Result Card-->
+                                                <div class="card bg-light-success border border-success border-dashed mb-8 mx-auto" style="max-width: 500px;">
+                                                    <div class="card-body d-flex align-items-center p-5">
+                                                        <div class="symbol symbol-60px me-5">
+                                                            <span class="symbol-label bg-success">
+                                                                <i class="fas fa-file-excel text-white fs-2"></i>
+                                                            </span>
+                                                        </div>
+                                                        <div class="text-start">
+                                                            <h4 class="fw-bold text-gray-900 mb-1" id="export-filename">groups_export.xlsx</h4>
+                                                            <span class="text-gray-600 fs-7" id="export-date">-</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <!--end::Export Result Card-->
+                                                
+                                                <!--begin::Actions-->
+                                                <div class="d-flex flex-center flex-wrap gap-3">
+                                                    <a href="#" id="download-btn" class="btn btn-success btn-lg px-8" download>
+                                                        <i class="fas fa-download me-2"></i>
+                                                        Download Excel
+                                                    </a>
+                                                    <button onclick="logout()" class="btn btn-light-danger btn-lg px-8">
+                                                        <i class="fas fa-sign-out-alt me-2"></i>
+                                                        Keluar
+                                                    </button>
+                                                </div>
+                                                <!--end::Actions-->
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!--end::Success Section-->
+                                    
+                                </section>
+                                <!--end::Processing Section-->
+                                
+                            </div>
+                            <!--end::Content container-->
+                        </div>
+                        <!--end::Content-->
+                    </div>
+                    <!--end::Content wrapper-->
+                    
+                    <!--begin::Footer-->
+                    <div id="kt_app_footer" class="app-footer">
+                        <div class="app-container container-fluid d-flex flex-column flex-md-row flex-center flex-md-stack py-3">
+                            <div class="text-gray-600 fw-semibold fs-7">
+                                WhatsApp Group Exporter &copy; 2024 | <a href="/dashboard" class="text-primary">Admin Panel</a>
+                            </div>
+                        </div>
+                    </div>
+                    <!--end::Footer-->
+                </div>
+                <!--end::Main-->
+            </div>
+            <!--end::Wrapper-->
+        </div>
+        <!--end::Page-->
     </div>
-
-    <!-- Scripts -->
+    <!--end::App-->
+    
+    <!--begin::Metronic JS-->
+    <script src="/assets/plugins/global/plugins.bundle.js"></script>
+    <script src="/assets/js/scripts.bundle.js"></script>
+    <!--end::Metronic JS-->
+    
+    <!--begin::Socket.IO & Custom JS-->
     <script src="/socket.io/socket.io.js"></script>
     <script src="/frontend/assets/js/frontend.js"></script>
     <script>
@@ -174,5 +360,6 @@
             initHomePage();
         });
     </script>
+    <!--end::Custom JS-->
 </body>
 </html>
