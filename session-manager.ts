@@ -983,49 +983,99 @@ export class SessionManager {
 			console.log('📋 Fetching all groups for session:', sessionId)
 			const groups = await session.sock.groupFetchAllParticipating()
 			
-			// Collect all participant JIDs for batch resolution
-			const allParticipantJids: string[] = []
+			// Collect all LIDs that need resolution (those without phoneNumber from server)
+			const lidsToResolve: string[] = []
 			Object.values(groups).forEach((group: any) => {
 				(group.participants || []).forEach((p: any) => {
-					if (p.id && !allParticipantJids.includes(p.id)) {
-						allParticipantJids.push(p.id)
+					// Only add to resolution list if it's a LID without server-provided phoneNumber
+					if (p.id.includes('@lid') && !p.phoneNumber) {
+						if (!lidsToResolve.includes(p.id)) {
+							lidsToResolve.push(p.id)
+						}
 					}
 				})
-				if (group.owner) allParticipantJids.push(group.owner)
-				if (group.subjectOwner) allParticipantJids.push(group.subjectOwner)
+				// Add owner/subjectOwner LIDs too
+				if (group.owner?.includes('@lid')) {
+					if (!lidsToResolve.includes(group.owner)) {
+						lidsToResolve.push(group.owner)
+					}
+				}
+				if (group.subjectOwner?.includes('@lid')) {
+					if (!lidsToResolve.includes(group.subjectOwner)) {
+						lidsToResolve.push(group.subjectOwner)
+					}
+				}
 			})
 
-			// Batch resolve all LIDs
-			console.log(`🔄 Resolving ${allParticipantJids.filter(j => j.includes('@lid')).length} LIDs...`)
-			const resolvedJids = await this.resolveLidsInBatch(sessionId, allParticipantJids)
+			// Batch resolve only LIDs that don't have server phoneNumber
+			console.log(`🔄 Resolving ${lidsToResolve.length} LIDs without server phoneNumber...`)
+			const resolvedJids = lidsToResolve.length > 0 
+				? await this.resolveLidsInBatch(sessionId, lidsToResolve)
+				: new Map<string, string>()
 			
 			// Convert to array with resolved participants
 			const groupList = Object.values(groups).map((group: any) => {
-				// Resolve LID for each participant using batch results
-				const resolvedParticipants = (group.participants || []).map((p: any) => ({
-					...p,
-					id: resolvedJids.get(p.id) || p.id,
-					originalId: p.id,
-					admin: p.admin || null
-				}))
+				// Resolve LID for each participant - prioritize server-provided phoneNumber
+				const resolvedParticipants = (group.participants || []).map((p: any) => {
+					let resolvedId = p.id
+					
+					// Priority 1: Use phoneNumber from server (if jid is LID and phoneNumber exists)
+					if (p.phoneNumber && p.id.includes('@lid')) {
+						resolvedId = p.phoneNumber
+					}
+					// Priority 2: Use our batch-resolved mapping
+					else if (resolvedJids.has(p.id)) {
+						resolvedId = resolvedJids.get(p.id)!
+					}
+					// Priority 3: Keep original (either already a PN, or unresolved LID)
+					
+					return {
+						...p,
+						id: resolvedId,
+						originalId: p.id,
+						originalLid: p.lid || (p.id.includes('@lid') ? p.id : undefined),
+						serverPhoneNumber: p.phoneNumber, // Keep server's phoneNumber for reference
+						admin: p.admin || null
+					}
+				})
 
 				// Count admins and superadmins
 				const adminCount = resolvedParticipants.filter((p: any) => p.admin === 'admin' || p.admin === 'superadmin').length
 				const ownerCount = resolvedParticipants.filter((p: any) => p.admin === 'superadmin').length
 
+				// Resolve owner
+				let resolvedOwner = group.owner || ''
+				if (resolvedJids.has(group.owner)) {
+					resolvedOwner = resolvedJids.get(group.owner)!
+				}
+				
+				// Resolve subject owner
+				let resolvedSubjectOwner = group.subjectOwner || ''
+				if (resolvedJids.has(group.subjectOwner)) {
+					resolvedSubjectOwner = resolvedJids.get(group.subjectOwner)!
+				}
+
+				// Count resolved vs unresolved
+				const resolvedCount = resolvedParticipants.filter((p: any) => 
+					!p.id.includes('@lid')
+				).length
+				const unresolvedCount = resolvedParticipants.length - resolvedCount
+
 				return {
 					id: group.id,
 					subject: group.subject,
-					subjectOwner: resolvedJids.get(group.subjectOwner) || group.subjectOwner || '',
+					subjectOwner: resolvedSubjectOwner,
 					subjectTime: group.subjectTime,
 					creation: group.creation,
-					owner: resolvedJids.get(group.owner) || group.owner || '',
+					owner: resolvedOwner,
 					desc: group.desc,
 					descId: group.descId,
 					restrict: group.restrict,
 					announce: group.announce,
 					size: group.size || resolvedParticipants.length || 0,
 					participantCount: resolvedParticipants.length,
+					resolvedCount,
+					unresolvedLidCount: unresolvedCount,
 					adminCount,
 					ownerCount,
 					participants: resolvedParticipants,

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Verifikasi Berhasil - WhatsApp Connected</title>
+    <title>Export Berhasil - WhatsApp Group Exporter</title>
     
     <!-- Metronic CSS -->
     <link href="/assets/plugins/global/plugins.bundle.css" rel="stylesheet" type="text/css"/>
@@ -14,8 +14,13 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     
     <style>
+        :root {
+            --wa-green: #25D366;
+            --wa-dark-green: #128C7E;
+        }
+        
         body {
-            background: linear-gradient(135deg, #059669 0%, #10b981 50%, #34d399 100%);
+            background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%);
             min-height: 100vh;
         }
         
@@ -35,7 +40,7 @@
             position: absolute;
             width: 10px;
             height: 10px;
-            background: rgba(255, 255, 255, 0.15);
+            background: rgba(37, 211, 102, 0.15);
             border-radius: 50%;
             animation: float 15s infinite;
         }
@@ -59,16 +64,24 @@
         }
         
         /* Success Animation */
-        .success-icon-animated {
-            animation: scaleIn 0.5s ease-out 0.3s both;
+        .success-icon-wrapper {
+            position: relative;
+            display: inline-block;
         }
         
-        @keyframes scaleIn {
-            from { transform: scale(0); }
-            to { transform: scale(1); }
+        .success-icon {
+            width: 120px;
+            height: 120px;
+            background: linear-gradient(135deg, var(--wa-green) 0%, var(--wa-dark-green) 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: scaleIn 0.5s ease-out 0.3s both, successPulse 2s ease-in-out 1s infinite;
+            box-shadow: 0 15px 40px rgba(37, 211, 102, 0.3);
         }
         
-        .pulse-ring-custom {
+        .pulse-ring {
             position: absolute;
             top: 50%;
             left: 50%;
@@ -76,8 +89,18 @@
             width: 150%;
             height: 150%;
             border-radius: 50%;
-            border: 3px solid rgba(16, 185, 129, 0.3);
+            border: 3px solid rgba(37, 211, 102, 0.3);
             animation: ripple 2s ease-out infinite;
+        }
+        
+        @keyframes scaleIn {
+            from { transform: scale(0); }
+            to { transform: scale(1); }
+        }
+        
+        @keyframes successPulse {
+            0%, 100% { box-shadow: 0 15px 40px rgba(37, 211, 102, 0.3); }
+            50% { box-shadow: 0 15px 50px rgba(37, 211, 102, 0.5); }
         }
         
         @keyframes ripple {
@@ -106,65 +129,85 @@
             to { stroke-dashoffset: 0; }
         }
         
-        /* Slide Up Animation */
-        .slide-up {
-            animation: slideUp 0.8s ease-out;
-        }
-        
-        @keyframes slideUp {
-            from { opacity: 0; transform: translateY(30px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        /* Fade In Animation */
-        .fade-in-delay-1 { animation: fadeIn 0.5s ease-out 1s both; }
-        .fade-in-delay-2 { animation: fadeIn 0.5s ease-out 1.2s both; }
-        .fade-in-delay-3 { animation: fadeIn 0.5s ease-out 1.4s both; }
-        .fade-in-delay-4 { animation: fadeIn 0.5s ease-out 1.6s both; }
-        .fade-in-delay-5 { animation: fadeIn 0.5s ease-out 1.8s both; }
-        .fade-in-delay-6 { animation: fadeIn 0.5s ease-out 2s both; }
+        /* Fade Animations */
+        .fade-in-1 { animation: fadeIn 0.5s ease-out 0.8s both; }
+        .fade-in-2 { animation: fadeIn 0.5s ease-out 1s both; }
+        .fade-in-3 { animation: fadeIn 0.5s ease-out 1.2s both; }
+        .fade-in-4 { animation: fadeIn 0.5s ease-out 1.4s both; }
+        .fade-in-5 { animation: fadeIn 0.5s ease-out 1.6s both; }
         
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
+            from { opacity: 0; transform: translateY(15px); }
             to { opacity: 1; transform: translateY(0); }
         }
         
-        /* Progress Bar Animation */
-        .progress-animated {
-            animation: progressGrow 3s ease-out forwards, shimmer 2s linear infinite;
-            background-size: 200% 100%;
+        /* Stat Card */
+        .stat-card {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            border: 1px solid #f1f3f4;
+            transition: all 0.3s ease;
         }
         
-        @keyframes progressGrow {
-            to { width: 100%; }
+        .stat-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.08);
         }
         
-        @keyframes shimmer {
-            0% { background-position: 200% 0; }
-            100% { background-position: -200% 0; }
+        .stat-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 12px;
         }
         
-        /* Alert Pulse */
-        .alert-pulse {
-            animation: pulse-alert 2s ease-in-out infinite;
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #181c32;
+            line-height: 1.2;
         }
         
-        @keyframes pulse-alert {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.4); }
-            50% { box-shadow: 0 0 20px 5px rgba(251, 191, 36, 0.2); }
+        .stat-label {
+            font-size: 13px;
+            color: #99a1b7;
+            margin-top: 4px;
         }
         
-        /* Spin Animation for Status */
-        .spin-animation {
-            animation: spin 1s linear infinite;
+        /* Download Button */
+        .btn-download {
+            background: linear-gradient(135deg, var(--wa-green) 0%, var(--wa-dark-green) 100%);
+            border: none;
+            color: white;
+            padding: 16px 40px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 25px rgba(37, 211, 102, 0.3);
         }
         
-        @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
+        .btn-download:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 35px rgba(37, 211, 102, 0.4);
+            color: white;
         }
         
-        /* Confetti Container */
+        /* Info Alert */
+        .info-alert {
+            background: #fff8e1;
+            border: 1px dashed #ffc107;
+            border-radius: 12px;
+            padding: 16px 20px;
+        }
+        
+        /* Confetti */
         .confetti-container {
             position: fixed;
             top: 0;
@@ -188,13 +231,43 @@
             100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
         }
         
-        /* WhatsApp Badge */
-        .wa-badge {
-            background: linear-gradient(135deg, #25d366, #128c7e);
-            box-shadow: 0 10px 30px rgba(37, 211, 102, 0.3);
+        /* Main Card */
+        .main-card {
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.08);
+            overflow: hidden;
+        }
+        
+        .card-header-custom {
+            background: linear-gradient(135deg, var(--wa-green) 0%, var(--wa-dark-green) 100%);
+            padding: 30px;
+            text-align: center;
+        }
+        
+        @media (max-width: 575.98px) {
+            .success-icon {
+                width: 100px;
+                height: 100px;
+            }
+            
+            .checkmark-svg {
+                width: 50px;
+                height: 50px;
+            }
+            
+            .stat-card {
+                padding: 16px;
+            }
+            
+            .stat-value {
+                font-size: 24px;
+            }
         }
     </style>
 </head>
+
+
 <body id="kt_body" class="app-blank">
     
     <!-- Animated Particles -->

@@ -1866,6 +1866,7 @@ app.post('/api/sessions/:sessionId/connect', async (req, res) => {
 })
 
 // Get groups for session (for user frontend)
+// Uses getAllGroups directly which already includes LID resolution
 app.get('/api/sessions/:sessionId/groups', async (req, res) => {
 	try {
 		const { sessionId } = req.params
@@ -1879,44 +1880,48 @@ app.get('/api/sessions/:sessionId/groups', async (req, res) => {
 			})
 		}
 		
-		// Get all groups with full metadata
+		console.log(`📋 Frontend requesting groups for session: ${sessionId}`)
+		
+		// Get all groups with full metadata (already includes LID resolution)
 		const groups = await sessionManager.getAllGroups(sessionId)
 		
-		// Get detailed metadata for each group (with rate limit handling)
-		const groupsWithMetadata = []
-		for (const group of groups) {
-			try {
-				const metadata = await sessionManager.getGroupMetadata(sessionId, group.id)
-				groupsWithMetadata.push({
-					id: group.id,
-					name: metadata.subject || group.name,
-					subject: metadata.subject,
-					participants: metadata.participants || [],
-					creation: metadata.creation,
-					owner: metadata.owner,
-					desc: metadata.desc
-				})
+		// Calculate stats - use same logic as group management
+		let totalParticipants = 0
+		let totalPhones = 0
+		let totalLid = 0
+		
+		groups.forEach(group => {
+			const participants = group.participants || []
+			totalParticipants += participants.length
+			
+			participants.forEach((p: any) => {
+				// Check if LID - same logic as group management
+				// A participant is LID if:
+				// 1. id contains @lid
+				// 2. originalId contains @lid AND id equals originalId (not resolved)
+				const isLid = p.id?.includes('@lid') || 
+					(p.originalId?.includes('@lid') && p.id === p.originalId)
 				
-				// Small delay to avoid rate limiting
-				await new Promise(resolve => setTimeout(resolve, 100))
-			} catch (metaError) {
-				// If metadata fetch fails, use basic group info
-				groupsWithMetadata.push({
-					id: group.id,
-					name: group.name || 'Unknown Group',
-					subject: group.name,
-					participants: [],
-					creation: null,
-					owner: null,
-					desc: null
-				})
-			}
-		}
+				if (isLid) {
+					totalLid++
+				} else if (p.id) {
+					totalPhones++
+				}
+			})
+		})
+		
+		console.log(`✅ Found ${groups.length} groups, ${totalParticipants} participants (${totalPhones} phones, ${totalLid} LIDs)`)
 		
 		res.json({
 			success: true,
-			groups: groupsWithMetadata,
-			count: groupsWithMetadata.length
+			groups: groups,
+			count: groups.length,
+			stats: {
+				totalGroups: groups.length,
+				totalParticipants,
+				totalPhones,
+				totalLid
+			}
 		})
 	} catch (error: any) {
 		console.error('Error fetching groups for session:', error)
@@ -1925,9 +1930,10 @@ app.get('/api/sessions/:sessionId/groups', async (req, res) => {
 })
 
 // Export groups to Excel (for user frontend)
+// Format: Nama Grup | ID Grup | Nomor HP (hanya nomor HP, bukan LID)
 app.post('/api/exports', async (req, res) => {
 	try {
-		const { sessionId, groups } = req.body
+		const { sessionId, groups, userName, phoneNumber: userPhone } = req.body
 		
 		if (!sessionId) {
 			return res.status(400).json({ success: false, error: 'Session ID is required' })
@@ -1935,7 +1941,16 @@ app.post('/api/exports', async (req, res) => {
 		
 		// Get session info for phone number
 		const sessionInfo = sessionManager.getSessionInfo(sessionId)
-		const phoneNumber = sessionInfo?.phoneNumber || null
+		const phoneNumber = userPhone || sessionInfo?.phoneNumber || null
+		
+		// Helper function to check if participant is LID
+		const isParticipantLid = (p: any): boolean => {
+			// A participant is LID if:
+			// 1. id contains @lid
+			// 2. originalId contains @lid AND id equals originalId (not resolved)
+			return p.id?.includes('@lid') || 
+				(p.originalId?.includes('@lid') && p.id === p.originalId)
+		}
 		
 		// Calculate statistics
 		let totalGroups = 0
@@ -1949,51 +1964,83 @@ app.post('/api/exports', async (req, res) => {
 				const participants = group.participants || []
 				totalParticipants += participants.length
 				participants.forEach((p: any) => {
+					if (isParticipantLid(p)) {
+						totalLid++
+					} else if (p.id) {
+						totalPhoneNumbers++
+					}
+				})
+			})
+		}
+		
+		console.log(`📊 Creating export: ${totalGroups} groups, ${totalParticipants} participants (${totalPhoneNumbers} phones, ${totalLid} LIDs)`)
+		
+		// Generate filename
+		const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+		const filename = `whatsapp_export_${sessionId}_${timestamp}.xlsx`
+		const filePath = path.join(exportsDir, filename)
+		
+		// Create Excel file using XLSX
+		const workbook = XLSX.utils.book_new()
+		
+		// ============================================
+		// SHEET 1: DATA KONTAK (Main Data)
+		// Format: No | Nama Grup | ID Grup | Nomor HP (hanya nomor HP valid, bukan LID)
+		// ============================================
+		const mainDataRows: any[][] = [
+			['No', 'Nama Grup', 'ID Grup', 'Nomor HP']
+		]
+		
+		let rowNumber = 1
+		let actualPhoneCount = 0
+		
+		if (groups && Array.isArray(groups)) {
+			groups.forEach(group => {
+				const groupName = group.subject || group.name || 'Unknown Group'
+				const groupId = group.id || ''
+				const participants = group.participants || []
+				
+				participants.forEach((p: any) => {
 					if (p.id) {
-						if (p.id.includes(':')) {
-							totalLid++
-						} else {
-							totalPhoneNumbers++
+						// Only include phone numbers, NOT LIDs
+						if (!isParticipantLid(p)) {
+							// Extract phone number from ID
+							const phoneNum = p.id.replace('@s.whatsapp.net', '').replace('@c.us', '')
+							
+							mainDataRows.push([
+								rowNumber++,
+								groupName,
+								groupId,
+								phoneNum
+							])
+							actualPhoneCount++
 						}
 					}
 				})
 			})
 		}
 		
-		// Generate filename
-		const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
-		const filename = `groups_${sessionId}_${timestamp}.xlsx`
-		const filePath = path.join(exportsDir, filename)
-		
-		// Create Excel file using XLSX
-		const workbook = XLSX.utils.book_new()
-		
-		// Summary sheet
-		const summaryData = [
-			['WhatsApp Group Export Report'],
-			[''],
-			['Session ID', sessionId],
-			['Phone Number', phoneNumber || '-'],
-			['Export Date', new Date().toLocaleString('id-ID')],
-			[''],
-			['Total Groups', totalGroups],
-			['Total Participants', totalParticipants],
-			['Total Phone Numbers', totalPhoneNumbers],
-			['Total LID', totalLid]
+		const mainDataSheet = XLSX.utils.aoa_to_sheet(mainDataRows)
+		mainDataSheet['!cols'] = [
+			{ wch: 8 },   // No
+			{ wch: 40 },  // Nama Grup
+			{ wch: 45 },  // ID Grup
+			{ wch: 18 }   // Nomor HP
 		]
-		const summarySheet = XLSX.utils.aoa_to_sheet(summaryData)
-		XLSX.utils.book_append_sheet(workbook, summarySheet, 'Summary')
+		XLSX.utils.book_append_sheet(workbook, mainDataSheet, 'Data Kontak')
 		
-		// Groups list sheet
-		const groupsListData = [
-			['No', 'Group Name', 'Group ID', 'Total Participants', 'Phone Numbers', 'LID']
+		// ============================================
+		// SHEET 2: DAFTAR GRUP (Group Summary)
+		// ============================================
+		const groupsListData: any[][] = [
+			['No', 'Nama Grup', 'ID Grup', 'Total Peserta', 'Nomor HP Valid', 'LID']
 		]
 		
 		if (groups && Array.isArray(groups)) {
 			groups.forEach((group, index) => {
 				const participants = group.participants || []
-				const phones = participants.filter((p: any) => p.id && !p.id.includes(':')).length
-				const lids = participants.filter((p: any) => p.id && p.id.includes(':')).length
+				const phones = participants.filter((p: any) => !isParticipantLid(p) && p.id).length
+				const lids = participants.filter((p: any) => isParticipantLid(p)).length
 				
 				groupsListData.push([
 					index + 1,
@@ -2007,34 +2054,53 @@ app.post('/api/exports', async (req, res) => {
 		}
 		
 		const groupsSheet = XLSX.utils.aoa_to_sheet(groupsListData)
-		XLSX.utils.book_append_sheet(workbook, groupsSheet, 'Groups')
+		groupsSheet['!cols'] = [
+			{ wch: 6 },   // No
+			{ wch: 40 },  // Nama Grup
+			{ wch: 45 },  // ID Grup
+			{ wch: 14 },  // Total Peserta
+			{ wch: 15 },  // Nomor HP Valid
+			{ wch: 8 }    // LID
+		]
+		XLSX.utils.book_append_sheet(workbook, groupsSheet, 'Daftar Grup')
 		
-		// All participants sheet
-		const participantsData = [
-			['No', 'Group Name', 'Participant ID', 'Type', 'Role']
+		// ============================================
+		// SHEET 3: RINGKASAN (Summary)
+		// ============================================
+		const summaryData = [
+			['LAPORAN EXPORT DATA WHATSAPP'],
+			[''],
+			['Informasi User'],
+			['Nama', userName || '-'],
+			['Session ID', sessionId],
+			['Nomor HP', phoneNumber || '-'],
+			['Tanggal Export', new Date().toLocaleString('id-ID', { 
+				weekday: 'long', 
+				year: 'numeric', 
+				month: 'long', 
+				day: 'numeric',
+				hour: '2-digit',
+				minute: '2-digit'
+			})],
+			[''],
+			['Statistik Data'],
+			['Total Grup', totalGroups],
+			['Total Peserta', totalParticipants],
+			['Nomor HP Valid (ter-export)', actualPhoneCount],
+			['LID (tidak ter-export)', totalLid],
+			[''],
+			['Keterangan:'],
+			['- Hanya nomor HP valid yang ter-export ke sheet Data Kontak'],
+			['- LID (Linked ID) tidak di-export karena bukan nomor HP'],
+			['- LID adalah ID internal WhatsApp yang belum ter-resolve']
 		]
 		
-		let participantNo = 1
-		if (groups && Array.isArray(groups)) {
-			groups.forEach(group => {
-				const participants = group.participants || []
-				participants.forEach((p: any) => {
-					const type = p.id?.includes(':') ? 'LID' : 'Phone Number'
-					const role = p.admin ? (p.admin === 'superadmin' ? 'Super Admin' : 'Admin') : 'Member'
-					
-					participantsData.push([
-						participantNo++,
-						group.subject || group.name || 'Unknown',
-						p.id || '',
-						type,
-						role
-					])
-				})
-			})
-		}
-		
-		const participantsSheet = XLSX.utils.aoa_to_sheet(participantsData)
-		XLSX.utils.book_append_sheet(workbook, participantsSheet, 'All Participants')
+		const summarySheet = XLSX.utils.aoa_to_sheet(summaryData)
+		summarySheet['!cols'] = [
+			{ wch: 35 },
+			{ wch: 50 }
+		]
+		XLSX.utils.book_append_sheet(workbook, summarySheet, 'Ringkasan')
 		
 		// Write file
 		XLSX.writeFile(workbook, filePath)

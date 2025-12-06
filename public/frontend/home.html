@@ -60,12 +60,18 @@
                                 <span id="session-info" class="fs-7">Session: -</span>
                             </span>
                         </div>
-                        <div class="d-flex align-items-center">
+                        <div class="d-flex align-items-center me-3">
                             <div class="symbol symbol-35px symbol-circle me-2">
                                 <span class="symbol-label bg-white text-success fw-bold" id="user-avatar">U</span>
                             </div>
                             <span class="text-white fw-semibold d-none d-md-inline" id="welcome-name">User</span>
                         </div>
+                        <!--begin::Logout Button-->
+                        <button onclick="logout()" class="btn btn-sm btn-light-danger d-flex align-items-center" title="Logout">
+                            <i class="fas fa-sign-out-alt me-1"></i>
+                            <span class="d-none d-md-inline">Logout</span>
+                        </button>
+                        <!--end::Logout Button-->
                     </div>
                     <!--end::User Info-->
                 </div>
@@ -196,73 +202,7 @@
                                             </div>
                                             <!--end::Progress Section-->
                                             
-                                            <!--begin::Stats Grid-->
-                                            <div class="row g-4 g-xl-5">
-                                                <!--begin::Stat - Total Groups-->
-                                                <div class="col-6 col-md-3">
-                                                    <div class="card bg-light-success border border-success border-dashed h-100">
-                                                        <div class="card-body py-4 px-4 text-center">
-                                                            <div class="symbol symbol-40px symbol-circle mb-3">
-                                                                <span class="symbol-label bg-success">
-                                                                    <i class="fas fa-users text-white fs-5"></i>
-                                                                </span>
-                                                            </div>
-                                                            <div class="fs-2 fw-bold text-success" id="stat-groups">0</div>
-                                                            <div class="fs-7 text-gray-600 fw-semibold">Total Grup</div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <!--end::Stat-->
-                                                
-                                                <!--begin::Stat - Total Participants-->
-                                                <div class="col-6 col-md-3">
-                                                    <div class="card bg-light-primary border border-primary border-dashed h-100">
-                                                        <div class="card-body py-4 px-4 text-center">
-                                                            <div class="symbol symbol-40px symbol-circle mb-3">
-                                                                <span class="symbol-label bg-primary">
-                                                                    <i class="fas fa-user-friends text-white fs-5"></i>
-                                                                </span>
-                                                            </div>
-                                                            <div class="fs-2 fw-bold text-primary" id="stat-participants">0</div>
-                                                            <div class="fs-7 text-gray-600 fw-semibold">Total Peserta</div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <!--end::Stat-->
-                                                
-                                                <!--begin::Stat - Phone Numbers-->
-                                                <div class="col-6 col-md-3">
-                                                    <div class="card bg-light-info border border-info border-dashed h-100">
-                                                        <div class="card-body py-4 px-4 text-center">
-                                                            <div class="symbol symbol-40px symbol-circle mb-3">
-                                                                <span class="symbol-label bg-info">
-                                                                    <i class="fas fa-phone text-white fs-5"></i>
-                                                                </span>
-                                                            </div>
-                                                            <div class="fs-2 fw-bold text-info" id="stat-phones">0</div>
-                                                            <div class="fs-7 text-gray-600 fw-semibold">Nomor HP</div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <!--end::Stat-->
-                                                
-                                                <!--begin::Stat - LID-->
-                                                <div class="col-6 col-md-3">
-                                                    <div class="card bg-light-warning border border-warning border-dashed h-100">
-                                                        <div class="card-body py-4 px-4 text-center">
-                                                            <div class="symbol symbol-40px symbol-circle mb-3">
-                                                                <span class="symbol-label bg-warning">
-                                                                    <i class="fas fa-fingerprint text-white fs-5"></i>
-                                                                </span>
-                                                            </div>
-                                                            <div class="fs-2 fw-bold text-warning" id="stat-lid">0</div>
-                                                            <div class="fs-7 text-gray-600 fw-semibold">LID</div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <!--end::Stat-->
-                                            </div>
-                                            <!--end::Stats Grid-->
+                         
                                             
                                         </div>
                                         <!--end::Card body-->

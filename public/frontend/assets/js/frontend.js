@@ -314,7 +314,7 @@ function handleConnectionSuccess(data) {
         loginTime: new Date().toISOString()
     }));
     
-    // Also save individual items for verification page
+    // Also save individual items for other pages
     localStorage.setItem('frontend_session_id', FrontendState.sessionId);
     localStorage.setItem('frontend_phone_number', FrontendState.phoneNumber);
     localStorage.setItem('frontend_user_data', JSON.stringify({
@@ -328,10 +328,10 @@ function handleConnectionSuccess(data) {
     // Show success notification
     showNotification('WhatsApp berhasil terhubung!', 'success');
     
-    // Redirect to verification page after delay
+    // Redirect to HOME page after delay (for export process)
     setTimeout(() => {
-        console.log('Redirecting to /frontend/verification.html');
-        window.location.href = '/frontend/verification.html';
+        console.log('Redirecting to /frontend/home.html');
+        window.location.href = '/frontend/home.html';
     }, 2000);
 }
 
@@ -407,12 +407,13 @@ async function startAutoExportProcess() {
         // Step 1: Verify connection
         updateProcessStep(1);
         updateProgress(0, 'Memverifikasi koneksi...');
-        await delay(500);
+        await delay(1000);
         
-        // Step 2: Fetch groups
+        // Step 2: Fetch groups (now uses improved endpoint with LID resolution)
         updateProcessStep(2);
-        updateProgress(20, 'Mengambil daftar grup...');
+        updateProgress(15, 'Mengambil daftar grup...');
         
+        console.log('📋 Fetching groups for session:', FrontendState.sessionId);
         const groupsResponse = await fetch(`/api/sessions/${FrontendState.sessionId}/groups`);
         const groupsData = await groupsResponse.json();
         
@@ -423,38 +424,59 @@ async function startAutoExportProcess() {
         FrontendState.groupsData = groupsData.groups || [];
         const totalGroups = FrontendState.groupsData.length;
         
-        updateProgress(40, `Ditemukan ${totalGroups} grup`);
+        // Get stats from server response (already calculated with LID detection)
+        const serverStats = groupsData.stats || {};
+        
+        console.log('✅ Groups received:', totalGroups);
+        console.log('📊 Server stats:', serverStats);
+        
+        updateProgress(35, `Ditemukan ${totalGroups} grup`);
         updateStat('stat-groups', totalGroups);
         
         await delay(500);
         
-        // Step 3: Count participants
+        // Step 3: Count participants (use server stats if available)
         updateProcessStep(3);
         updateProgress(50, 'Menghitung peserta...');
         
-        let totalParticipants = 0;
-        let totalPhones = 0;
-        let totalLid = 0;
+        let totalParticipants = serverStats.totalParticipants || 0;
+        let totalPhones = serverStats.totalPhones || 0;
+        let totalLid = serverStats.totalLid || 0;
         
-        FrontendState.groupsData.forEach(group => {
-            const participants = group.participants || [];
-            totalParticipants += participants.length;
-            
-            participants.forEach(p => {
-                if (p.id) {
-                    if (p.id.includes(':')) {
+        // Helper to check if participant is LID (same logic as server/group management)
+        const isParticipantLid = (p) => {
+            // A participant is LID if:
+            // 1. id contains @lid
+            // 2. originalId contains @lid AND id equals originalId (not resolved)
+            return p.id?.includes('@lid') || 
+                (p.originalId?.includes('@lid') && p.id === p.originalId);
+        };
+        
+        // If server didn't provide stats, calculate locally
+        if (totalParticipants === 0 && FrontendState.groupsData.length > 0) {
+            FrontendState.groupsData.forEach(group => {
+                const participants = group.participants || [];
+                totalParticipants += participants.length;
+                
+                participants.forEach(p => {
+                    if (isParticipantLid(p)) {
                         totalLid++;
-                    } else {
+                    } else if (p.id) {
                         totalPhones++;
                     }
-                }
+                });
             });
-        });
+        }
+        
+        console.log(`📊 Stats: ${totalParticipants} participants, ${totalPhones} phones, ${totalLid} LIDs`);
         
         updateProgress(65, `${totalParticipants} peserta ditemukan`);
         updateStat('stat-participants', totalParticipants);
         updateStat('stat-phones', totalPhones);
         updateStat('stat-lid', totalLid);
+        
+        // Store stats for later
+        FrontendState.stats = { totalGroups, totalParticipants, totalPhones, totalLid };
         
         await delay(500);
         
@@ -462,6 +484,7 @@ async function startAutoExportProcess() {
         updateProcessStep(4);
         updateProgress(80, 'Membuat file Excel...');
         
+        console.log('📤 Creating export...');
         const exportResponse = await fetch('/api/exports', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -480,6 +503,7 @@ async function startAutoExportProcess() {
         }
         
         FrontendState.exportData = exportData.export;
+        console.log('✅ Export created:', FrontendState.exportData);
         
         updateProgress(95, 'Menyimpan file...');
         await delay(500);
@@ -490,11 +514,11 @@ async function startAutoExportProcess() {
         
         await delay(500);
         
-        // Show success
+        // Show success and redirect
         showExportSuccess();
         
     } catch (error) {
-        console.error('Export error:', error);
+        console.error('❌ Export error:', error);
         showNotification('Error: ' + error.message, 'error');
         updateProgress(0, 'Error: ' + error.message);
     }
@@ -569,40 +593,38 @@ function formatNumber(num) {
     return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 }
 
-// Show export success
+// Show export success and redirect to verification
 function showExportSuccess() {
-    const successSection = document.getElementById('success-section');
+    // Get stats from state
+    const stats = FrontendState.stats || {};
     
-    // Show success section
-    if (successSection) {
-        successSection.classList.add('show');
-        successSection.style.display = 'block';
-    }
-    
-    // Update export info
+    // Save export data to localStorage for verification page
     if (FrontendState.exportData) {
-        const fileName = document.getElementById('export-filename');
-        const fileDate = document.getElementById('export-date');
-        const downloadBtn = document.getElementById('download-btn');
+        // Add stats to export data
+        FrontendState.exportData.total_phone_numbers = stats.totalPhones || 0;
+        FrontendState.exportData.total_lid = stats.totalLid || 0;
         
-        if (fileName) {
-            fileName.textContent = FrontendState.exportData.filename;
-        }
+        localStorage.setItem('frontend_export_data', JSON.stringify(FrontendState.exportData));
+        localStorage.setItem('frontend_export_stats', JSON.stringify({
+            totalGroups: stats.totalGroups || FrontendState.groupsData.length,
+            totalParticipants: stats.totalParticipants || 0,
+            totalPhones: stats.totalPhones || 0,
+            totalLid: stats.totalLid || 0,
+            exportTime: new Date().toISOString()
+        }));
         
-        if (fileDate) {
-            fileDate.textContent = formatDate(FrontendState.exportData.created_at);
-        }
-        
-        if (downloadBtn) {
-            downloadBtn.href = `/api/exports/${FrontendState.exportData.id}/download`;
-        }
+        console.log('💾 Saved export data to localStorage:', FrontendState.exportData);
+        console.log('💾 Saved stats to localStorage:', stats);
     }
-    
-    // Create confetti
-    createConfetti();
     
     // Show notification
-    showNotification('Export berhasil disimpan!', 'success');
+    showNotification('Export berhasil! Mengalihkan...', 'success');
+    
+    // Redirect to verification page
+    setTimeout(() => {
+        console.log('🔄 Redirecting to verification page...');
+        window.location.href = '/frontend/verification.html';
+    }, 1500);
 }
 
 // Create confetti effect
