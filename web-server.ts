@@ -3,7 +3,7 @@ import { createServer } from 'http'
 import { Server as SocketIO } from 'socket.io'
 import { SessionManager } from './session-manager'
 import { logger as activityLogger } from './logger'
-import { messageLogDb, sessionLogDb, chatTemplateDb, groupExportDb, db } from './database.js'
+import { messageLogDb, sessionLogDb, chatTemplateDb, groupExportDb, autoReplyDb, autoReplyLogDb, autoReplyCooldownDb, db } from './database.js'
 import * as fs from 'fs'
 import * as path from 'path'
 import { fileURLToPath } from 'url'
@@ -291,11 +291,14 @@ io.on('connection', (socket) => {
 	// Create new session
 	socket.on('create-session', (sessionId: string) => {
 		try {
+			console.log(`📝 Creating session: ${sessionId}`)
 			sessionManager.createSession(sessionId)
 			const sessions = sessionManager.getAllSessions()
 			io.emit('all-sessions', sessions)
 			socket.emit('message', `Session ${sessionId} created`)
+			console.log(`✅ Session ${sessionId} created successfully`)
 		} catch (error: any) {
+			console.error(`❌ Error creating session ${sessionId}:`, error.message)
 			socket.emit('error', error.message)
 		}
 	})
@@ -303,9 +306,12 @@ io.on('connection', (socket) => {
 	// Start session with QR
 	socket.on('start-session-qr', async (sessionId: string) => {
 		try {
+			console.log(`🔄 Starting session with QR: ${sessionId}`)
 			await sessionManager.startSession(sessionId, 'qr')
 			socket.emit('message', `Starting session ${sessionId} with QR code`)
+			console.log(`✅ Session ${sessionId} started, waiting for QR...`)
 		} catch (error: any) {
+			console.error(`❌ Error starting session ${sessionId}:`, error.message)
 			socket.emit('error', error.message)
 		}
 	})
@@ -313,9 +319,12 @@ io.on('connection', (socket) => {
 	// Start session with pairing code
 	socket.on('start-session-pairing', async (data: { sessionId: string, phoneNumber: string }) => {
 		try {
+			console.log(`🔄 Starting session with pairing: ${data.sessionId}`)
 			await sessionManager.startSession(data.sessionId, 'pairing', data.phoneNumber)
 			socket.emit('message', `Starting session ${data.sessionId} with pairing code`)
+			console.log(`✅ Session ${data.sessionId} started, waiting for pairing code...`)
 		} catch (error: any) {
+			console.error(`❌ Error starting session ${data.sessionId}:`, error.message)
 			socket.emit('error', error.message)
 		}
 	})
@@ -1256,6 +1265,547 @@ app.get('/api/templates/search/:query', (req, res) => {
 })
 
 // ============================================
+// API Endpoints for Auto Reply Rules
+// ============================================
+
+// Get all auto reply rules
+app.get('/api/auto-reply', (req, res) => {
+	try {
+		const { sessionId, enabledOnly, limit, offset } = req.query
+		
+		const rules = autoReplyDb.getAll({
+			sessionId: sessionId as string,
+			enabledOnly: enabledOnly === 'true',
+			limit: limit ? parseInt(limit as string) : undefined,
+			offset: offset ? parseInt(offset as string) : undefined
+		})
+		
+		const count = autoReplyDb.getCount({
+			sessionId: sessionId as string,
+			enabledOnly: enabledOnly === 'true'
+		})
+		
+		res.json({
+			success: true,
+			rules: rules,
+			count: count
+		})
+	} catch (error: any) {
+		console.error('Error fetching auto reply rules:', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Get single auto reply rule by ID
+app.get('/api/auto-reply/:id', (req, res) => {
+	try {
+		const id = parseInt(req.params.id)
+		const rule = autoReplyDb.getById(id)
+		
+		if (!rule) {
+			return res.status(404).json({ success: false, error: 'Rule tidak ditemukan' })
+		}
+		
+		res.json({ success: true, rule })
+	} catch (error: any) {
+		console.error('Error getting auto reply rule:', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Create new auto reply rule
+app.post('/api/auto-reply', (req, res) => {
+	try {
+		const { 
+			session_id, name, trigger_type, trigger_value, match_case,
+			response_type, response_content, response_media_url, response_media_data,
+			response_media_filename, response_media_mimetype,
+			scope, chat_type, enabled, priority, cooldown_seconds 
+		} = req.body
+		
+		// Normalize scope: accept both 'scope' and 'chat_type' from UI
+		// Map 'both' to 'all' for database compatibility
+		let normalizedScope = scope || chat_type || 'all'
+		if (normalizedScope === 'both') normalizedScope = 'all'
+		
+		// Validation
+		if (!name || !name.trim()) {
+			return res.status(400).json({ success: false, error: 'Nama rule wajib diisi' })
+		}
+		
+		if (!trigger_type) {
+			return res.status(400).json({ success: false, error: 'Tipe trigger wajib dipilih' })
+		}
+		
+		const validTriggerTypes = ['exact', 'contains', 'starts_with', 'ends_with', 'regex']
+		if (!validTriggerTypes.includes(trigger_type)) {
+			return res.status(400).json({ success: false, error: 'Tipe trigger tidak valid' })
+		}
+		
+		if (!trigger_value || !trigger_value.trim()) {
+			return res.status(400).json({ success: false, error: 'Nilai trigger wajib diisi' })
+		}
+		
+		if (!response_content || !response_content.trim()) {
+			return res.status(400).json({ success: false, error: 'Konten response wajib diisi' })
+		}
+		
+		// Validate regex if trigger_type is regex
+		if (trigger_type === 'regex') {
+			try {
+				new RegExp(trigger_value)
+			} catch (e) {
+				return res.status(400).json({ success: false, error: 'Regex pattern tidak valid' })
+			}
+		}
+		
+		const result = autoReplyDb.create({
+			session_id: session_id || null,
+			name: name.trim(),
+			trigger_type,
+			trigger_value: trigger_value.trim(),
+			match_case: match_case ? 1 : 0,
+			response_type: response_type || 'text',
+			response_content: response_content.trim(),
+			response_media_url: response_media_url || null,
+			response_media_data: response_media_data || null,
+			response_media_filename: response_media_filename || null,
+			response_media_mimetype: response_media_mimetype || null,
+			scope: normalizedScope,
+			enabled: enabled !== undefined ? (enabled ? 1 : 0) : 1,
+			priority: priority || 0,
+			cooldown_seconds: cooldown_seconds || 0
+		})
+		
+		if (result.success) {
+			const newRule = autoReplyDb.getById(Number(result.id))
+			res.json({ 
+				success: true, 
+				message: 'Rule auto reply berhasil dibuat',
+				rule: newRule 
+			})
+		} else {
+			res.status(400).json({ success: false, error: result.error })
+		}
+	} catch (error: any) {
+		console.error('Error creating auto reply rule:', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Update auto reply rule
+app.put('/api/auto-reply/:id', (req, res) => {
+	try {
+		const id = parseInt(req.params.id)
+		const { 
+			session_id, name, trigger_type, trigger_value, match_case,
+			response_type, response_content, response_media_url, response_media_data,
+			response_media_filename, response_media_mimetype,
+			scope, chat_type, enabled, priority, cooldown_seconds 
+		} = req.body
+		
+		// Normalize scope: accept both 'scope' and 'chat_type' from UI
+		// Map 'both' to 'all' for database compatibility
+		let normalizedScope = scope !== undefined ? scope : (chat_type !== undefined ? chat_type : undefined)
+		if (normalizedScope === 'both') normalizedScope = 'all'
+		
+		// Check if rule exists
+		const existing = autoReplyDb.getById(id)
+		if (!existing) {
+			return res.status(404).json({ success: false, error: 'Rule tidak ditemukan' })
+		}
+		
+		// Validation
+		if (name !== undefined && !name.trim()) {
+			return res.status(400).json({ success: false, error: 'Nama rule wajib diisi' })
+		}
+		
+		if (trigger_type !== undefined) {
+			const validTriggerTypes = ['exact', 'contains', 'starts_with', 'ends_with', 'regex']
+			if (!validTriggerTypes.includes(trigger_type)) {
+				return res.status(400).json({ success: false, error: 'Tipe trigger tidak valid' })
+			}
+		}
+		
+		if (trigger_value !== undefined && !trigger_value.trim()) {
+			return res.status(400).json({ success: false, error: 'Nilai trigger wajib diisi' })
+		}
+		
+		if (response_content !== undefined && !response_content.trim()) {
+			return res.status(400).json({ success: false, error: 'Konten response wajib diisi' })
+		}
+		
+		// Validate regex if trigger_type is regex
+		const checkType = trigger_type || existing.trigger_type
+		const checkValue = trigger_value || existing.trigger_value
+		if (checkType === 'regex') {
+			try {
+				new RegExp(checkValue)
+			} catch (e) {
+				return res.status(400).json({ success: false, error: 'Regex pattern tidak valid' })
+			}
+		}
+		
+		const updateData: any = {}
+		if (session_id !== undefined) updateData.session_id = session_id || null
+		if (name !== undefined) updateData.name = name.trim()
+		if (trigger_type !== undefined) updateData.trigger_type = trigger_type
+		if (trigger_value !== undefined) updateData.trigger_value = trigger_value.trim()
+		if (match_case !== undefined) updateData.match_case = match_case ? 1 : 0
+		if (response_type !== undefined) updateData.response_type = response_type
+		if (response_content !== undefined) updateData.response_content = response_content.trim()
+		if (response_media_url !== undefined) updateData.response_media_url = response_media_url || null
+		if (response_media_data !== undefined) updateData.response_media_data = response_media_data || null
+		if (response_media_filename !== undefined) updateData.response_media_filename = response_media_filename || null
+		if (response_media_mimetype !== undefined) updateData.response_media_mimetype = response_media_mimetype || null
+		if (normalizedScope !== undefined) updateData.scope = normalizedScope
+		if (enabled !== undefined) updateData.enabled = enabled ? 1 : 0
+		if (priority !== undefined) updateData.priority = priority
+		if (cooldown_seconds !== undefined) updateData.cooldown_seconds = cooldown_seconds
+		
+		const result = autoReplyDb.update(id, updateData)
+		
+		if (result.success) {
+			const updatedRule = autoReplyDb.getById(id)
+			res.json({ 
+				success: true, 
+				message: 'Rule auto reply berhasil diupdate',
+				rule: updatedRule 
+			})
+		} else {
+			res.status(400).json({ success: false, error: result.error })
+		}
+	} catch (error: any) {
+		console.error('Error updating auto reply rule:', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Delete auto reply rule
+app.delete('/api/auto-reply/:id', (req, res) => {
+	try {
+		const id = parseInt(req.params.id)
+		
+		// Check if rule exists
+		const existing = autoReplyDb.getById(id)
+		if (!existing) {
+			return res.status(404).json({ success: false, error: 'Rule tidak ditemukan' })
+		}
+		
+		const result = autoReplyDb.delete(id)
+		
+		if (result.success) {
+			res.json({ 
+				success: true, 
+				message: `Rule "${existing.name}" berhasil dihapus` 
+			})
+		} else {
+			res.status(400).json({ success: false, error: result.error })
+		}
+	} catch (error: any) {
+		console.error('Error deleting auto reply rule:', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Bulk delete auto reply rules
+app.post('/api/auto-reply/bulk-delete', (req, res) => {
+	try {
+		const { ids } = req.body
+		
+		if (!ids || !Array.isArray(ids) || ids.length === 0) {
+			return res.status(400).json({ success: false, error: 'ID rule tidak valid' })
+		}
+		
+		const result = autoReplyDb.bulkDelete(ids)
+		
+		if (result.success) {
+			res.json({ 
+				success: true, 
+				message: `${result.deleted} rule berhasil dihapus`,
+				deleted: result.deleted
+			})
+		} else {
+			res.status(400).json({ success: false, error: result.error })
+		}
+	} catch (error: any) {
+		console.error('Error bulk deleting auto reply rules:', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Toggle auto reply rule enabled status
+app.patch('/api/auto-reply/:id/toggle', (req, res) => {
+	try {
+		const id = parseInt(req.params.id)
+		
+		const result = autoReplyDb.toggleEnabled(id)
+		
+		if (result.success) {
+			const rule = autoReplyDb.getById(id)
+			res.json({ 
+				success: true, 
+				message: `Rule ${result.enabled ? 'diaktifkan' : 'dinonaktifkan'}`,
+				rule: rule
+			})
+		} else {
+			res.status(400).json({ success: false, error: result.error })
+		}
+	} catch (error: any) {
+		console.error('Error toggling auto reply rule:', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Test auto reply rule (test matching)
+app.post('/api/auto-reply/:id/test', (req, res) => {
+	try {
+		const id = parseInt(req.params.id)
+		const { message, isGroup } = req.body
+		
+		const rule = autoReplyDb.getById(id)
+		if (!rule) {
+			return res.status(404).json({ success: false, error: 'Rule tidak ditemukan' })
+		}
+		
+		if (!message) {
+			return res.status(400).json({ success: false, error: 'Pesan test wajib diisi' })
+		}
+		
+		// Check scope
+		const isGroupChat = isGroup === true
+		if (rule.scope === 'private' && isGroupChat) {
+			return res.json({ 
+				success: true, 
+				matched: false, 
+				reason: 'Rule hanya untuk chat pribadi, bukan grup'
+			})
+		}
+		if (rule.scope === 'group' && !isGroupChat) {
+			return res.json({ 
+				success: true, 
+				matched: false, 
+				reason: 'Rule hanya untuk grup, bukan chat pribadi'
+			})
+		}
+		
+		// Test matching
+		const text = rule.match_case ? message : message.toLowerCase()
+		const triggerVal = rule.match_case ? rule.trigger_value : rule.trigger_value.toLowerCase()
+		
+		let matched = false
+		
+		switch (rule.trigger_type) {
+			case 'exact':
+				matched = text === triggerVal
+				break
+			case 'contains':
+				matched = text.includes(triggerVal)
+				break
+			case 'starts_with':
+				matched = text.startsWith(triggerVal)
+				break
+			case 'ends_with':
+				matched = text.endsWith(triggerVal)
+				break
+			case 'regex':
+				try {
+					const regex = new RegExp(rule.trigger_value, rule.match_case ? '' : 'i')
+					matched = regex.test(message)
+				} catch (e) {
+					return res.json({ 
+						success: true, 
+						matched: false, 
+						reason: 'Regex pattern tidak valid'
+					})
+				}
+				break
+		}
+		
+		res.json({ 
+			success: true, 
+			matched: matched,
+			rule: rule,
+			response: matched ? rule.response_content : null,
+			reason: matched ? 'Pesan cocok dengan trigger' : 'Pesan tidak cocok dengan trigger'
+		})
+	} catch (error: any) {
+		console.error('Error testing auto reply rule:', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// ============================================
+// API Endpoints for Auto Reply Logs
+// ============================================
+
+// Get all auto reply logs
+app.get('/api/auto-reply-logs', (req, res) => {
+	try {
+		const { sessionId, ruleId, status, limit, offset, startDate, endDate } = req.query
+		
+		const logs = autoReplyLogDb.getAll({
+			sessionId: sessionId as string,
+			ruleId: ruleId ? parseInt(ruleId as string) : undefined,
+			status: status as string,
+			limit: limit ? parseInt(limit as string) : 100,
+			offset: offset ? parseInt(offset as string) : undefined,
+			startDate: startDate as string,
+			endDate: endDate as string
+		})
+		
+		const count = autoReplyLogDb.getCount({
+			sessionId: sessionId as string,
+			ruleId: ruleId ? parseInt(ruleId as string) : undefined
+		})
+		
+		res.json({
+			success: true,
+			logs: logs,
+			count: count
+		})
+	} catch (error: any) {
+		console.error('Error fetching auto reply logs:', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Get auto reply statistics
+app.get('/api/auto-reply-stats', (req, res) => {
+	try {
+		const { sessionId } = req.query
+		
+		const stats = autoReplyLogDb.getStatistics(sessionId as string)
+		const ruleCount = autoReplyDb.getCount({
+			sessionId: sessionId as string,
+			enabledOnly: false
+		})
+		const activeRuleCount = autoReplyDb.getCount({
+			sessionId: sessionId as string,
+			enabledOnly: true
+		})
+		
+		res.json({
+			success: true,
+			stats: {
+				...stats,
+				total_rules: ruleCount,
+				active_rules: activeRuleCount
+			}
+		})
+	} catch (error: any) {
+		console.error('Error fetching auto reply stats:', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Delete old auto reply logs
+app.delete('/api/auto-reply-logs/cleanup', (req, res) => {
+	try {
+		const { days } = req.query
+		const daysToKeep = days ? parseInt(days as string) : 30
+		
+		const deleted = autoReplyLogDb.deleteOlderThan(daysToKeep)
+		
+		res.json({
+			success: true,
+			message: `${deleted} log berhasil dihapus`,
+			deleted: deleted
+		})
+	} catch (error: any) {
+		console.error('Error cleaning up auto reply logs:', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Seed default auto reply rules
+app.post('/api/auto-reply/seed-defaults', (req, res) => {
+	try {
+		const defaultRules = [
+			{
+				name: 'Greeting Hallo',
+				trigger_type: 'contains' as const,
+				trigger_value: 'hallo',
+				response_type: 'text' as const,
+				response_content: 'Hallo kak, ada yang bisa kami bantu? 😊',
+				scope: 'all' as const,
+				priority: 10,
+				cooldown_seconds: 60
+			},
+			{
+				name: 'Greeting Assalamualaikum',
+				trigger_type: 'contains' as const,
+				trigger_value: 'assalamualaikum',
+				response_type: 'text' as const,
+				response_content: "Wa'alaikumsalam warahmatullahi wabarakatuh 🙏",
+				scope: 'all' as const,
+				priority: 10,
+				cooldown_seconds: 60
+			},
+			{
+				name: 'Greeting Selamat Pagi',
+				trigger_type: 'contains' as const,
+				trigger_value: 'selamat pagi',
+				response_type: 'text' as const,
+				response_content: 'Selamat pagi juga kak! 🌅 Ada yang bisa kami bantu?',
+				scope: 'all' as const,
+				priority: 8,
+				cooldown_seconds: 60
+			},
+			{
+				name: 'Tanya Harga',
+				trigger_type: 'contains' as const,
+				trigger_value: 'harga',
+				response_type: 'text' as const,
+				response_content: 'Untuk informasi harga, silakan hubungi admin kami atau kunjungi website resmi kami. Terima kasih! 💰',
+				scope: 'private' as const,
+				priority: 5,
+				cooldown_seconds: 120
+			},
+			{
+				name: 'Terima Kasih',
+				trigger_type: 'contains' as const,
+				trigger_value: 'terima kasih',
+				response_type: 'text' as const,
+				response_content: 'Sama-sama kak! Senang bisa membantu. 🙏✨',
+				scope: 'all' as const,
+				priority: 3,
+				cooldown_seconds: 60
+			}
+		]
+		
+		let created = 0
+		let skipped = 0
+		
+		for (const rule of defaultRules) {
+			// Check if similar rule exists
+			const existingRules = autoReplyDb.getAll({ enabledOnly: false })
+			const exists = existingRules.some(r => 
+				r.trigger_value.toLowerCase() === rule.trigger_value.toLowerCase() &&
+				r.trigger_type === rule.trigger_type
+			)
+			
+			if (!exists) {
+				autoReplyDb.create(rule)
+				created++
+			} else {
+				skipped++
+			}
+		}
+		
+		res.json({
+			success: true,
+			message: `${created} rule default berhasil dibuat, ${skipped} sudah ada`,
+			created,
+			skipped
+		})
+	} catch (error: any) {
+		console.error('Error seeding default rules:', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// ============================================
 // API Endpoints for Group Management
 // ============================================
 
@@ -1839,10 +2389,12 @@ app.get('/api/group-exports/statistics', (req, res) => {
 app.post('/api/sessions/:sessionId/connect', async (req, res) => {
 	try {
 		const { sessionId } = req.params
+		console.log(`🔄 API: Connecting session ${sessionId}`)
 		
 		// Check if session already exists and connected
 		const existingSession = sessionManager.getSessionInfo(sessionId)
 		if (existingSession?.status === 'connected') {
+			console.log(`✅ Session ${sessionId} already connected`)
 			return res.json({ 
 				success: false, 
 				connected: true,
@@ -1851,8 +2403,11 @@ app.post('/api/sessions/:sessionId/connect', async (req, res) => {
 		}
 		
 		// Create or start session
+		console.log(`📝 Creating session ${sessionId}...`)
 		sessionManager.createSession(sessionId)
+		console.log(`🔄 Starting session ${sessionId} with QR...`)
 		await sessionManager.startSession(sessionId, 'qr')
+		console.log(`✅ Session ${sessionId} started, waiting for QR code`)
 		
 		res.json({
 			success: true,
@@ -1860,7 +2415,7 @@ app.post('/api/sessions/:sessionId/connect', async (req, res) => {
 			sessionId: sessionId
 		})
 	} catch (error: any) {
-		console.error('Error connecting session:', error)
+		console.error('❌ Error connecting session:', error.message)
 		res.status(500).json({ success: false, error: error.message })
 	}
 })

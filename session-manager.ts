@@ -10,7 +10,7 @@ import makeWASocket, {
 	downloadMediaMessage
 } from './src'
 import { logger as activityLogger } from './logger'
-import { messageLogDb, chatTemplateDb, db } from './database.js'
+import { messageLogDb, chatTemplateDb, autoReplyDb, autoReplyLogDb, autoReplyCooldownDb, db } from './database.js'
 import { readFileSync, existsSync, readdirSync } from 'fs'
 import { join } from 'path'
 
@@ -318,26 +318,44 @@ export class SessionManager {
 		type: 'qr' | 'pairing',
 		phoneNumber?: string
 	): Promise<void> {
+		console.log(`🔄 startSession called: ${sessionId}, type: ${type}`)
+		
 		let session = this.getSession(sessionId)
 		
 		if (!session) {
+			console.log(`📝 Creating new session object for: ${sessionId}`)
 			session = this.createSession(sessionId)
+		} else {
+			console.log(`📋 Session object exists: ${sessionId}, isConnected: ${session.isConnected}, hasSock: ${!!session.sock}`)
 		}
 
 		if (session.isConnected) {
+			console.log(`⚠️ Session ${sessionId} already connected`)
 			throw new Error('Session already connected')
 		}
 
 		if (session.sock) {
-			throw new Error('Session already in progress')
+			console.log(`⚠️ Session ${sessionId} already has sock, closing it first...`)
+			// Instead of throwing error, close existing connection and restart
+			try {
+				session.sock.end(undefined)
+			} catch (e) {
+				console.log('Error closing sock:', e)
+			}
+			session.sock = null
+			// Wait a moment before proceeding
+			await new Promise(resolve => setTimeout(resolve, 500))
 		}
 
 		session.type = type
 		session.phoneNumber = phoneNumber
 
 		const authFolder = `baileys_auth_info_${sessionId}`
+		console.log(`📁 Using auth folder: ${authFolder}`)
+		
 		const { state, saveCreds } = await useMultiFileAuthState(authFolder)
 		const { version } = await fetchLatestBaileysVersion()
+		console.log(`📦 Baileys version: ${version.join('.')}`)
 
 		const sock = makeWASocket({
 			version,
@@ -356,11 +374,13 @@ export class SessionManager {
 		// Handle connection updates
 		sock.ev.on('connection.update', async (update) => {
 			const { connection, lastDisconnect, qr } = update
+			console.log(`🔔 Connection update for ${sessionId}:`, { connection, hasQR: !!qr })
 
 			if (qr && type === 'qr') {
 				session.qrCode = qr
-				console.log(`QR Code generated for session ${sessionId}`)
+				console.log(`📱 QR Code generated for session ${sessionId}, length: ${qr.length}`)
 				this.socketIO.emit('qr', { sessionId, qr })
+				console.log(`📤 QR event emitted for ${sessionId}`)
 			}
 
 			if (connection === 'close') {
@@ -661,6 +681,195 @@ export class SessionManager {
 							console.log(`✅ Media data saved to database for ${messageId}`)
 						} catch (dbError) {
 							console.error('⚠️ Failed to save media data:', dbError)
+						}
+					}
+					
+					// ============================================
+					// AUTO REPLY HANDLER
+					// ============================================
+					// Only process incoming text messages (not fromMe)
+					if (!fromMe && messageType === 'text' && messageContent) {
+						try {
+							const isGroup = remoteJid.includes('@g.us')
+							const senderNumber = isGroup ? (msg.key.participant || remoteJid) : remoteJid
+							
+							// Find matching rule
+							const matchedRule = autoReplyDb.matchMessage(sessionId, messageContent, isGroup)
+							
+							if (matchedRule) {
+								console.log(`🤖 Auto-reply rule matched: "${matchedRule.name}" for message: "${messageContent.substring(0, 50)}..."`)
+								
+								// Check cooldown
+								const isInCooldown = autoReplyCooldownDb.isInCooldown(
+									matchedRule.id!,
+									sessionId,
+									senderNumber,
+									matchedRule.cooldown_seconds || 0
+								)
+								
+								if (isInCooldown) {
+									console.log(`⏳ Auto-reply skipped (cooldown): ${matchedRule.name}`)
+									
+									// Log cooldown skip
+									autoReplyLogDb.insert({
+										rule_id: matchedRule.id!,
+										rule_name: matchedRule.name,
+										session_id: sessionId,
+										message_id: messageId,
+										from_number: senderNumber,
+										chat_id: remoteJid,
+										is_group: isGroup ? 1 : 0,
+										matched_text: messageContent.substring(0, 500),
+										trigger_value: matchedRule.trigger_value,
+										response_sent: null,
+										status: 'cooldown',
+										error_message: 'Sender is in cooldown period'
+									})
+								} else {
+									// Send auto-reply
+									try {
+										let replyResult: any = null
+										const targetJid = remoteJid // Reply to the chat (group or private)
+										
+										// Handle different response types
+										if (matchedRule.response_type === 'template') {
+											// Get template by code
+											const template = chatTemplateDb.getByCode(matchedRule.response_content)
+											if (template) {
+												if (template.media_data) {
+													// Send template with media
+													const mediaBuffer = Buffer.from(template.media_data, 'base64')
+													replyResult = await sock.sendMessage(targetJid, {
+														image: mediaBuffer,
+														caption: template.content,
+														mimetype: template.media_mimetype || 'image/jpeg'
+													})
+												} else {
+													// Send template text only
+													replyResult = await sock.sendMessage(targetJid, { text: template.content })
+												}
+												console.log(`✅ Auto-reply template sent: ${template.code}`)
+											} else {
+												throw new Error(`Template not found: ${matchedRule.response_content}`)
+											}
+										} else if (matchedRule.response_type === 'image' && matchedRule.response_media_data) {
+											// Send image response
+											const mediaBuffer = Buffer.from(matchedRule.response_media_data, 'base64')
+											replyResult = await sock.sendMessage(targetJid, {
+												image: mediaBuffer,
+												caption: matchedRule.response_content || undefined,
+												mimetype: matchedRule.response_media_mimetype || 'image/jpeg'
+											})
+											console.log(`✅ Auto-reply image sent`)
+										} else if (matchedRule.response_type === 'document' && matchedRule.response_media_data) {
+											// Send document response
+											const mediaBuffer = Buffer.from(matchedRule.response_media_data, 'base64')
+											replyResult = await sock.sendMessage(targetJid, {
+												document: mediaBuffer,
+												fileName: matchedRule.response_media_filename || 'document',
+												mimetype: matchedRule.response_media_mimetype || 'application/octet-stream',
+												caption: matchedRule.response_content || undefined
+											})
+											console.log(`✅ Auto-reply document sent`)
+										} else if (matchedRule.response_type === 'audio' && matchedRule.response_media_data) {
+											// Send audio response
+											const mediaBuffer = Buffer.from(matchedRule.response_media_data, 'base64')
+											replyResult = await sock.sendMessage(targetJid, {
+												audio: mediaBuffer,
+												mimetype: matchedRule.response_media_mimetype || 'audio/mp4',
+												ptt: false
+											})
+											console.log(`✅ Auto-reply audio sent`)
+										} else if (matchedRule.response_type === 'video' && matchedRule.response_media_data) {
+											// Send video response
+											const mediaBuffer = Buffer.from(matchedRule.response_media_data, 'base64')
+											replyResult = await sock.sendMessage(targetJid, {
+												video: mediaBuffer,
+												caption: matchedRule.response_content || undefined,
+												mimetype: matchedRule.response_media_mimetype || 'video/mp4'
+											})
+											console.log(`✅ Auto-reply video sent`)
+										} else {
+											// Send text response (default)
+											replyResult = await sock.sendMessage(targetJid, { text: matchedRule.response_content })
+											console.log(`✅ Auto-reply text sent: "${matchedRule.response_content.substring(0, 50)}..."`)
+										}
+										
+										// Track the sent message to prevent duplicate processing
+										if (replyResult?.key?.id) {
+											uiSentMessages.add(replyResult.key.id)
+											setTimeout(() => uiSentMessages.delete(replyResult.key.id), 30000)
+										}
+										
+										// Update cooldown
+										if (matchedRule.cooldown_seconds && matchedRule.cooldown_seconds > 0) {
+											autoReplyCooldownDb.updateCooldown(matchedRule.id!, sessionId, senderNumber)
+										}
+										
+										// Log success
+										autoReplyLogDb.insert({
+											rule_id: matchedRule.id!,
+											rule_name: matchedRule.name,
+											session_id: sessionId,
+											message_id: messageId,
+											from_number: senderNumber,
+											chat_id: remoteJid,
+											is_group: isGroup ? 1 : 0,
+											matched_text: messageContent.substring(0, 500),
+											trigger_value: matchedRule.trigger_value,
+											response_sent: matchedRule.response_content.substring(0, 500),
+											status: 'success'
+										})
+										
+										// Log the auto-reply message
+										activityLogger.logMessage({
+											timestamp: new Date().toISOString(),
+											sessionId,
+											direction: 'outgoing',
+											from: session.user?.id || sessionId,
+											to: targetJid,
+											messageType: matchedRule.response_type === 'text' ? 'text' : matchedRule.response_type,
+											content: matchedRule.response_content,
+											status: 'sent',
+											messageId: replyResult?.key?.id || `auto_reply_${Date.now()}`,
+											source: 'auto-reply'
+										})
+										
+										// Emit auto-reply-sent event
+										this.socketIO.emit('auto-reply-sent', {
+											success: true,
+											sessionId,
+											to: targetJid,
+											ruleName: matchedRule.name,
+											ruleId: matchedRule.id,
+											trigger: matchedRule.trigger_value,
+											response: matchedRule.response_content,
+											isGroup: isGroup,
+											messageId: replyResult?.key?.id
+										})
+									} catch (sendError: any) {
+										console.error(`❌ Auto-reply failed:`, sendError)
+										
+										// Log failure
+										autoReplyLogDb.insert({
+											rule_id: matchedRule.id!,
+											rule_name: matchedRule.name,
+											session_id: sessionId,
+											message_id: messageId,
+											from_number: senderNumber,
+											chat_id: remoteJid,
+											is_group: isGroup ? 1 : 0,
+											matched_text: messageContent.substring(0, 500),
+											trigger_value: matchedRule.trigger_value,
+											response_sent: matchedRule.response_content.substring(0, 500),
+											status: 'failed',
+											error_message: sendError.message
+										})
+									}
+								}
+							}
+						} catch (autoReplyError) {
+							console.error('⚠️ Auto-reply processing error:', autoReplyError)
 						}
 					}
 					

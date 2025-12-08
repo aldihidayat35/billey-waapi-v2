@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auto Reply Logs - WhatsApp Gateway</title>
+    
+    <!-- Metronic 8 Styles -->
+    <link rel="stylesheet" href="assets/plugins/global/plugins.bundle.css">
+    <link rel="stylesheet" href="assets/css/style.bundle.css">
+    
+    <style>
+        :root {
+            --wa-green: #25D366;
+            --wa-dark-green: #128C7E;
+            --wa-teal: #075E54;
+            --wa-blue: #34B7F1;
+        }
+        
+        /* Page Header */
+        .page-header {
+            background: linear-gradient(135deg, var(--wa-teal) 0%, var(--wa-dark-green) 100%);
+            padding: 25px 30px;
+            border-radius: 12px;
+            margin-bottom: 25px;
+            color: white;
+        }
+        
+        .page-header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        
+        .page-header p {
+            margin: 5px 0 0;
+            opacity: 0.9;
+            font-size: 14px;
+        }
+        
+        /* Stats Cards */
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.05);
+            border: 1px solid #e9edef;
+            transition: all 0.3s;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 25px rgba(0,0,0,0.1);
+        }
+        
+        .stat-card .stat-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 15px;
+            font-size: 22px;
+        }
+        
+        .stat-card .stat-icon.primary { background: rgba(0,158,247,0.1); color: #009ef7; }
+        .stat-card .stat-icon.success { background: rgba(37,211,102,0.1); color: var(--wa-green); }
+        .stat-card .stat-icon.warning { background: rgba(255,199,0,0.1); color: #ffc700; }
+        .stat-card .stat-icon.danger { background: rgba(241,65,108,0.1); color: #f1416c; }
+        
+        .stat-card .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #181c32;
+            line-height: 1;
+        }
+        
+        .stat-card .stat-label {
+            font-size: 13px;
+            color: #a1a5b7;
+            margin-top: 8px;
+        }
+        
+        /* Logs Container */
+        .logs-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.05);
+            border: 1px solid #e9edef;
+        }
+        
+        .logs-header {
+            padding: 20px;
+            border-bottom: 1px solid #e9edef;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .logs-header h5 {
+            margin: 0;
+            font-weight: 600;
+            color: #181c32;
+        }
+        
+        /* Filter Bar */
+        .filter-bar {
+            padding: 15px 20px;
+            background: #f9fafb;
+            border-bottom: 1px solid #e9edef;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .filter-bar .search-input {
+            flex: 1;
+            min-width: 200px;
+            position: relative;
+        }
+        
+        .filter-bar .search-input i {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #a1a5b7;
+        }
+        
+        .filter-bar .search-input input {
+            width: 100%;
+            padding: 10px 15px 10px 38px;
+            border: 1px solid #e9edef;
+            border-radius: 8px;
+            font-size: 13px;
+        }
+        
+        .filter-bar .search-input input:focus {
+            outline: none;
+            border-color: var(--wa-green);
+        }
+        
+        .filter-bar select {
+            padding: 10px 15px;
+            border: 1px solid #e9edef;
+            border-radius: 8px;
+            font-size: 13px;
+            min-width: 140px;
+        }
+        
+        /* Logs Table */
+        .logs-table {
+            width: 100%;
+        }
+        
+        .logs-table thead th {
+            background: #f9fafb;
+            padding: 14px 20px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #7e8299;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid #e9edef;
+        }
+        
+        .logs-table tbody td {
+            padding: 14px 20px;
+            border-bottom: 1px solid #f1f1f4;
+            vertical-align: middle;
+            font-size: 13px;
+        }
+        
+        .logs-table tbody tr:hover {
+            background: #f9fafb;
+        }
+        
+        /* Status Badge */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 5px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        
+        .status-badge.success { background: #e8fff3; color: #50cd89; }
+        .status-badge.failed { background: #fff5f8; color: #f1416c; }
+        .status-badge.cooldown { background: #fff8dd; color: #ffc700; }
+        
+        /* Chat Type Badge */
+        .chat-type-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+        
+        .chat-type-badge.private { background: #f1faff; color: #009ef7; }
+        .chat-type-badge.group { background: #e8fff3; color: #50cd89; }
+        
+        /* Rule Name Cell */
+        .rule-cell {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .rule-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: rgba(0,158,247,0.1);
+            color: #009ef7;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+        
+        .rule-info h6 {
+            margin: 0;
+            font-size: 13px;
+            font-weight: 600;
+            color: #181c32;
+        }
+        
+        .rule-info small {
+            color: #a1a5b7;
+            font-size: 11px;
+        }
+        
+        /* From Cell */
+        .from-cell {
+            font-family: 'Consolas', monospace;
+            font-size: 12px;
+            color: #5e6278;
+        }
+        
+        /* Message Preview */
+        .message-preview {
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: #5e6278;
+        }
+        
+        /* Time Cell */
+        .time-cell {
+            color: #a1a5b7;
+            font-size: 12px;
+        }
+        
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+        }
+        
+        .empty-state i {
+            font-size: 80px;
+            color: #e4e6ef;
+            margin-bottom: 20px;
+        }
+        
+        .empty-state h4 {
+            color: #181c32;
+            margin-bottom: 10px;
+        }
+        
+        .empty-state p {
+            color: #a1a5b7;
+            margin-bottom: 20px;
+        }
+        
+        /* Pagination */
+        .pagination-wrapper {
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px solid #e9edef;
+        }
+        
+        .pagination .page-link {
+            border: none;
+            color: #5e6278;
+            padding: 8px 14px;
+            border-radius: 6px;
+            margin: 0 2px;
+        }
+        
+        .pagination .page-link:hover {
+            background: #f1faff;
+            color: #009ef7;
+        }
+        
+        .pagination .page-item.active .page-link {
+            background: var(--wa-green);
+            color: white;
+        }
+        
+        /* Modal */
+        .modal-header {
+            background: linear-gradient(135deg, var(--wa-teal) 0%, var(--wa-dark-green) 100%);
+            color: white;
+            border-radius: 12px 12px 0 0;
+        }
+        
+        .modal-header .btn-close {
+            filter: brightness(0) invert(1);
+        }
+        
+        .detail-row {
+            display: flex;
+            border-bottom: 1px solid #f1f1f4;
+            padding: 12px 0;
+        }
+        
+        .detail-row:last-child {
+            border-bottom: none;
+        }
+        
+        .detail-label {
+            width: 120px;
+            font-weight: 600;
+            color: #7e8299;
+            font-size: 12px;
+        }
+        
+        .detail-value {
+            flex: 1;
+            color: #181c32;
+            font-size: 13px;
+            word-break: break-all;
+        }
+        
+        .detail-value.message {
+            background: #f9fafb;
+            padding: 10px;
+            border-radius: 8px;
+            white-space: pre-wrap;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .logs-header {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .filter-bar {
+                flex-direction: column;
+            }
+            
+            .filter-bar .search-input {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+
+<body id="kt_app_body" data-kt-app-layout="dark-sidebar" data-kt-app-header-fixed="true" 
+      data-kt-app-sidebar-enabled="true" data-kt-app-sidebar-fixed="true" 
+      data-kt-app-sidebar-hoverable="true" data-kt-app-sidebar-push-header="true" 
+      data-kt-app-sidebar-push-toolbar="true" data-kt-app-sidebar-push-footer="true" 
+      class="app-default">
+    
+    <div class="d-flex flex-column flex-root app-root" id="kt_app_root">
+        <div class="app-page flex-column flex-column-fluid" id="kt_app_page">
+            
+            <!-- Header -->
+            <div id="kt_app_header" class="app-header">
+                <div id="header-container"></div>
+            </div>
+            
+            <div class="app-wrapper flex-column flex-row-fluid" id="kt_app_wrapper">
+                
+                <!-- Sidebar -->
+                <div id="sidebar-container"></div>
+                
+                <!-- Main Content -->
+                <div class="app-main flex-column flex-row-fluid" id="kt_app_main">
+                    <div class="d-flex flex-column flex-column-fluid">
+                        
+                        <div id="kt_app_content" class="app-content flex-column-fluid">
+                            <div id="kt_app_content_container" class="app-container container-fluid">
+                                
+                                <!-- Page Header -->
+                                <div class="page-header">
+                                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+                                        <div>
+                                            <h1><i class="bi bi-clock-history me-2"></i>Auto Reply Logs</h1>
+                                            <p>Riwayat balasan otomatis yang telah dikirim</p>
+                                        </div>
+                                        <div class="d-flex gap-2">
+                                            <a href="auto-reply.html" class="btn btn-light btn-sm">
+                                                <i class="bi bi-arrow-left me-1"></i>Kembali ke Rules
+                                            </a>
+                                            <button class="btn btn-light btn-sm" onclick="loadLogs()">
+                                                <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+                                            </button>
+                                            <button class="btn btn-light-danger btn-sm" onclick="cleanupLogs()">
+                                                <i class="bi bi-trash me-1"></i>Bersihkan
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Stats Row -->
+                                <div class="row g-4 mb-4">
+                                    <div class="col-xl-3 col-md-6">
+                                        <div class="stat-card">
+                                            <div class="stat-icon primary">
+                                                <i class="bi bi-chat-dots"></i>
+                                            </div>
+                                            <div class="stat-value" id="total-logs">0</div>
+                                            <div class="stat-label">Total Logs</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-xl-3 col-md-6">
+                                        <div class="stat-card">
+                                            <div class="stat-icon success">
+                                                <i class="bi bi-check-circle"></i>
+                                            </div>
+                                            <div class="stat-value" id="success-count">0</div>
+                                            <div class="stat-label">Success</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-xl-3 col-md-6">
+                                        <div class="stat-card">
+                                            <div class="stat-icon danger">
+                                                <i class="bi bi-x-circle"></i>
+                                            </div>
+                                            <div class="stat-value" id="failed-count">0</div>
+                                            <div class="stat-label">Failed</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-xl-3 col-md-6">
+                                        <div class="stat-card">
+                                            <div class="stat-icon warning">
+                                                <i class="bi bi-hourglass-split"></i>
+                                            </div>
+                                            <div class="stat-value" id="cooldown-count">0</div>
+                                            <div class="stat-label">Cooldown</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Logs Container -->
+                                <div class="logs-container">
+                                    <div class="logs-header">
+                                        <h5><i class="bi bi-list-ul me-2"></i>Daftar Log</h5>
+                                        <span class="text-muted" id="log-count">0 logs</span>
+                                    </div>
+                                    
+                                    <!-- Filter Bar -->
+                                    <div class="filter-bar">
+                                        <div class="search-input">
+                                            <i class="bi bi-search"></i>
+                                            <input type="text" id="search-input" placeholder="Cari rule atau nomor...">
+                                        </div>
+                                        <select id="filter-session">
+                                            <option value="">Semua Session</option>
+                                        </select>
+                                        <select id="filter-status">
+                                            <option value="">Semua Status</option>
+                                            <option value="success">Success</option>
+                                            <option value="failed">Failed</option>
+                                            <option value="cooldown">Cooldown</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <!-- Logs Table -->
+                                    <div class="table-responsive">
+                                        <table class="logs-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Waktu</th>
+                                                    <th>Rule</th>
+                                                    <th>Session</th>
+                                                    <th>From</th>
+                                                    <th>Chat</th>
+                                                    <th>Pesan</th>
+                                                    <th>Status</th>
+                                                    <th>Aksi</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="logs-tbody">
+                                                <!-- Logs will be rendered here -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    
+                                    <!-- Empty State -->
+                                    <div class="empty-state d-none" id="empty-state">
+                                        <i class="bi bi-clock-history"></i>
+                                        <h4>Belum Ada Log</h4>
+                                        <p>Log auto reply akan muncul di sini setelah ada balasan terkirim</p>
+                                    </div>
+                                    
+                                    <!-- Pagination -->
+                                    <div class="pagination-wrapper" id="pagination-wrapper">
+                                        <div>
+                                            <select class="form-select form-select-sm" id="page-size" style="width: auto;">
+                                                <option value="25">25 per halaman</option>
+                                                <option value="50">50 per halaman</option>
+                                                <option value="100" selected>100 per halaman</option>
+                                            </select>
+                                        </div>
+                                        <nav>
+                                            <ul class="pagination pagination-sm mb-0" id="pagination">
+                                            </ul>
+                                        </nav>
+                                    </div>
+                                </div>
+                                
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Detail Modal -->
+    <div class="modal fade" id="detailModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-info-circle me-2"></i>Detail Log</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="detail-content">
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Scripts -->
+    <script src="assets/plugins/global/plugins.bundle.js"></script>
+    <script src="assets/js/scripts.bundle.js"></script>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    
+    <script>
+        // Load components
+        fetch('components/header.html').then(r => r.text()).then(html => {
+            document.getElementById('header-container').innerHTML = html;
+        });
+        
+        fetch('components/sidebar.html').then(r => r.text()).then(html => {
+            document.getElementById('sidebar-container').innerHTML = html;
+            setTimeout(() => {
+                document.querySelectorAll('.menu-link').forEach(link => {
+                    if (link.getAttribute('href')?.includes('auto-reply')) {
+                        link.classList.add('active');
+                        const accordion = link.closest('.menu-accordion');
+                        if (accordion) accordion.classList.add('here', 'show');
+                    }
+                });
+            }, 100);
+        });
+    </script>
+    
+    <script>
+        let logs = [];
+        let currentPage = 1;
+        let totalLogs = 0;
+        const socket = io();
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSessions();
+            loadLogs();
+            loadStats();
+            
+            // Filter events
+            let debounceTimer;
+            document.getElementById('search-input').addEventListener('input', () => {
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(() => { currentPage = 1; loadLogs(); }, 300);
+            });
+            document.getElementById('filter-session').addEventListener('change', () => { currentPage = 1; loadLogs(); });
+            document.getElementById('filter-status').addEventListener('change', () => { currentPage = 1; loadLogs(); });
+            document.getElementById('page-size').addEventListener('change', () => { currentPage = 1; loadLogs(); });
+            
+            // Real-time updates
+            socket.on('auto-reply-sent', () => {
+                loadLogs();
+                loadStats();
+            });
+        });
+        
+        async function loadSessions() {
+            try {
+                const response = await fetch('/api/sessions');
+                const data = await response.json();
+                
+                if (data.success && data.sessions) {
+                    const select = document.getElementById('filter-session');
+                    data.sessions.forEach(s => {
+                        const opt = document.createElement('option');
+                        opt.value = s.id;
+                        opt.textContent = s.id;
+                        select.appendChild(opt);
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading sessions:', error);
+            }
+        }
+        
+        async function loadLogs() {
+            try {
+                const sessionId = document.getElementById('filter-session').value;
+                const status = document.getElementById('filter-status').value;
+                const search = document.getElementById('search-input').value;
+                const limit = document.getElementById('page-size').value;
+                const offset = (currentPage - 1) * limit;
+                
+                let url = `/api/auto-reply-logs?limit=${limit}&offset=${offset}`;
+                if (sessionId) url += `&sessionId=${sessionId}`;
+                if (status) url += `&status=${status}`;
+                
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if (data.success) {
+                    logs = data.logs || [];
+                    totalLogs = data.total || data.count || logs.length;
+                    
+                    // Client-side search filter
+                    if (search) {
+                        logs = logs.filter(log => 
+                            (log.rule_name && log.rule_name.toLowerCase().includes(search.toLowerCase())) ||
+                            (log.from_number && log.from_number.includes(search)) ||
+                            (log.chat_id && log.chat_id.includes(search))
+                        );
+                    }
+                    
+                    renderLogs();
+                    renderPagination();
+                }
+            } catch (error) {
+                console.error('Error loading logs:', error);
+            }
+        }
+        
+        async function loadStats() {
+            try {
+                // Total logs
+                const totalRes = await fetch('/api/auto-reply-logs?limit=1');
+                const totalData = await totalRes.json();
+                document.getElementById('total-logs').textContent = totalData.total || totalData.count || 0;
+                
+                // Success count
+                const successRes = await fetch('/api/auto-reply-logs?status=success&limit=1');
+                const successData = await successRes.json();
+                document.getElementById('success-count').textContent = successData.total || successData.count || 0;
+                
+                // Failed count
+                const failedRes = await fetch('/api/auto-reply-logs?status=failed&limit=1');
+                const failedData = await failedRes.json();
+                document.getElementById('failed-count').textContent = failedData.total || failedData.count || 0;
+                
+                // Cooldown count
+                const cooldownRes = await fetch('/api/auto-reply-logs?status=cooldown&limit=1');
+                const cooldownData = await cooldownRes.json();
+                document.getElementById('cooldown-count').textContent = cooldownData.total || cooldownData.count || 0;
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+        
+        function renderLogs() {
+            const tbody = document.getElementById('logs-tbody');
+            const emptyState = document.getElementById('empty-state');
+            
+            document.getElementById('log-count').textContent = `${totalLogs} logs`;
+            
+            if (logs.length === 0) {
+                tbody.innerHTML = '';
+                emptyState.classList.remove('d-none');
+                document.getElementById('pagination-wrapper').style.display = 'none';
+                return;
+            }
+            
+            emptyState.classList.add('d-none');
+            document.getElementById('pagination-wrapper').style.display = 'flex';
+            
+            tbody.innerHTML = logs.map(log => `
+                <tr>
+                    <td class="time-cell">
+                        ${formatTime(log.created_at)}
+                    </td>
+                    <td>
+                        <div class="rule-cell">
+                            <div class="rule-icon">
+                                <i class="bi bi-robot"></i>
+                            </div>
+                            <div class="rule-info">
+                                <h6>${escapeHtml(log.rule_name || 'Unknown')}</h6>
+                                <small>${log.trigger_type || '-'}</small>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="badge badge-light-primary">${escapeHtml(log.session_id || '-')}</span>
+                    </td>
+                    <td class="from-cell">
+                        ${escapeHtml(log.from_number || '-')}
+                    </td>
+                    <td>
+                        <span class="chat-type-badge ${log.chat_type || 'private'}">
+                            <i class="bi bi-${log.chat_type === 'group' ? 'people' : 'person'}"></i>
+                            ${log.chat_type === 'group' ? 'Group' : 'Private'}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="message-preview" title="${escapeHtml(log.matched_text || '')}">
+                            ${escapeHtml(log.matched_text?.substring(0, 40) || '-')}${log.matched_text?.length > 40 ? '...' : ''}
+                        </div>
+                    </td>
+                    <td>
+                        <span class="status-badge ${log.status || 'success'}">
+                            <i class="bi bi-${log.status === 'success' ? 'check' : log.status === 'failed' ? 'x' : 'hourglass'}"></i>
+                            ${log.status || 'success'}
+                        </span>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-light-primary" onclick="viewDetail(${log.id})">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+        
+        function renderPagination() {
+            const limit = parseInt(document.getElementById('page-size').value);
+            const totalPages = Math.ceil(totalLogs / limit);
+            const pagination = document.getElementById('pagination');
+            
+            if (totalPages <= 1) {
+                pagination.innerHTML = '';
+                return;
+            }
+            
+            let html = '';
+            
+            // Previous
+            html += `<li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+                <a class="page-link" href="#" onclick="goToPage(${currentPage - 1}); return false;">
+                    <i class="bi bi-chevron-left"></i>
+                </a>
+            </li>`;
+            
+            // Page numbers
+            const start = Math.max(1, currentPage - 2);
+            const end = Math.min(totalPages, currentPage + 2);
+            
+            for (let i = start; i <= end; i++) {
+                html += `<li class="page-item ${i === currentPage ? 'active' : ''}">
+                    <a class="page-link" href="#" onclick="goToPage(${i}); return false;">${i}</a>
+                </li>`;
+            }
+            
+            // Next
+            html += `<li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
+                <a class="page-link" href="#" onclick="goToPage(${currentPage + 1}); return false;">
+                    <i class="bi bi-chevron-right"></i>
+                </a>
+            </li>`;
+            
+            pagination.innerHTML = html;
+        }
+        
+        function goToPage(page) {
+            const limit = parseInt(document.getElementById('page-size').value);
+            const totalPages = Math.ceil(totalLogs / limit);
+            
+            if (page < 1 || page > totalPages) return;
+            currentPage = page;
+            loadLogs();
+        }
+        
+        function formatTime(dateStr) {
+            if (!dateStr) return '-';
+            const date = new Date(dateStr);
+            const now = new Date();
+            const diff = now - date;
+            
+            if (diff < 60000) return 'Baru saja';
+            if (diff < 3600000) return `${Math.floor(diff / 60000)} menit lalu`;
+            if (diff < 86400000) return `${Math.floor(diff / 3600000)} jam lalu`;
+            
+            return date.toLocaleDateString('id-ID', {
+                day: '2-digit',
+                month: 'short',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+        
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                      .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+        }
+        
+        function viewDetail(id) {
+            const log = logs.find(l => l.id === id);
+            if (!log) return;
+            
+            const content = document.getElementById('detail-content');
+            content.innerHTML = `
+                <div class="detail-row">
+                    <div class="detail-label">ID</div>
+                    <div class="detail-value">#${log.id}</div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Rule</div>
+                    <div class="detail-value">${escapeHtml(log.rule_name || '-')}</div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Session</div>
+                    <div class="detail-value">${escapeHtml(log.session_id || '-')}</div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">From</div>
+                    <div class="detail-value">${escapeHtml(log.from_number || '-')}</div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Chat ID</div>
+                    <div class="detail-value">${escapeHtml(log.chat_id || '-')}</div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Chat Type</div>
+                    <div class="detail-value">${log.chat_type === 'group' ? 'Group' : 'Private'}</div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Trigger</div>
+                    <div class="detail-value"><code>${escapeHtml(log.trigger_type || '-')}</code>: "${escapeHtml(log.trigger_value || '-')}"</div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Pesan Masuk</div>
+                    <div class="detail-value message">${escapeHtml(log.matched_text || '-')}</div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Response</div>
+                    <div class="detail-value message">${escapeHtml(log.response_sent || '-')}</div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Status</div>
+                    <div class="detail-value">
+                        <span class="status-badge ${log.status || 'success'}">
+                            <i class="bi bi-${log.status === 'success' ? 'check' : log.status === 'failed' ? 'x' : 'hourglass'}"></i>
+                            ${log.status || 'success'}
+                        </span>
+                    </div>
+                </div>
+                ${log.error_message ? `
+                <div class="detail-row">
+                    <div class="detail-label">Error</div>
+                    <div class="detail-value text-danger">${escapeHtml(log.error_message)}</div>
+                </div>
+                ` : ''}
+                <div class="detail-row">
+                    <div class="detail-label">Waktu</div>
+                    <div class="detail-value">${new Date(log.created_at).toLocaleString('id-ID')}</div>
+                </div>
+            `;
+            
+            new bootstrap.Modal(document.getElementById('detailModal')).show();
+        }
+        
+        async function cleanupLogs() {
+            const result = await Swal.fire({
+                title: 'Bersihkan Log Lama?',
+                text: 'Ini akan menghapus log yang lebih dari 7 hari',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#f1416c',
+                confirmButtonText: 'Ya, Bersihkan',
+                cancelButtonText: 'Batal'
+            });
+            
+            if (result.isConfirmed) {
+                try {
+                    const response = await fetch('/api/auto-reply-logs/cleanup', { method: 'DELETE' });
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        Swal.fire('Berhasil', `${data.deleted || 0} log berhasil dihapus`, 'success');
+                        loadLogs();
+                        loadStats();
+                    }
+                } catch (error) {
+                    Swal.fire('Error', 'Gagal membersihkan log', 'error');
+                }
+            }
+        }
+    </script>
+</body>
+</html>

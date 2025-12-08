@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auto Reply - WhatsApp Gateway</title>
+    
+    <!-- Metronic 8 Styles -->
+    <link rel="stylesheet" href="assets/plugins/global/plugins.bundle.css">
+    <link rel="stylesheet" href="assets/css/style.bundle.css">
+    
+    <style>
+        :root {
+            --wa-green: #25D366;
+            --wa-dark-green: #128C7E;
+            --wa-teal: #075E54;
+            --wa-blue: #34B7F1;
+            --wa-light-green: #DCF8C6;
+        }
+        
+        /* Page Header */
+        .page-header {
+            background: linear-gradient(135deg, var(--wa-teal) 0%, var(--wa-dark-green) 100%);
+            padding: 25px 30px;
+            border-radius: 12px;
+            margin-bottom: 25px;
+            color: white;
+        }
+        
+        .page-header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        
+        .page-header p {
+            margin: 5px 0 0;
+            opacity: 0.9;
+            font-size: 14px;
+        }
+        
+        /* Stats Cards */
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.05);
+            border: 1px solid #e9edef;
+            transition: all 0.3s;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 25px rgba(0,0,0,0.1);
+        }
+        
+        .stat-card .stat-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 15px;
+            font-size: 22px;
+        }
+        
+        .stat-card .stat-icon.primary { background: rgba(0,158,247,0.1); color: #009ef7; }
+        .stat-card .stat-icon.success { background: rgba(37,211,102,0.1); color: var(--wa-green); }
+        .stat-card .stat-icon.warning { background: rgba(255,199,0,0.1); color: #ffc700; }
+        .stat-card .stat-icon.danger { background: rgba(241,65,108,0.1); color: #f1416c; }
+        
+        .stat-card .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #181c32;
+            line-height: 1;
+        }
+        
+        .stat-card .stat-label {
+            font-size: 13px;
+            color: #a1a5b7;
+            margin-top: 8px;
+        }
+        
+        /* Rules Container */
+        .rules-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.05);
+            border: 1px solid #e9edef;
+        }
+        
+        .rules-header {
+            padding: 20px;
+            border-bottom: 1px solid #e9edef;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .rules-header h5 {
+            margin: 0;
+            font-weight: 600;
+            color: #181c32;
+        }
+        
+        .rules-toolbar {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        /* Filter Bar */
+        .filter-bar {
+            padding: 15px 20px;
+            background: #f9fafb;
+            border-bottom: 1px solid #e9edef;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .filter-bar .search-input {
+            flex: 1;
+            min-width: 200px;
+            position: relative;
+        }
+        
+        .filter-bar .search-input i {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #a1a5b7;
+        }
+        
+        .filter-bar .search-input input {
+            width: 100%;
+            padding: 10px 15px 10px 38px;
+            border: 1px solid #e9edef;
+            border-radius: 8px;
+            font-size: 13px;
+        }
+        
+        .filter-bar .search-input input:focus {
+            outline: none;
+            border-color: var(--wa-green);
+        }
+        
+        .filter-bar select {
+            padding: 10px 15px;
+            border: 1px solid #e9edef;
+            border-radius: 8px;
+            font-size: 13px;
+            min-width: 150px;
+        }
+        
+        /* Rules Table */
+        .rules-table {
+            width: 100%;
+        }
+        
+        .rules-table thead th {
+            background: #f9fafb;
+            padding: 14px 20px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #7e8299;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid #e9edef;
+        }
+        
+        .rules-table tbody td {
+            padding: 16px 20px;
+            border-bottom: 1px solid #f1f1f4;
+            vertical-align: middle;
+        }
+        
+        .rules-table tbody tr:hover {
+            background: #f9fafb;
+        }
+        
+        .rules-table tbody tr.inactive {
+            opacity: 0.6;
+            background: #fafafa;
+        }
+        
+        /* Rule Name Cell */
+        .rule-name-cell {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .rule-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+        
+        .rule-icon.active { background: rgba(37,211,102,0.1); color: var(--wa-green); }
+        .rule-icon.inactive { background: #f1f1f4; color: #a1a5b7; }
+        
+        .rule-info h6 {
+            margin: 0;
+            font-size: 14px;
+            font-weight: 600;
+            color: #181c32;
+        }
+        
+        .rule-info small {
+            color: #a1a5b7;
+            font-size: 12px;
+        }
+        
+        /* Trigger Badge */
+        .trigger-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            font-family: 'Consolas', monospace;
+        }
+        
+        .trigger-badge.exact { background: #e8fff3; color: #50cd89; }
+        .trigger-badge.contains { background: #fff8dd; color: #ffc700; }
+        .trigger-badge.starts_with { background: #f1faff; color: #009ef7; }
+        .trigger-badge.ends_with { background: #f8f5ff; color: #7239ea; }
+        .trigger-badge.regex { background: #fff5f8; color: #f1416c; }
+        
+        /* Scope Badge */
+        .scope-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        
+        .scope-badge.all { background: #e4e6ef; color: #5e6278; }
+        .scope-badge.private { background: #f1faff; color: #009ef7; }
+        .scope-badge.group { background: #e8fff3; color: #50cd89; }
+        
+        /* Status Toggle */
+        .status-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .status-toggle .form-check-input {
+            width: 40px;
+            height: 22px;
+            cursor: pointer;
+        }
+        
+        .status-toggle .form-check-input:checked {
+            background-color: var(--wa-green);
+            border-color: var(--wa-green);
+        }
+        
+        /* Actions */
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .action-btn {
+            width: 34px;
+            height: 34px;
+            border-radius: 8px;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .action-btn.edit { background: #f1faff; color: #009ef7; }
+        .action-btn.edit:hover { background: #009ef7; color: white; }
+        
+        .action-btn.test { background: #fff8dd; color: #ffc700; }
+        .action-btn.test:hover { background: #ffc700; color: white; }
+        
+        .action-btn.delete { background: #fff5f8; color: #f1416c; }
+        .action-btn.delete:hover { background: #f1416c; color: white; }
+        
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+        }
+        
+        .empty-state i {
+            font-size: 80px;
+            color: #e4e6ef;
+            margin-bottom: 20px;
+        }
+        
+        .empty-state h4 {
+            color: #181c32;
+            margin-bottom: 10px;
+        }
+        
+        .empty-state p {
+            color: #a1a5b7;
+            margin-bottom: 20px;
+        }
+        
+        /* Modal Styles */
+        .modal-header {
+            background: linear-gradient(135deg, var(--wa-teal) 0%, var(--wa-dark-green) 100%);
+            color: white;
+            border-radius: 12px 12px 0 0;
+        }
+        
+        .modal-header .btn-close {
+            filter: brightness(0) invert(1);
+        }
+        
+        .form-label {
+            font-weight: 600;
+            color: #181c32;
+            font-size: 13px;
+            margin-bottom: 8px;
+        }
+        
+        .form-control, .form-select {
+            border: 1px solid #e9edef;
+            border-radius: 8px;
+            padding: 10px 15px;
+            font-size: 13px;
+        }
+        
+        .form-control:focus, .form-select:focus {
+            border-color: var(--wa-green);
+            box-shadow: 0 0 0 3px rgba(37,211,102,0.15);
+        }
+        
+        .response-textarea {
+            font-family: 'Consolas', monospace;
+            min-height: 120px;
+            line-height: 1.6;
+        }
+        
+        /* Test Area */
+        .test-area {
+            background: #f9fafb;
+            border: 1px solid #e9edef;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+        
+        .test-result {
+            margin-top: 10px;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 13px;
+        }
+        
+        .test-result.success { background: #e8fff3; border: 1px solid #50cd89; color: #50cd89; }
+        .test-result.failed { background: #fff5f8; border: 1px solid #f1416c; color: #f1416c; }
+        
+        /* Usage Hint */
+        .usage-hint {
+            background: linear-gradient(135deg, #fff8dd 0%, #fffaf0 100%);
+            border: 1px solid #ffc700;
+            border-radius: 10px;
+            padding: 15px 20px;
+            margin-bottom: 25px;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+        
+        .usage-hint i {
+            color: #ffc700;
+            font-size: 20px;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+        
+        .usage-hint-content h6 {
+            margin: 0 0 5px;
+            font-size: 14px;
+            color: #181c32;
+        }
+        
+        .usage-hint-content p {
+            margin: 0;
+            font-size: 13px;
+            color: #5e6278;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .rules-header {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .filter-bar {
+                flex-direction: column;
+            }
+            
+            .filter-bar .search-input {
+                width: 100%;
+            }
+            
+            .stat-card .stat-value {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+
+<body id="kt_app_body" data-kt-app-layout="dark-sidebar" data-kt-app-header-fixed="true" 
+      data-kt-app-sidebar-enabled="true" data-kt-app-sidebar-fixed="true" 
+      data-kt-app-sidebar-hoverable="true" data-kt-app-sidebar-push-header="true" 
+      data-kt-app-sidebar-push-toolbar="true" data-kt-app-sidebar-push-footer="true" 
+      class="app-default">
+    
+    <div class="d-flex flex-column flex-root app-root" id="kt_app_root">
+        <div class="app-page flex-column flex-column-fluid" id="kt_app_page">
+            
+            <!-- Header -->
+            <div id="kt_app_header" class="app-header">
+                <div id="header-container"></div>
+            </div>
+            
+            <div class="app-wrapper flex-column flex-row-fluid" id="kt_app_wrapper">
+                
+                <!-- Sidebar -->
+                <div id="sidebar-container"></div>
+                
+                <!-- Main Content -->
+                <div class="app-main flex-column flex-row-fluid" id="kt_app_main">
+                    <div class="d-flex flex-column flex-column-fluid">
+                        
+                        <div id="kt_app_content" class="app-content flex-column-fluid">
+                            <div id="kt_app_content_container" class="app-container container-fluid">
+                                
+                                <!-- Page Header -->
+                                <div class="page-header">
+                                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+                                        <div>
+                                            <h1><i class="bi bi-robot me-2"></i>Auto Reply</h1>
+                                            <p>Kelola balasan otomatis untuk pesan WhatsApp yang masuk</p>
+                                        </div>
+                                        <div class="d-flex gap-2">
+                                            <button class="btn btn-light btn-sm" onclick="seedDefaultRules()">
+                                                <i class="bi bi-magic me-1"></i>Default Rules
+                                            </button>
+                                            <a href="auto-reply-logs.html" class="btn btn-light btn-sm">
+                                                <i class="bi bi-clock-history me-1"></i>Lihat Log
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Usage Hint -->
+                                <div class="usage-hint">
+                                    <i class="bi bi-lightbulb-fill"></i>
+                                    <div class="usage-hint-content">
+                                        <h6>Cara Kerja Auto Reply</h6>
+                                        <p>Auto Reply akan merespon pesan masuk secara otomatis berdasarkan rule yang Anda buat. 
+                                           Atur trigger (kata kunci), tipe pencocokan, dan response yang akan dikirim. 
+                                           Gunakan cooldown untuk mencegah spam reply.</p>
+                                    </div>
+                                </div>
+                                
+                                <!-- Stats Row -->
+                                <div class="row g-4 mb-4">
+                                    <div class="col-xl-3 col-md-6">
+                                        <div class="stat-card">
+                                            <div class="stat-icon primary">
+                                                <i class="bi bi-list-check"></i>
+                                            </div>
+                                            <div class="stat-value" id="total-rules">0</div>
+                                            <div class="stat-label">Total Rules</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-xl-3 col-md-6">
+                                        <div class="stat-card">
+                                            <div class="stat-icon success">
+                                                <i class="bi bi-check-circle"></i>
+                                            </div>
+                                            <div class="stat-value" id="active-rules">0</div>
+                                            <div class="stat-label">Active Rules</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-xl-3 col-md-6">
+                                        <div class="stat-card">
+                                            <div class="stat-icon warning">
+                                                <i class="bi bi-send-check"></i>
+                                            </div>
+                                            <div class="stat-value" id="total-replies">0</div>
+                                            <div class="stat-label">Total Replies</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-xl-3 col-md-6">
+                                        <div class="stat-card">
+                                            <div class="stat-icon danger">
+                                                <i class="bi bi-x-circle"></i>
+                                            </div>
+                                            <div class="stat-value" id="failed-replies">0</div>
+                                            <div class="stat-label">Failed Replies</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Rules Container -->
+                                <div class="rules-container">
+                                    <div class="rules-header">
+                                        <h5><i class="bi bi-gear me-2"></i>Daftar Auto Reply Rules</h5>
+                                        <div class="rules-toolbar">
+                                            <button class="btn btn-sm btn-light-primary" onclick="loadRules()">
+                                                <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+                                            </button>
+                                            <button class="btn btn-sm btn-primary" onclick="openCreateModal()">
+                                                <i class="bi bi-plus-lg me-1"></i>Tambah Rule
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Filter Bar -->
+                                    <div class="filter-bar">
+                                        <div class="search-input">
+                                            <i class="bi bi-search"></i>
+                                            <input type="text" id="search-input" placeholder="Cari rule...">
+                                        </div>
+                                        <select id="filter-session">
+                                            <option value="">Semua Session</option>
+                                        </select>
+                                        <select id="filter-scope">
+                                            <option value="">Semua Scope</option>
+                                            <option value="all">All Chat</option>
+                                            <option value="private">Private Only</option>
+                                            <option value="group">Group Only</option>
+                                        </select>
+                                        <select id="filter-status">
+                                            <option value="">Semua Status</option>
+                                            <option value="1">Aktif</option>
+                                            <option value="0">Nonaktif</option>
+                                        </select>
+                                        <span class="text-muted" id="filter-count">0 rules</span>
+                                    </div>
+                                    
+                                    <!-- Rules Table -->
+                                    <div class="table-responsive">
+                                        <table class="rules-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Rule</th>
+                                                    <th>Trigger</th>
+                                                    <th>Response</th>
+                                                    <th>Scope</th>
+                                                    <th>Status</th>
+                                                    <th style="width: 140px;">Aksi</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="rules-tbody">
+                                                <!-- Rules will be rendered here -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    
+                                    <!-- Empty State -->
+                                    <div class="empty-state d-none" id="empty-state">
+                                        <i class="bi bi-robot"></i>
+                                        <h4>Belum Ada Auto Reply Rule</h4>
+                                        <p>Buat rule pertama Anda untuk memulai auto reply otomatis</p>
+                                        <button class="btn btn-primary" onclick="openCreateModal()">
+                                            <i class="bi bi-plus-lg me-2"></i>Tambah Rule Pertama
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Create/Edit Modal -->
+    <div class="modal fade" id="ruleModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="ruleModalTitle">
+                        <i class="bi bi-plus-circle me-2"></i>Tambah Auto Reply Rule
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="ruleForm">
+                        <input type="hidden" id="rule-id">
+                        
+                        <div class="row g-4">
+                            <!-- Nama Rule -->
+                            <div class="col-md-6">
+                                <label class="form-label">Nama Rule <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="rule-name" 
+                                       placeholder="Contoh: Greeting Hallo" required>
+                            </div>
+                            
+                            <!-- Session -->
+                            <div class="col-md-6">
+                                <label class="form-label">Session <small class="text-muted">(kosongkan untuk global)</small></label>
+                                <select class="form-select" id="rule-session">
+                                    <option value="">Semua Session (Global)</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Trigger Type -->
+                            <div class="col-md-4">
+                                <label class="form-label">Tipe Trigger <span class="text-danger">*</span></label>
+                                <select class="form-select" id="rule-trigger-type" required>
+                                    <option value="contains">Contains (Mengandung)</option>
+                                    <option value="exact">Exact (Persis)</option>
+                                    <option value="starts_with">Starts With (Diawali)</option>
+                                    <option value="ends_with">Ends With (Diakhiri)</option>
+                                    <option value="regex">Regex</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Trigger Value -->
+                            <div class="col-md-5">
+                                <label class="form-label">Nilai Trigger <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="rule-trigger-value" 
+                                       placeholder="Contoh: hallo" required>
+                            </div>
+                            
+                            <!-- Match Case -->
+                            <div class="col-md-3">
+                                <label class="form-label">Case Sensitive</label>
+                                <select class="form-select" id="rule-match-case">
+                                    <option value="0">Tidak</option>
+                                    <option value="1">Ya</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Response Content -->
+                            <div class="col-12">
+                                <label class="form-label">Response <span class="text-danger">*</span></label>
+                                <textarea class="form-control response-textarea" id="rule-response" rows="4"
+                                          placeholder="Halo! Terima kasih sudah menghubungi kami. Ada yang bisa dibantu?" required></textarea>
+                                <small class="text-muted">Tip: Gunakan {name} untuk nama pengirim, {number} untuk nomor</small>
+                            </div>
+                            
+                            <!-- Chat Type -->
+                            <div class="col-md-4">
+                                <label class="form-label">Tipe Chat</label>
+                                <select class="form-select" id="rule-chat-type">
+                                    <option value="all">Semua Chat</option>
+                                    <option value="private">Private Only</option>
+                                    <option value="group">Group Only</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Priority -->
+                            <div class="col-md-4">
+                                <label class="form-label">Prioritas</label>
+                                <input type="number" class="form-control" id="rule-priority" 
+                                       value="0" min="0" max="100">
+                                <small class="text-muted">Makin tinggi, makin prioritas</small>
+                            </div>
+                            
+                            <!-- Cooldown -->
+                            <div class="col-md-4">
+                                <label class="form-label">Cooldown (detik)</label>
+                                <input type="number" class="form-control" id="rule-cooldown" 
+                                       value="60" min="0">
+                                <small class="text-muted">Jeda antar reply ke nomor sama</small>
+                            </div>
+                            
+                            <!-- Status -->
+                            <div class="col-12">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="rule-enabled" checked>
+                                    <label class="form-check-label" for="rule-enabled">Aktifkan rule ini</label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Test Area -->
+                        <div class="test-area">
+                            <h6 class="mb-3"><i class="bi bi-play-circle me-2"></i>Test Rule</h6>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="test-message" 
+                                       placeholder="Ketik pesan untuk test...">
+                                <button type="button" class="btn btn-outline-primary" onclick="testRule()">
+                                    <i class="bi bi-lightning me-1"></i>Test
+                                </button>
+                            </div>
+                            <div id="test-result" class="test-result d-none"></div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
+                    <button type="button" class="btn btn-primary" onclick="saveRule()">
+                        <i class="bi bi-check-lg me-1"></i>Simpan Rule
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Scripts -->
+    <script src="assets/plugins/global/plugins.bundle.js"></script>
+    <script src="assets/js/scripts.bundle.js"></script>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    
+    <script>
+        // Load components
+        fetch('components/header.html').then(r => r.text()).then(html => {
+            document.getElementById('header-container').innerHTML = html;
+        });
+        
+        fetch('components/sidebar.html').then(r => r.text()).then(html => {
+            document.getElementById('sidebar-container').innerHTML = html;
+            setTimeout(() => {
+                document.querySelectorAll('.menu-link').forEach(link => {
+                    if (link.getAttribute('href')?.includes('auto-reply')) {
+                        link.classList.add('active');
+                        const accordion = link.closest('.menu-accordion');
+                        if (accordion) accordion.classList.add('here', 'show');
+                    }
+                });
+            }, 100);
+        });
+    </script>
+    
+    <script>
+        let rules = [];
+        let sessions = [];
+        const socket = io();
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSessions();
+            loadRules();
+            loadStats();
+            
+            // Filter events
+            document.getElementById('search-input').addEventListener('input', filterRules);
+            document.getElementById('filter-session').addEventListener('change', filterRules);
+            document.getElementById('filter-scope').addEventListener('change', filterRules);
+            document.getElementById('filter-status').addEventListener('change', filterRules);
+            
+            // Real-time updates
+            socket.on('auto-reply-sent', () => {
+                loadStats();
+            });
+        });
+        
+        async function loadSessions() {
+            try {
+                const response = await fetch('/api/sessions');
+                const data = await response.json();
+                
+                if (data.success && data.sessions) {
+                    sessions = data.sessions;
+                    const selects = ['filter-session', 'rule-session'];
+                    selects.forEach(id => {
+                        const select = document.getElementById(id);
+                        const firstOption = select.options[0];
+                        select.innerHTML = '';
+                        select.appendChild(firstOption);
+                        sessions.forEach(s => {
+                            const opt = document.createElement('option');
+                            opt.value = s.id;
+                            opt.textContent = s.id;
+                            select.appendChild(opt);
+                        });
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading sessions:', error);
+            }
+        }
+        
+        async function loadRules() {
+            try {
+                const response = await fetch('/api/auto-reply');
+                const data = await response.json();
+                
+                if (data.success) {
+                    rules = data.rules || [];
+                    renderRules(rules);
+                    updateStats();
+                }
+            } catch (error) {
+                console.error('Error loading rules:', error);
+                Swal.fire('Error', 'Gagal memuat rules', 'error');
+            }
+        }
+        
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/auto-reply-logs?limit=1');
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('total-replies').textContent = data.total || 0;
+                    // Get failed count
+                    const failedRes = await fetch('/api/auto-reply-logs?status=failed&limit=1');
+                    const failedData = await failedRes.json();
+                    document.getElementById('failed-replies').textContent = failedData.total || 0;
+                }
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+        
+        function updateStats() {
+            document.getElementById('total-rules').textContent = rules.length;
+            document.getElementById('active-rules').textContent = rules.filter(r => r.enabled).length;
+        }
+        
+        function filterRules() {
+            const search = document.getElementById('search-input').value.toLowerCase();
+            const sessionFilter = document.getElementById('filter-session').value;
+            const scopeFilter = document.getElementById('filter-scope').value;
+            const statusFilter = document.getElementById('filter-status').value;
+            
+            const filtered = rules.filter(rule => {
+                if (search && !rule.name.toLowerCase().includes(search) && 
+                    !rule.trigger_value.toLowerCase().includes(search)) return false;
+                if (sessionFilter && rule.session_id !== sessionFilter) return false;
+                if (scopeFilter && rule.scope !== scopeFilter) return false;
+                if (statusFilter !== '' && rule.enabled !== parseInt(statusFilter)) return false;
+                return true;
+            });
+            
+            renderRules(filtered);
+        }
+        
+        function renderRules(rulesToRender) {
+            const tbody = document.getElementById('rules-tbody');
+            const emptyState = document.getElementById('empty-state');
+            
+            document.getElementById('filter-count').textContent = `${rulesToRender.length} rules`;
+            
+            if (rulesToRender.length === 0) {
+                tbody.innerHTML = '';
+                emptyState.classList.remove('d-none');
+                return;
+            }
+            
+            emptyState.classList.add('d-none');
+            
+            tbody.innerHTML = rulesToRender.map(rule => `
+                <tr class="${rule.enabled ? '' : 'inactive'}">
+                    <td>
+                        <div class="rule-name-cell">
+                            <div class="rule-icon ${rule.enabled ? 'active' : 'inactive'}">
+                                <i class="bi bi-robot"></i>
+                            </div>
+                            <div class="rule-info">
+                                <h6>${escapeHtml(rule.name)}</h6>
+                                <small>${rule.session_id || 'Global'} · Priority: ${rule.priority}</small>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="trigger-badge ${rule.trigger_type}">
+                            ${rule.trigger_type}
+                        </span>
+                        <div class="mt-1" style="font-family: monospace; font-size: 12px; color: #5e6278;">
+                            "${escapeHtml(rule.trigger_value.substring(0, 30))}${rule.trigger_value.length > 30 ? '...' : ''}"
+                        </div>
+                    </td>
+                    <td>
+                        <div style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; 
+                                    font-size: 13px; color: #5e6278;">
+                            ${escapeHtml(rule.response_content?.substring(0, 50) || '')}${rule.response_content?.length > 50 ? '...' : ''}
+                        </div>
+                    </td>
+                    <td>
+                        <span class="scope-badge ${rule.scope}">
+                            <i class="bi bi-${rule.scope === 'private' ? 'person' : rule.scope === 'group' ? 'people' : 'chat-dots'}"></i>
+                            ${rule.scope === 'all' ? 'All' : rule.scope}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="status-toggle">
+                            <input type="checkbox" class="form-check-input" 
+                                   ${rule.enabled ? 'checked' : ''} 
+                                   onchange="toggleRule(${rule.id}, this.checked)">
+                        </div>
+                    </td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="action-btn edit" onclick="editRule(${rule.id})" title="Edit">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="action-btn test" onclick="testRuleById(${rule.id})" title="Test">
+                                <i class="bi bi-lightning"></i>
+                            </button>
+                            <button class="action-btn delete" onclick="deleteRule(${rule.id})" title="Hapus">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+        
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                      .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+        }
+        
+        function openCreateModal() {
+            document.getElementById('ruleModalTitle').innerHTML = '<i class="bi bi-plus-circle me-2"></i>Tambah Auto Reply Rule';
+            document.getElementById('ruleForm').reset();
+            document.getElementById('rule-id').value = '';
+            document.getElementById('rule-enabled').checked = true;
+            document.getElementById('test-result').classList.add('d-none');
+            new bootstrap.Modal(document.getElementById('ruleModal')).show();
+        }
+        
+        async function editRule(id) {
+            const rule = rules.find(r => r.id === id);
+            if (!rule) return;
+            
+            document.getElementById('ruleModalTitle').innerHTML = '<i class="bi bi-pencil me-2"></i>Edit Auto Reply Rule';
+            document.getElementById('rule-id').value = rule.id;
+            document.getElementById('rule-name').value = rule.name;
+            document.getElementById('rule-session').value = rule.session_id || '';
+            document.getElementById('rule-trigger-type').value = rule.trigger_type;
+            document.getElementById('rule-trigger-value').value = rule.trigger_value;
+            document.getElementById('rule-match-case').value = rule.match_case ? '1' : '0';
+            document.getElementById('rule-response').value = rule.response_content || '';
+            document.getElementById('rule-chat-type').value = rule.scope || 'all';
+            document.getElementById('rule-priority').value = rule.priority || 0;
+            document.getElementById('rule-cooldown').value = rule.cooldown_seconds || 60;
+            document.getElementById('rule-enabled').checked = rule.enabled;
+            document.getElementById('test-result').classList.add('d-none');
+            
+            new bootstrap.Modal(document.getElementById('ruleModal')).show();
+        }
+        
+        async function saveRule() {
+            const id = document.getElementById('rule-id').value;
+            const data = {
+                name: document.getElementById('rule-name').value,
+                session_id: document.getElementById('rule-session').value || null,
+                trigger_type: document.getElementById('rule-trigger-type').value,
+                trigger_value: document.getElementById('rule-trigger-value').value,
+                match_case: document.getElementById('rule-match-case').value === '1',
+                response_type: 'text',
+                response_content: document.getElementById('rule-response').value,
+                scope: document.getElementById('rule-chat-type').value,
+                priority: parseInt(document.getElementById('rule-priority').value) || 0,
+                cooldown_seconds: parseInt(document.getElementById('rule-cooldown').value) || 60,
+                enabled: document.getElementById('rule-enabled').checked
+            };
+            
+            if (!data.name || !data.trigger_value || !data.response_content) {
+                Swal.fire('Error', 'Mohon lengkapi semua field yang wajib', 'error');
+                return;
+            }
+            
+            try {
+                const url = id ? `/api/auto-reply/${id}` : '/api/auto-reply';
+                const method = id ? 'PUT' : 'POST';
+                
+                const response = await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    bootstrap.Modal.getInstance(document.getElementById('ruleModal')).hide();
+                    Swal.fire('Berhasil', id ? 'Rule berhasil diupdate' : 'Rule berhasil ditambahkan', 'success');
+                    loadRules();
+                } else {
+                    Swal.fire('Error', result.error || 'Gagal menyimpan rule', 'error');
+                }
+            } catch (error) {
+                console.error('Error saving rule:', error);
+                Swal.fire('Error', 'Gagal menyimpan rule', 'error');
+            }
+        }
+        
+        async function toggleRule(id, enabled) {
+            try {
+                const response = await fetch(`/api/auto-reply/${id}/toggle`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enabled })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    const rule = rules.find(r => r.id === id);
+                    if (rule) rule.enabled = enabled;
+                    updateStats();
+                }
+            } catch (error) {
+                console.error('Error toggling rule:', error);
+            }
+        }
+        
+        async function deleteRule(id) {
+            const result = await Swal.fire({
+                title: 'Hapus Rule?',
+                text: 'Rule yang dihapus tidak dapat dikembalikan',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#f1416c',
+                confirmButtonText: 'Ya, Hapus',
+                cancelButtonText: 'Batal'
+            });
+            
+            if (result.isConfirmed) {
+                try {
+                    const response = await fetch(`/api/auto-reply/${id}`, { method: 'DELETE' });
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        Swal.fire('Dihapus', 'Rule berhasil dihapus', 'success');
+                        loadRules();
+                    }
+                } catch (error) {
+                    Swal.fire('Error', 'Gagal menghapus rule', 'error');
+                }
+            }
+        }
+        
+        function testRule() {
+            const triggerType = document.getElementById('rule-trigger-type').value;
+            const triggerValue = document.getElementById('rule-trigger-value').value;
+            const matchCase = document.getElementById('rule-match-case').value === '1';
+            const testMessage = document.getElementById('test-message').value;
+            const resultDiv = document.getElementById('test-result');
+            
+            if (!testMessage) {
+                resultDiv.classList.add('d-none');
+                return;
+            }
+            
+            const msg = matchCase ? testMessage : testMessage.toLowerCase();
+            const trigger = matchCase ? triggerValue : triggerValue.toLowerCase();
+            
+            let matched = false;
+            switch (triggerType) {
+                case 'exact': matched = msg === trigger; break;
+                case 'contains': matched = msg.includes(trigger); break;
+                case 'starts_with': matched = msg.startsWith(trigger); break;
+                case 'ends_with': matched = msg.endsWith(trigger); break;
+                case 'regex':
+                    try { matched = new RegExp(triggerValue, matchCase ? '' : 'i').test(testMessage); }
+                    catch (e) { matched = false; }
+                    break;
+            }
+            
+            resultDiv.classList.remove('d-none', 'success', 'failed');
+            resultDiv.classList.add(matched ? 'success' : 'failed');
+            resultDiv.innerHTML = matched 
+                ? '<i class="bi bi-check-circle me-2"></i>Match! Rule akan merespon pesan ini'
+                : '<i class="bi bi-x-circle me-2"></i>Tidak match. Rule tidak akan merespon';
+        }
+        
+        async function testRuleById(id) {
+            const testMsg = await Swal.fire({
+                title: 'Test Rule',
+                input: 'text',
+                inputPlaceholder: 'Ketik pesan untuk test...',
+                showCancelButton: true,
+                confirmButtonText: 'Test',
+                cancelButtonText: 'Batal'
+            });
+            
+            if (testMsg.isConfirmed && testMsg.value) {
+                try {
+                    const response = await fetch(`/api/auto-reply/${id}/test`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ message: testMsg.value })
+                    });
+                    const data = await response.json();
+                    
+                    if (data.matched) {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Match!',
+                            html: `<p>Rule akan merespon dengan:</p><div style="background:#f5f5f5;padding:10px;border-radius:8px;text-align:left">${escapeHtml(data.response)}</div>`
+                        });
+                    } else {
+                        Swal.fire('Tidak Match', 'Pesan tidak cocok dengan trigger rule ini', 'info');
+                    }
+                } catch (error) {
+                    Swal.fire('Error', 'Gagal test rule', 'error');
+                }
+            }
+        }
+        
+        async function seedDefaultRules() {
+            const result = await Swal.fire({
+                title: 'Buat Default Rules?',
+                text: 'Ini akan membuat contoh auto reply rules standar',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Ya, Buat',
+                cancelButtonText: 'Batal'
+            });
+            
+            if (result.isConfirmed) {
+                try {
+                    const response = await fetch('/api/auto-reply/seed', { method: 'POST' });
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        Swal.fire('Berhasil', `${data.created} default rules berhasil dibuat`, 'success');
+                        loadRules();
+                    } else {
+                        Swal.fire('Info', data.message || 'Gagal membuat default rules', 'info');
+                    }
+                } catch (error) {
+                    Swal.fire('Error', 'Gagal membuat default rules', 'error');
+                }
+            }
+        }
+    </script>
+</body>
+</html>

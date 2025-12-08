@@ -92,6 +92,58 @@ db.exec(`
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
+    -- Auto Reply Rules Table
+    CREATE TABLE IF NOT EXISTS auto_reply_rules (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id TEXT,
+        name TEXT NOT NULL,
+        trigger_type TEXT NOT NULL CHECK(trigger_type IN ('exact', 'contains', 'starts_with', 'ends_with', 'regex')),
+        trigger_value TEXT NOT NULL,
+        match_case INTEGER DEFAULT 0,
+        response_type TEXT NOT NULL DEFAULT 'text' CHECK(response_type IN ('text', 'template', 'image', 'document', 'audio', 'video')),
+        response_content TEXT NOT NULL,
+        response_media_url TEXT,
+        response_media_data TEXT,
+        response_media_filename TEXT,
+        response_media_mimetype TEXT,
+        scope TEXT NOT NULL DEFAULT 'all' CHECK(scope IN ('all', 'private', 'group')),
+        enabled INTEGER DEFAULT 1,
+        priority INTEGER DEFAULT 0,
+        cooldown_seconds INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- Auto Reply Logs Table
+    CREATE TABLE IF NOT EXISTS auto_reply_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        rule_id INTEGER NOT NULL,
+        rule_name TEXT,
+        session_id TEXT NOT NULL,
+        message_id TEXT,
+        from_number TEXT NOT NULL,
+        chat_id TEXT NOT NULL,
+        is_group INTEGER DEFAULT 0,
+        matched_text TEXT,
+        trigger_value TEXT,
+        response_sent TEXT,
+        status TEXT DEFAULT 'success' CHECK(status IN ('success', 'failed', 'cooldown')),
+        error_message TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (rule_id) REFERENCES auto_reply_rules(id) ON DELETE CASCADE
+    );
+
+    -- Auto Reply Cooldowns Table
+    CREATE TABLE IF NOT EXISTS auto_reply_cooldowns (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        rule_id INTEGER NOT NULL,
+        session_id TEXT NOT NULL,
+        sender_number TEXT NOT NULL,
+        last_sent_at DATETIME NOT NULL,
+        UNIQUE(rule_id, session_id, sender_number),
+        FOREIGN KEY (rule_id) REFERENCES auto_reply_rules(id) ON DELETE CASCADE
+    );
+
     -- Create indexes for better query performance
     CREATE INDEX IF NOT EXISTS idx_message_logs_session ON message_logs(session_id);
     CREATE INDEX IF NOT EXISTS idx_message_logs_timestamp ON message_logs(timestamp);
@@ -103,6 +155,12 @@ db.exec(`
     CREATE INDEX IF NOT EXISTS idx_chat_templates_code ON chat_templates(code);
     CREATE INDEX IF NOT EXISTS idx_group_exports_session ON group_exports(session_id);
     CREATE INDEX IF NOT EXISTS idx_group_exports_created ON group_exports(created_at);
+    CREATE INDEX IF NOT EXISTS idx_auto_reply_rules_session ON auto_reply_rules(session_id);
+    CREATE INDEX IF NOT EXISTS idx_auto_reply_rules_enabled ON auto_reply_rules(enabled);
+    CREATE INDEX IF NOT EXISTS idx_auto_reply_logs_rule ON auto_reply_logs(rule_id);
+    CREATE INDEX IF NOT EXISTS idx_auto_reply_logs_session ON auto_reply_logs(session_id);
+    CREATE INDEX IF NOT EXISTS idx_auto_reply_logs_created ON auto_reply_logs(created_at);
+    CREATE INDEX IF NOT EXISTS idx_auto_reply_cooldowns_rule ON auto_reply_cooldowns(rule_id);
 `)
 
 // Migration: Add media columns to chat_templates if they don't exist
@@ -635,6 +693,55 @@ export interface GroupExportEntry {
     updated_at?: string
 }
 
+// Auto Reply Rule Interface
+export interface AutoReplyRuleEntry {
+    id?: number
+    session_id?: string | null
+    name: string
+    trigger_type: 'exact' | 'contains' | 'starts_with' | 'ends_with' | 'regex'
+    trigger_value: string
+    match_case?: number
+    response_type: 'text' | 'template' | 'image' | 'document' | 'audio' | 'video'
+    response_content: string
+    response_media_url?: string
+    response_media_data?: string
+    response_media_filename?: string
+    response_media_mimetype?: string
+    scope: 'all' | 'private' | 'group'
+    enabled?: number
+    priority?: number
+    cooldown_seconds?: number
+    created_at?: string
+    updated_at?: string
+}
+
+// Auto Reply Log Interface
+export interface AutoReplyLogEntry {
+    id?: number
+    rule_id: number
+    rule_name?: string
+    session_id: string
+    message_id?: string
+    from_number: string
+    chat_id: string
+    is_group?: number
+    matched_text?: string
+    trigger_value?: string
+    response_sent?: string
+    status?: 'success' | 'failed' | 'cooldown'
+    error_message?: string
+    created_at?: string
+}
+
+// Auto Reply Cooldown Interface
+export interface AutoReplyCooldownEntry {
+    id?: number
+    rule_id: number
+    session_id: string
+    sender_number: string
+    last_sent_at: string
+}
+
 // Group Export Functions
 export const groupExportDb = {
     // Create new export record
@@ -812,6 +919,459 @@ export const groupExportDb = {
         
         const result = db.prepare(query).get(...params) as any
         return result?.count || 0
+    }
+}
+
+// Auto Reply Rules Functions
+export const autoReplyDb = {
+    // Create new rule
+    create: (rule: AutoReplyRuleEntry): { success: boolean; id?: number | bigint; error?: string } => {
+        try {
+            const stmt = db.prepare(`
+                INSERT INTO auto_reply_rules (
+                    session_id, name, trigger_type, trigger_value, match_case,
+                    response_type, response_content, response_media_url, response_media_data,
+                    response_media_filename, response_media_mimetype,
+                    scope, enabled, priority, cooldown_seconds, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+            `)
+            
+            const result = stmt.run(
+                rule.session_id || null,
+                rule.name,
+                rule.trigger_type,
+                rule.trigger_value,
+                rule.match_case || 0,
+                rule.response_type || 'text',
+                rule.response_content,
+                rule.response_media_url || null,
+                rule.response_media_data || null,
+                rule.response_media_filename || null,
+                rule.response_media_mimetype || null,
+                rule.scope || 'all',
+                rule.enabled !== undefined ? rule.enabled : 1,
+                rule.priority || 0,
+                rule.cooldown_seconds || 0
+            )
+            
+            return { success: true, id: result.lastInsertRowid }
+        } catch (error: any) {
+            return { success: false, error: error.message }
+        }
+    },
+
+    // Get all rules
+    getAll: (options: { sessionId?: string; enabledOnly?: boolean; limit?: number; offset?: number } = {}): AutoReplyRuleEntry[] => {
+        let query = 'SELECT * FROM auto_reply_rules WHERE 1=1'
+        const params: any[] = []
+
+        if (options.sessionId) {
+            query += ' AND (session_id = ? OR session_id IS NULL)'
+            params.push(options.sessionId)
+        }
+
+        if (options.enabledOnly) {
+            query += ' AND enabled = 1'
+        }
+
+        query += ' ORDER BY priority DESC, created_at DESC'
+
+        if (options.limit) {
+            query += ' LIMIT ?'
+            params.push(options.limit)
+        }
+
+        if (options.offset) {
+            query += ' OFFSET ?'
+            params.push(options.offset)
+        }
+
+        const stmt = db.prepare(query)
+        return stmt.all(...params) as AutoReplyRuleEntry[]
+    },
+
+    // Get rules for matching (active rules for a session)
+    getRulesForMatching: (sessionId: string): AutoReplyRuleEntry[] => {
+        const stmt = db.prepare(`
+            SELECT * FROM auto_reply_rules 
+            WHERE (session_id = ? OR session_id IS NULL) 
+            AND enabled = 1
+            ORDER BY priority DESC, id ASC
+        `)
+        return stmt.all(sessionId) as AutoReplyRuleEntry[]
+    },
+
+    // Get rule by ID
+    getById: (id: number): AutoReplyRuleEntry | undefined => {
+        const stmt = db.prepare('SELECT * FROM auto_reply_rules WHERE id = ?')
+        return stmt.get(id) as AutoReplyRuleEntry | undefined
+    },
+
+    // Update rule
+    update: (id: number, rule: Partial<AutoReplyRuleEntry>): { success: boolean; changes?: number; error?: string } => {
+        try {
+            const updates: string[] = []
+            const params: any[] = []
+
+            if (rule.session_id !== undefined) {
+                updates.push('session_id = ?')
+                params.push(rule.session_id)
+            }
+            if (rule.name !== undefined) {
+                updates.push('name = ?')
+                params.push(rule.name)
+            }
+            if (rule.trigger_type !== undefined) {
+                updates.push('trigger_type = ?')
+                params.push(rule.trigger_type)
+            }
+            if (rule.trigger_value !== undefined) {
+                updates.push('trigger_value = ?')
+                params.push(rule.trigger_value)
+            }
+            if (rule.match_case !== undefined) {
+                updates.push('match_case = ?')
+                params.push(rule.match_case)
+            }
+            if (rule.response_type !== undefined) {
+                updates.push('response_type = ?')
+                params.push(rule.response_type)
+            }
+            if (rule.response_content !== undefined) {
+                updates.push('response_content = ?')
+                params.push(rule.response_content)
+            }
+            if (rule.response_media_url !== undefined) {
+                updates.push('response_media_url = ?')
+                params.push(rule.response_media_url)
+            }
+            if (rule.response_media_data !== undefined) {
+                updates.push('response_media_data = ?')
+                params.push(rule.response_media_data)
+            }
+            if (rule.response_media_filename !== undefined) {
+                updates.push('response_media_filename = ?')
+                params.push(rule.response_media_filename)
+            }
+            if (rule.response_media_mimetype !== undefined) {
+                updates.push('response_media_mimetype = ?')
+                params.push(rule.response_media_mimetype)
+            }
+            if (rule.scope !== undefined) {
+                updates.push('scope = ?')
+                params.push(rule.scope)
+            }
+            if (rule.enabled !== undefined) {
+                updates.push('enabled = ?')
+                params.push(rule.enabled)
+            }
+            if (rule.priority !== undefined) {
+                updates.push('priority = ?')
+                params.push(rule.priority)
+            }
+            if (rule.cooldown_seconds !== undefined) {
+                updates.push('cooldown_seconds = ?')
+                params.push(rule.cooldown_seconds)
+            }
+
+            if (updates.length === 0) {
+                return { success: false, error: 'No fields to update' }
+            }
+
+            updates.push("updated_at = datetime('now')")
+            params.push(id)
+
+            const stmt = db.prepare(`UPDATE auto_reply_rules SET ${updates.join(', ')} WHERE id = ?`)
+            const result = stmt.run(...params)
+            return { success: true, changes: result.changes }
+        } catch (error: any) {
+            return { success: false, error: error.message }
+        }
+    },
+
+    // Delete rule
+    delete: (id: number): { success: boolean; changes?: number; error?: string } => {
+        try {
+            const stmt = db.prepare('DELETE FROM auto_reply_rules WHERE id = ?')
+            const result = stmt.run(id)
+            return { success: true, changes: result.changes }
+        } catch (error: any) {
+            return { success: false, error: error.message }
+        }
+    },
+
+    // Toggle enabled status
+    toggleEnabled: (id: number): { success: boolean; enabled?: boolean; error?: string } => {
+        try {
+            const current = db.prepare('SELECT enabled FROM auto_reply_rules WHERE id = ?').get(id) as any
+            if (!current) {
+                return { success: false, error: 'Rule tidak ditemukan' }
+            }
+            
+            const newStatus = current.enabled === 1 ? 0 : 1
+            const stmt = db.prepare("UPDATE auto_reply_rules SET enabled = ?, updated_at = datetime('now') WHERE id = ?")
+            stmt.run(newStatus, id)
+            
+            return { success: true, enabled: newStatus === 1 }
+        } catch (error: any) {
+            return { success: false, error: error.message }
+        }
+    },
+
+    // Bulk delete
+    bulkDelete: (ids: number[]): { success: boolean; deleted?: number; error?: string } => {
+        try {
+            const placeholders = ids.map(() => '?').join(',')
+            const stmt = db.prepare(`DELETE FROM auto_reply_rules WHERE id IN (${placeholders})`)
+            const result = stmt.run(...ids)
+            return { success: true, deleted: result.changes }
+        } catch (error: any) {
+            return { success: false, error: error.message }
+        }
+    },
+
+    // Get count
+    getCount: (options: { sessionId?: string; enabledOnly?: boolean } = {}): number => {
+        let query = 'SELECT COUNT(*) as count FROM auto_reply_rules WHERE 1=1'
+        const params: any[] = []
+        
+        if (options.sessionId) {
+            query += ' AND (session_id = ? OR session_id IS NULL)'
+            params.push(options.sessionId)
+        }
+        
+        if (options.enabledOnly) {
+            query += ' AND enabled = 1'
+        }
+        
+        const result = db.prepare(query).get(...params) as any
+        return result?.count || 0
+    },
+
+    // Match message against rules
+    matchMessage: (sessionId: string, messageText: string, isGroup: boolean): AutoReplyRuleEntry | null => {
+        const rules = autoReplyDb.getRulesForMatching(sessionId)
+        
+        for (const rule of rules) {
+            // Check scope
+            if (rule.scope === 'private' && isGroup) continue
+            if (rule.scope === 'group' && !isGroup) continue
+            
+            const text = rule.match_case ? messageText : messageText.toLowerCase()
+            const triggerVal = rule.match_case ? rule.trigger_value : rule.trigger_value.toLowerCase()
+            
+            let matched = false
+            
+            switch (rule.trigger_type) {
+                case 'exact':
+                    matched = text === triggerVal
+                    break
+                case 'contains':
+                    matched = text.includes(triggerVal)
+                    break
+                case 'starts_with':
+                    matched = text.startsWith(triggerVal)
+                    break
+                case 'ends_with':
+                    matched = text.endsWith(triggerVal)
+                    break
+                case 'regex':
+                    try {
+                        const regex = new RegExp(rule.trigger_value, rule.match_case ? '' : 'i')
+                        matched = regex.test(messageText)
+                    } catch (e) {
+                        // Invalid regex, skip
+                        continue
+                    }
+                    break
+            }
+            
+            if (matched) {
+                return rule
+            }
+        }
+        
+        return null
+    }
+}
+
+// Auto Reply Logs Functions
+export const autoReplyLogDb = {
+    // Insert log
+    insert: (log: AutoReplyLogEntry): number | bigint => {
+        const stmt = db.prepare(`
+            INSERT INTO auto_reply_logs (
+                rule_id, rule_name, session_id, message_id, from_number,
+                chat_id, is_group, matched_text, trigger_value,
+                response_sent, status, error_message, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+        `)
+        
+        const result = stmt.run(
+            log.rule_id,
+            log.rule_name || null,
+            log.session_id,
+            log.message_id || null,
+            log.from_number,
+            log.chat_id,
+            log.is_group || 0,
+            log.matched_text || null,
+            log.trigger_value || null,
+            log.response_sent || null,
+            log.status || 'success',
+            log.error_message || null
+        )
+        
+        return result.lastInsertRowid
+    },
+
+    // Get all logs
+    getAll: (options: { 
+        sessionId?: string; 
+        ruleId?: number;
+        status?: string;
+        limit?: number; 
+        offset?: number;
+        startDate?: string;
+        endDate?: string;
+    } = {}): AutoReplyLogEntry[] => {
+        let query = 'SELECT * FROM auto_reply_logs WHERE 1=1'
+        const params: any[] = []
+
+        if (options.sessionId) {
+            query += ' AND session_id = ?'
+            params.push(options.sessionId)
+        }
+
+        if (options.ruleId) {
+            query += ' AND rule_id = ?'
+            params.push(options.ruleId)
+        }
+
+        if (options.status) {
+            query += ' AND status = ?'
+            params.push(options.status)
+        }
+
+        if (options.startDate) {
+            query += ' AND created_at >= ?'
+            params.push(options.startDate)
+        }
+
+        if (options.endDate) {
+            query += ' AND created_at <= ?'
+            params.push(options.endDate)
+        }
+
+        query += ' ORDER BY created_at DESC'
+
+        if (options.limit) {
+            query += ' LIMIT ?'
+            params.push(options.limit)
+        }
+
+        if (options.offset) {
+            query += ' OFFSET ?'
+            params.push(options.offset)
+        }
+
+        const stmt = db.prepare(query)
+        return stmt.all(...params) as AutoReplyLogEntry[]
+    },
+
+    // Get statistics
+    getStatistics: (sessionId?: string): any => {
+        let query = `
+            SELECT 
+                COUNT(*) as total_replies,
+                SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) as success,
+                SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed,
+                SUM(CASE WHEN status = 'cooldown' THEN 1 ELSE 0 END) as cooldown,
+                SUM(CASE WHEN is_group = 1 THEN 1 ELSE 0 END) as group_replies,
+                SUM(CASE WHEN is_group = 0 THEN 1 ELSE 0 END) as private_replies
+            FROM auto_reply_logs
+        `
+        
+        if (sessionId) {
+            query += ' WHERE session_id = ?'
+            const stmt = db.prepare(query)
+            return stmt.get(sessionId)
+        }
+        
+        const stmt = db.prepare(query)
+        return stmt.get()
+    },
+
+    // Get count
+    getCount: (options: { sessionId?: string; ruleId?: number } = {}): number => {
+        let query = 'SELECT COUNT(*) as count FROM auto_reply_logs WHERE 1=1'
+        const params: any[] = []
+        
+        if (options.sessionId) {
+            query += ' AND session_id = ?'
+            params.push(options.sessionId)
+        }
+        
+        if (options.ruleId) {
+            query += ' AND rule_id = ?'
+            params.push(options.ruleId)
+        }
+        
+        const result = db.prepare(query).get(...params) as any
+        return result?.count || 0
+    },
+
+    // Delete old logs
+    deleteOlderThan: (days: number): number => {
+        const cutoffDate = new Date()
+        cutoffDate.setDate(cutoffDate.getDate() - days)
+        
+        const stmt = db.prepare('DELETE FROM auto_reply_logs WHERE created_at < ?')
+        const result = stmt.run(cutoffDate.toISOString())
+        return result.changes
+    }
+}
+
+// Auto Reply Cooldown Functions
+export const autoReplyCooldownDb = {
+    // Check if in cooldown
+    isInCooldown: (ruleId: number, sessionId: string, senderNumber: string, cooldownSeconds: number): boolean => {
+        if (cooldownSeconds <= 0) return false
+        
+        const stmt = db.prepare(`
+            SELECT last_sent_at FROM auto_reply_cooldowns 
+            WHERE rule_id = ? AND session_id = ? AND sender_number = ?
+        `)
+        const result = stmt.get(ruleId, sessionId, senderNumber) as AutoReplyCooldownEntry | undefined
+        
+        if (!result) return false
+        
+        const lastSent = new Date(result.last_sent_at)
+        const now = new Date()
+        const diffSeconds = (now.getTime() - lastSent.getTime()) / 1000
+        
+        return diffSeconds < cooldownSeconds
+    },
+
+    // Update cooldown timestamp
+    updateCooldown: (ruleId: number, sessionId: string, senderNumber: string): void => {
+        const stmt = db.prepare(`
+            INSERT INTO auto_reply_cooldowns (rule_id, session_id, sender_number, last_sent_at)
+            VALUES (?, ?, ?, datetime('now'))
+            ON CONFLICT(rule_id, session_id, sender_number) 
+            DO UPDATE SET last_sent_at = datetime('now')
+        `)
+        stmt.run(ruleId, sessionId, senderNumber)
+    },
+
+    // Clean old cooldowns
+    cleanOldCooldowns: (hours: number = 24): number => {
+        const cutoffDate = new Date()
+        cutoffDate.setHours(cutoffDate.getHours() - hours)
+        
+        const stmt = db.prepare('DELETE FROM auto_reply_cooldowns WHERE last_sent_at < ?')
+        const result = stmt.run(cutoffDate.toISOString())
+        return result.changes
     }
 }
 

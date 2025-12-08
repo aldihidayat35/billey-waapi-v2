@@ -36,8 +36,22 @@ function initializeComponents() {
 
 // Initialize modals
 function initializeModals() {
-    qrModal = new bootstrap.Modal(document.getElementById('qrModal'))
-    pairingModal = new bootstrap.Modal(document.getElementById('pairingModal'))
+    const qrModalEl = document.getElementById('qrModal')
+    const pairingModalEl = document.getElementById('pairingModal')
+    
+    if (qrModalEl) {
+        qrModal = new bootstrap.Modal(qrModalEl)
+        console.log('✅ QR Modal initialized')
+    } else {
+        console.error('❌ QR Modal element not found!')
+    }
+    
+    if (pairingModalEl) {
+        pairingModal = new bootstrap.Modal(pairingModalEl)
+        console.log('✅ Pairing Modal initialized')
+    } else {
+        console.error('❌ Pairing Modal element not found!')
+    }
 }
 
 // DOM Elements
@@ -65,6 +79,19 @@ socket.on('connect', () => {
     socket.emit('get-sessions')
 })
 
+socket.on('error', (errorMessage) => {
+    console.error('❌ Socket error:', errorMessage)
+    Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: errorMessage
+    })
+})
+
+socket.on('message', (message) => {
+    console.log('📨 Server message:', message)
+})
+
 socket.on('all-sessions', (sessions) => {
     console.log('📋 Received sessions:', sessions)
     allSessions = sessions
@@ -73,11 +100,14 @@ socket.on('all-sessions', (sessions) => {
 
 socket.on('qr', (data) => {
     console.log('📱 QR Code received for:', data.sessionId)
+    console.log('📱 QR data length:', data.qr?.length)
+    Swal.close() // Close loading dialog
     displayQRCode(data.qr)
 })
 
 socket.on('pairing-code', (data) => {
     console.log('🔢 Pairing code received:', data.code)
+    Swal.close() // Close loading dialog
     displayPairingCode(data.code)
 })
 
@@ -166,11 +196,24 @@ async function createSession() {
 
 // Display QR Code (sama seperti app.js)
 function displayQRCode(qrData) {
+    console.log('🖼️ displayQRCode called, data length:', qrData?.length)
+    
+    if (!qrData) {
+        console.error('❌ No QR data received')
+        return
+    }
+    
     const qrContainer = document.getElementById('qr-code-container')
+    if (!qrContainer) {
+        console.error('❌ QR container element not found!')
+        return
+    }
+    
     qrContainer.innerHTML = ''
     
     // Try using QRCode library if available
     if (typeof QRCode !== 'undefined' && QRCode.toCanvas) {
+        console.log('📦 Using QRCode.toCanvas')
         QRCode.toCanvas(qrData, {
             width: 300,
             margin: 2,
@@ -189,11 +232,23 @@ function displayQRCode(qrData) {
             console.log('✅ QR Code displayed successfully')
         })
     } else {
+        console.log('📦 QRCode library not found, using fallback')
         // Fallback to image API
         displayQRCodeFallback(qrData, qrContainer)
     }
     
-    qrModal.show()
+    // Show modal
+    if (qrModal) {
+        console.log('🔲 Showing QR Modal')
+        qrModal.show()
+    } else {
+        console.error('❌ QR Modal not initialized! Trying to initialize...')
+        const qrModalEl = document.getElementById('qrModal')
+        if (qrModalEl) {
+            qrModal = new bootstrap.Modal(qrModalEl)
+            qrModal.show()
+        }
+    }
 }
 
 // Fallback QR Code display
