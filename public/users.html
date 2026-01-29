@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manajemen User - WhatsApp Gateway</title>
+    
+    <!-- Metronic CSS -->
+    <link href="/assets/plugins/global/plugins.bundle.css" rel="stylesheet" type="text/css"/>
+    <link href="/assets/css/style.bundle.css" rel="stylesheet" type="text/css"/>
+    
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    
+    <style>
+        .user-avatar {
+            width: 45px;
+            height: 45px;
+            background: linear-gradient(135deg, #25D366, #128C7E);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 16px;
+        }
+        
+        .badge-role {
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        
+        .badge-adminwa {
+            background: #fff5f8;
+            color: #f1416c;
+        }
+        
+        .badge-memberwa {
+            background: #e8fff3;
+            color: #50cd89;
+        }
+        
+        .badge-aktif {
+            background: #e8fff3;
+            color: #50cd89;
+        }
+        
+        .badge-non-aktif {
+            background: #fff5f8;
+            color: #f1416c;
+        }
+        
+        .token-text {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            background: #f5f8fa;
+            padding: 4px 8px;
+            border-radius: 4px;
+            color: #7e8299;
+        }
+        
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.05);
+            transition: transform 0.2s;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-3px);
+        }
+        
+        .stat-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+        
+        .stat-icon.total { background: #f1faff; color: #009ef7; }
+        .stat-icon.admin { background: #fff5f8; color: #f1416c; }
+        .stat-icon.member { background: #e8fff3; color: #50cd89; }
+        .stat-icon.active { background: #fff8dd; color: #ffc700; }
+        
+        .action-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .action-btn.edit { background: #f1faff; color: #009ef7; }
+        .action-btn.delete { background: #fff5f8; color: #f1416c; }
+        .action-btn.reset { background: #fff8dd; color: #ffc700; }
+        .action-btn.token { background: #e8fff3; color: #50cd89; }
+        
+        .action-btn:hover { transform: scale(1.1); }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+        }
+        
+        .empty-state i {
+            font-size: 64px;
+            color: #e4e6ef;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body id="kt_body" class="header-fixed header-tablet-and-mobile-fixed aside-fixed aside-secondary-disabled">
+    <div class="d-flex flex-column flex-root">
+        <div class="page d-flex flex-row flex-column-fluid">
+            <!-- Sidebar -->
+            <div id="sidebar-container"></div>
+            
+            <div class="wrapper d-flex flex-column flex-row-fluid" id="kt_wrapper">
+                <!-- Header -->
+                <div id="header-container"></div>
+                
+                <!-- Content -->
+                <div class="content d-flex flex-column flex-column-fluid" id="kt_content">
+                    <div class="container-xxl" id="kt_content_container">
+                        
+                        <!-- Page Header -->
+                        <div class="d-flex flex-wrap flex-stack mb-6">
+                            <h3 class="fw-bold my-2">
+                                <i class="bi bi-people-fill text-primary me-2"></i>
+                                Manajemen User
+                            </h3>
+                            <button class="btn btn-primary" onclick="showAddUserModal()">
+                                <i class="bi bi-plus-lg me-2"></i>Tambah User
+                            </button>
+                        </div>
+                        
+                        <!-- Stats Cards -->
+                        <div class="row g-4 mb-6">
+                            <div class="col-6 col-md-3">
+                                <div class="stat-card">
+                                    <div class="d-flex align-items-center">
+                                        <div class="stat-icon total me-3">
+                                            <i class="bi bi-people"></i>
+                                        </div>
+                                        <div>
+                                            <div class="fs-2 fw-bold" id="stat-total">0</div>
+                                            <div class="text-muted fs-7">Total User</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="stat-card">
+                                    <div class="d-flex align-items-center">
+                                        <div class="stat-icon admin me-3">
+                                            <i class="bi bi-shield-check"></i>
+                                        </div>
+                                        <div>
+                                            <div class="fs-2 fw-bold" id="stat-admin">0</div>
+                                            <div class="text-muted fs-7">Admin</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="stat-card">
+                                    <div class="d-flex align-items-center">
+                                        <div class="stat-icon member me-3">
+                                            <i class="bi bi-person"></i>
+                                        </div>
+                                        <div>
+                                            <div class="fs-2 fw-bold" id="stat-member">0</div>
+                                            <div class="text-muted fs-7">Member</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="stat-card">
+                                    <div class="d-flex align-items-center">
+                                        <div class="stat-icon active me-3">
+                                            <i class="bi bi-check-circle"></i>
+                                        </div>
+                                        <div>
+                                            <div class="fs-2 fw-bold" id="stat-active">0</div>
+                                            <div class="text-muted fs-7">Aktif</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Users Table Card -->
+                        <div class="card">
+                            <div class="card-header border-0 pt-6">
+                                <div class="card-title">
+                                    <div class="d-flex align-items-center position-relative my-1">
+                                        <i class="bi bi-search position-absolute ms-4 fs-5 text-muted"></i>
+                                        <input type="text" class="form-control form-control-solid w-250px ps-12" 
+                                               id="search-input" placeholder="Cari user...">
+                                    </div>
+                                </div>
+                                <div class="card-toolbar">
+                                    <select class="form-select form-select-solid w-150px me-3" id="filter-role">
+                                        <option value="">Semua Role</option>
+                                        <option value="adminwa">Admin</option>
+                                        <option value="memberwa">Member</option>
+                                    </select>
+                                    <select class="form-select form-select-solid w-150px" id="filter-status">
+                                        <option value="">Semua Status</option>
+                                        <option value="aktif">Aktif</option>
+                                        <option value="non-aktif">Non-Aktif</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div class="card-body py-4">
+                                <div class="table-responsive">
+                                    <table class="table align-middle table-row-dashed fs-6 gy-4">
+                                        <thead>
+                                            <tr class="text-start text-muted fw-bold fs-7 text-uppercase">
+                                                <th>User</th>
+                                                <th>Role</th>
+                                                <th>Token API</th>
+                                                <th>Status</th>
+                                                <th>Dibuat</th>
+                                                <th class="text-end">Aksi</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="users-tbody">
+                                            <!-- Users will be loaded here -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                                
+                                <!-- Empty State -->
+                                <div class="empty-state d-none" id="empty-state">
+                                    <i class="bi bi-inbox"></i>
+                                    <h4 class="text-muted">Belum ada user</h4>
+                                    <p class="text-gray-500">Klik tombol "Tambah User" untuk membuat user baru</p>
+                                </div>
+                                
+                                <!-- Pagination -->
+                                <div class="d-flex justify-content-between align-items-center mt-4" id="pagination-container">
+                                    <div class="text-muted" id="pagination-info">Menampilkan 0 dari 0 user</div>
+                                    <div id="pagination-buttons"></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                    </div>
+                </div>
+                
+                <!-- Footer -->
+                <div id="footer-container"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Add/Edit User Modal -->
+    <div class="modal fade" id="userModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title" id="userModalTitle">
+                        <i class="bi bi-person-plus me-2"></i>Tambah User
+                    </h3>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="user-form">
+                        <input type="hidden" id="user-id">
+                        
+                        <div class="mb-4">
+                            <label class="form-label required">Nama Lengkap</label>
+                            <input type="text" class="form-control" id="user-name" required>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="form-label required">Email</label>
+                            <input type="email" class="form-control" id="user-email" required>
+                        </div>
+                        
+                        <div class="mb-4" id="password-group">
+                            <label class="form-label required">Password</label>
+                            <input type="password" class="form-control" id="user-password" minlength="6">
+                            <small class="text-muted">Minimal 6 karakter</small>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-4">
+                                <label class="form-label">Role</label>
+                                <select class="form-select" id="user-role">
+                                    <option value="memberwa">Member</option>
+                                    <option value="adminwa">Admin</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-4">
+                                <label class="form-label">Status</label>
+                                <select class="form-select" id="user-status">
+                                    <option value="aktif">Aktif</option>
+                                    <option value="non-aktif">Non-Aktif</option>
+                                </select>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
+                    <button type="button" class="btn btn-primary" onclick="saveUser()">
+                        <i class="bi bi-check-lg me-1"></i>Simpan
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Reset Password Modal -->
+    <div class="modal fade" id="resetPasswordModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">
+                        <i class="bi bi-key me-2"></i>Reset Password
+                    </h3>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="reset-user-id">
+                    <div class="mb-3">
+                        <label class="form-label">Password Baru</label>
+                        <input type="password" class="form-control" id="new-password" minlength="6">
+                        <small class="text-muted">Minimal 6 karakter</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Konfirmasi Password</label>
+                        <input type="password" class="form-control" id="confirm-password" minlength="6">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
+                    <button type="button" class="btn btn-warning" onclick="resetPassword()">
+                        <i class="bi bi-check-lg me-1"></i>Reset
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Scripts -->
+    <script src="/assets/plugins/global/plugins.bundle.js"></script>
+    <script src="/assets/js/scripts.bundle.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
+    <script>
+        // State
+        let users = [];
+        let currentPage = 1;
+        let totalUsers = 0;
+        const limit = 20;
+        let userModal, resetPasswordModal;
+        
+        // Load components
+        async function loadComponents() {
+            try {
+                const [headerRes, sidebarRes, footerRes] = await Promise.all([
+                    fetch('/components/header.html'),
+                    fetch('/components/sidebar.html'),
+                    fetch('/components/footer.html')
+                ]);
+                
+                document.getElementById('header-container').innerHTML = await headerRes.text();
+                document.getElementById('sidebar-container').innerHTML = await sidebarRes.text();
+                document.getElementById('footer-container').innerHTML = await footerRes.text();
+                
+                if (typeof KTMenu !== 'undefined') KTMenu.createInstances();
+                if (typeof KTDrawer !== 'undefined') KTDrawer.createInstances();
+            } catch (error) {
+                console.error('Error loading components:', error);
+            }
+        }
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadComponents();
+            userModal = new bootstrap.Modal(document.getElementById('userModal'));
+            resetPasswordModal = new bootstrap.Modal(document.getElementById('resetPasswordModal'));
+            
+            loadStats();
+            loadUsers();
+            
+            // Search handler
+            let searchTimeout;
+            document.getElementById('search-input').addEventListener('input', (e) => {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    currentPage = 1;
+                    loadUsers();
+                }, 300);
+            });
+            
+            // Filter handlers
+            document.getElementById('filter-role').addEventListener('change', () => {
+                currentPage = 1;
+                loadUsers();
+            });
+            document.getElementById('filter-status').addEventListener('change', () => {
+                currentPage = 1;
+                loadUsers();
+            });
+        });
+        
+        // Load stats
+        async function loadStats() {
+            try {
+                const res = await fetch('/api/users/stats');
+                const data = await res.json();
+                
+                if (data.success) {
+                    document.getElementById('stat-total').textContent = data.stats.total;
+                    document.getElementById('stat-admin').textContent = data.stats.adminwa;
+                    document.getElementById('stat-member').textContent = data.stats.memberwa;
+                    document.getElementById('stat-active').textContent = data.stats.aktif;
+                }
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+        
+        // Load users
+        async function loadUsers() {
+            try {
+                const search = document.getElementById('search-input').value;
+                const role = document.getElementById('filter-role').value;
+                const status = document.getElementById('filter-status').value;
+                
+                const params = new URLSearchParams({
+                    page: currentPage,
+                    limit: limit
+                });
+                if (search) params.append('search', search);
+                if (role) params.append('role', role);
+                if (status) params.append('status', status);
+                
+                const res = await fetch(`/api/users?${params}`);
+                const data = await res.json();
+                
+                if (data.success) {
+                    users = data.users;
+                    totalUsers = data.total;
+                    renderUsers();
+                    renderPagination();
+                }
+            } catch (error) {
+                console.error('Error loading users:', error);
+            }
+        }
+        
+        // Render users table
+        function renderUsers() {
+            const tbody = document.getElementById('users-tbody');
+            const emptyState = document.getElementById('empty-state');
+            
+            if (users.length === 0) {
+                tbody.innerHTML = '';
+                emptyState.classList.remove('d-none');
+                return;
+            }
+            
+            emptyState.classList.add('d-none');
+            
+            tbody.innerHTML = users.map(user => {
+                const initials = user.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+                const createdAt = new Date(user.created_at).toLocaleDateString('id-ID', {
+                    day: 'numeric', month: 'short', year: 'numeric'
+                });
+                
+                return `
+                    <tr>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <div class="user-avatar me-3">${initials}</div>
+                                <div>
+                                    <div class="fw-bold">${escapeHtml(user.name)}</div>
+                                    <div class="text-muted fs-7">${escapeHtml(user.email)}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge-role badge-${user.role}">
+                                ${user.role === 'adminwa' ? '👑 Admin' : '👤 Member'}
+                            </span>
+                        </td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <span class="token-text me-2" id="token-${user.id}">${user.token}</span>
+                                <button class="btn btn-sm btn-icon btn-light" onclick="copyToken('${user.token}')" title="Copy">
+                                    <i class="bi bi-clipboard"></i>
+                                </button>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge-role badge-${user.status}">
+                                ${user.status === 'aktif' ? '✓ Aktif' : '✗ Non-Aktif'}
+                            </span>
+                        </td>
+                        <td class="text-muted">${createdAt}</td>
+                        <td class="text-end">
+                            <button class="action-btn edit me-1" onclick="editUser(${user.id})" title="Edit">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="action-btn reset me-1" onclick="showResetPassword(${user.id})" title="Reset Password">
+                                <i class="bi bi-key"></i>
+                            </button>
+                            <button class="action-btn token me-1" onclick="regenerateToken(${user.id})" title="Generate Token Baru">
+                                <i class="bi bi-arrow-repeat"></i>
+                            </button>
+                            <button class="action-btn delete" onclick="deleteUser(${user.id})" title="Hapus">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+        
+        // Render pagination
+        function renderPagination() {
+            const totalPages = Math.ceil(totalUsers / limit);
+            const info = document.getElementById('pagination-info');
+            const buttons = document.getElementById('pagination-buttons');
+            
+            const start = (currentPage - 1) * limit + 1;
+            const end = Math.min(currentPage * limit, totalUsers);
+            info.textContent = `Menampilkan ${start}-${end} dari ${totalUsers} user`;
+            
+            if (totalPages <= 1) {
+                buttons.innerHTML = '';
+                return;
+            }
+            
+            let html = '<nav><ul class="pagination pagination-sm mb-0">';
+            
+            // Previous
+            html += `<li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+                <a class="page-link" href="#" onclick="goToPage(${currentPage - 1})">‹</a>
+            </li>`;
+            
+            // Page numbers
+            for (let i = 1; i <= totalPages; i++) {
+                if (i === 1 || i === totalPages || (i >= currentPage - 1 && i <= currentPage + 1)) {
+                    html += `<li class="page-item ${i === currentPage ? 'active' : ''}">
+                        <a class="page-link" href="#" onclick="goToPage(${i})">${i}</a>
+                    </li>`;
+                } else if (i === currentPage - 2 || i === currentPage + 2) {
+                    html += '<li class="page-item disabled"><span class="page-link">...</span></li>';
+                }
+            }
+            
+            // Next
+            html += `<li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
+                <a class="page-link" href="#" onclick="goToPage(${currentPage + 1})">›</a>
+            </li>`;
+            
+            html += '</ul></nav>';
+            buttons.innerHTML = html;
+        }
+        
+        function goToPage(page) {
+            if (page < 1 || page > Math.ceil(totalUsers / limit)) return;
+            currentPage = page;
+            loadUsers();
+        }
+        
+        // Show add user modal
+        function showAddUserModal() {
+            document.getElementById('userModalTitle').innerHTML = '<i class="bi bi-person-plus me-2"></i>Tambah User';
+            document.getElementById('user-form').reset();
+            document.getElementById('user-id').value = '';
+            document.getElementById('password-group').style.display = 'block';
+            document.getElementById('user-password').required = true;
+            userModal.show();
+        }
+        
+        // Edit user
+        function editUser(id) {
+            const user = users.find(u => u.id === id);
+            if (!user) return;
+            
+            document.getElementById('userModalTitle').innerHTML = '<i class="bi bi-pencil me-2"></i>Edit User';
+            document.getElementById('user-id').value = user.id;
+            document.getElementById('user-name').value = user.name;
+            document.getElementById('user-email').value = user.email;
+            document.getElementById('user-role').value = user.role;
+            document.getElementById('user-status').value = user.status;
+            document.getElementById('password-group').style.display = 'none';
+            document.getElementById('user-password').required = false;
+            userModal.show();
+        }
+        
+        // Save user
+        async function saveUser() {
+            const id = document.getElementById('user-id').value;
+            const data = {
+                name: document.getElementById('user-name').value,
+                email: document.getElementById('user-email').value,
+                role: document.getElementById('user-role').value,
+                status: document.getElementById('user-status').value
+            };
+            
+            if (!id) {
+                data.password = document.getElementById('user-password').value;
+                if (!data.password || data.password.length < 6) {
+                    Swal.fire('Error', 'Password minimal 6 karakter', 'error');
+                    return;
+                }
+            }
+            
+            if (!data.name || !data.email) {
+                Swal.fire('Error', 'Nama dan email wajib diisi', 'error');
+                return;
+            }
+            
+            try {
+                const url = id ? `/api/users/${id}` : '/api/users';
+                const method = id ? 'PUT' : 'POST';
+                
+                const res = await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await res.json();
+                
+                if (result.success) {
+                    userModal.hide();
+                    Swal.fire('Berhasil', id ? 'User berhasil diupdate' : 'User berhasil ditambahkan', 'success');
+                    loadUsers();
+                    loadStats();
+                } else {
+                    Swal.fire('Error', result.error, 'error');
+                }
+            } catch (error) {
+                Swal.fire('Error', 'Gagal menyimpan user', 'error');
+            }
+        }
+        
+        // Delete user
+        async function deleteUser(id) {
+            const result = await Swal.fire({
+                title: 'Hapus User?',
+                text: 'User yang dihapus tidak dapat dikembalikan',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#f1416c',
+                confirmButtonText: 'Ya, Hapus',
+                cancelButtonText: 'Batal'
+            });
+            
+            if (result.isConfirmed) {
+                try {
+                    const res = await fetch(`/api/users/${id}`, { method: 'DELETE' });
+                    const data = await res.json();
+                    
+                    if (data.success) {
+                        Swal.fire('Dihapus', 'User berhasil dihapus', 'success');
+                        loadUsers();
+                        loadStats();
+                    } else {
+                        Swal.fire('Error', data.error, 'error');
+                    }
+                } catch (error) {
+                    Swal.fire('Error', 'Gagal menghapus user', 'error');
+                }
+            }
+        }
+        
+        // Show reset password modal
+        function showResetPassword(id) {
+            document.getElementById('reset-user-id').value = id;
+            document.getElementById('new-password').value = '';
+            document.getElementById('confirm-password').value = '';
+            resetPasswordModal.show();
+        }
+        
+        // Reset password
+        async function resetPassword() {
+            const id = document.getElementById('reset-user-id').value;
+            const newPassword = document.getElementById('new-password').value;
+            const confirmPassword = document.getElementById('confirm-password').value;
+            
+            if (!newPassword || newPassword.length < 6) {
+                Swal.fire('Error', 'Password minimal 6 karakter', 'error');
+                return;
+            }
+            
+            if (newPassword !== confirmPassword) {
+                Swal.fire('Error', 'Password tidak cocok', 'error');
+                return;
+            }
+            
+            try {
+                const res = await fetch(`/api/users/${id}/reset-password`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ newPassword })
+                });
+                
+                const data = await res.json();
+                
+                if (data.success) {
+                    resetPasswordModal.hide();
+                    Swal.fire('Berhasil', 'Password berhasil direset', 'success');
+                } else {
+                    Swal.fire('Error', data.error, 'error');
+                }
+            } catch (error) {
+                Swal.fire('Error', 'Gagal reset password', 'error');
+            }
+        }
+        
+        // Regenerate token
+        async function regenerateToken(id) {
+            const result = await Swal.fire({
+                title: 'Generate Token Baru?',
+                text: 'Token lama tidak akan bisa digunakan lagi',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Ya, Generate',
+                cancelButtonText: 'Batal'
+            });
+            
+            if (result.isConfirmed) {
+                try {
+                    const res = await fetch(`/api/users/${id}/regenerate-token`, { method: 'POST' });
+                    const data = await res.json();
+                    
+                    if (data.success) {
+                        Swal.fire({
+                            title: 'Token Baru',
+                            html: `<code class="user-select-all">${data.token}</code>`,
+                            icon: 'success'
+                        });
+                        loadUsers();
+                    } else {
+                        Swal.fire('Error', data.error, 'error');
+                    }
+                } catch (error) {
+                    Swal.fire('Error', 'Gagal generate token', 'error');
+                }
+            }
+        }
+        
+        // Copy token
+        function copyToken(token) {
+            navigator.clipboard.writeText(token).then(() => {
+                Swal.fire({
+                    toast: true,
+                    position: 'top-end',
+                    icon: 'success',
+                    title: 'Token disalin',
+                    showConfirmButton: false,
+                    timer: 1500
+                });
+            });
+        }
+        
+        // Escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

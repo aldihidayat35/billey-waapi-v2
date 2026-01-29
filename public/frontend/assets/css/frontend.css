@@ -1,0 +1,484 @@
+/* ============================================
+   WhatsApp Gateway - Frontend Styles
+   Mobile-First, Metronic Compatible
+   ============================================ */
+
+/* ============================================
+   Custom Variables (Compatible with Metronic)
+   ============================================ */
+:root {
+    /* WhatsApp Brand Colors */
+    --wa-green: #25D366;
+    --wa-green-dark: #128C7E;
+    --wa-green-light: #dcf8c6;
+    --wa-teal: #075E54;
+    --wa-bg-green: #e7f8e9;
+}
+
+/* ============================================
+   Auth Page Background
+   ============================================ */
+.auth-bg {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    min-height: 100vh;
+}
+
+/* ============================================
+   Stepper Customization
+   ============================================ */
+.stepper-item.current .stepper-icon {
+    background-color: var(--wa-green) !important;
+    color: white !important;
+}
+
+.stepper-item.current .stepper-icon .stepper-number {
+    color: white !important;
+}
+
+.stepper-item.completed .stepper-icon {
+    background-color: var(--wa-green-dark) !important;
+    color: white !important;
+}
+
+.stepper-item .stepper-icon {
+    background-color: #f1f1f4;
+    transition: all 0.3s ease;
+}
+
+/* ============================================
+   Form Section Visibility
+   ============================================ */
+.form-section {
+    display: none;
+}
+
+.form-section.current {
+    display: block;
+    animation: fadeIn 0.4s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ============================================
+   QR Code Styles
+   ============================================ */
+.qr-wrapper {
+    position: relative;
+    display: inline-block;
+    border: 3px solid #e9ecef;
+    transition: all 0.3s ease;
+}
+
+.qr-wrapper.scanning {
+    border-color: var(--wa-green);
+    box-shadow: 0 0 30px rgba(37, 211, 102, 0.3);
+}
+
+.qr-scan-line {
+    position: absolute;
+    top: 15%;
+    left: 10%;
+    right: 10%;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, var(--wa-green), transparent);
+    animation: scan 2s linear infinite;
+    border-radius: 10px;
+    display: none;
+}
+
+.qr-wrapper.scanning .qr-scan-line {
+    display: block;
+}
+
+@keyframes scan {
+    0% { top: 15%; opacity: 1; }
+    50% { top: 80%; opacity: 0.5; }
+    100% { top: 15%; opacity: 1; }
+}
+
+#qr-canvas img,
+#qr-canvas-desktop img,
+#qr-canvas-mobile img {
+    border-radius: 8px;
+}
+
+/* ============================================
+   Process Steps Styles
+   ============================================ */
+.process-step.active .symbol-label {
+    background-color: #ffc107 !important;
+    animation: pulse 2s infinite;
+}
+
+.process-step.active .symbol-label i {
+    color: white !important;
+}
+
+.process-step.completed .symbol-label {
+    background-color: var(--wa-green) !important;
+}
+
+.process-step.completed .symbol-label i {
+    color: white !important;
+}
+
+.process-step.completed .symbol {
+    position: relative;
+}
+
+.process-step.completed .symbol::after {
+    content: '✓';
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    width: 20px;
+    height: 20px;
+    background: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: var(--wa-green);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+}
+
+/* Process Steps Wrapper - Horizontal Scroll on Mobile */
+.process-steps-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.process-steps-wrapper::-webkit-scrollbar {
+    display: none;
+}
+
+/* ============================================
+   Animation Utilities
+   ============================================ */
+@keyframes pulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(37, 211, 102, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 0 15px rgba(37, 211, 102, 0);
+    }
+}
+
+.animation-blink {
+    animation: blink 1.5s infinite;
+}
+
+@keyframes blink {
+    0%, 50%, 100% { opacity: 1; }
+    25%, 75% { opacity: 0.3; }
+}
+
+/* ============================================
+   Success Section
+   ============================================ */
+.success-section.show {
+    display: block !important;
+    animation: fadeInUp 0.6s ease;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.pulse-success {
+    position: relative;
+}
+
+.pulse-success::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: 50%;
+    animation: pulseRing 2s ease-out infinite;
+    border: 3px solid rgba(37, 211, 102, 0.5);
+}
+
+@keyframes pulseRing {
+    0% { transform: scale(1); opacity: 1; }
+    100% { transform: scale(1.5); opacity: 0; }
+}
+
+/* ============================================
+   Notification Toast
+   ============================================ */
+.notification-toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 16px 24px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: 500;
+    z-index: 10000;
+    animation: slideInRight 0.3s ease;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+    max-width: 90%;
+}
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes fadeOut {
+    from { opacity: 1; transform: translateX(0); }
+    to { opacity: 0; transform: translateX(30px); }
+}
+
+/* ============================================
+   Confetti Effect
+   ============================================ */
+.confetti {
+    position: fixed;
+    width: 10px;
+    height: 10px;
+    animation: confetti 3s ease-out forwards;
+    pointer-events: none;
+    z-index: 1000;
+}
+
+@keyframes confetti {
+    0% {
+        transform: translateY(0) rotate(0);
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(100vh) rotate(720deg);
+        opacity: 0;
+    }
+}
+
+/* ============================================
+   Mobile Responsive Enhancements
+   ============================================ */
+@media (max-width: 991.98px) {
+    /* Make cards full width on tablet */
+    .w-lg-500px {
+        width: 100% !important;
+        max-width: 450px;
+    }
+    
+    /* Reduce padding on mobile */
+    .p-10 {
+        padding: 1.5rem !important;
+    }
+    
+    .py-7 {
+        padding-top: 1.5rem !important;
+        padding-bottom: 1.5rem !important;
+    }
+}
+
+@media (max-width: 575.98px) {
+    /* Extra small devices */
+    .fs-2x {
+        font-size: 1.5rem !important;
+    }
+    
+    .fs-2qx {
+        font-size: 1.75rem !important;
+    }
+    
+    .p-10 {
+        padding: 1rem !important;
+    }
+    
+    /* Stepper labels hide on very small */
+    .stepper-label {
+        display: none !important;
+    }
+    
+    /* Stats cards smaller on mobile */
+    .symbol-40px {
+        width: 35px !important;
+        height: 35px !important;
+    }
+    
+    .symbol-40px .symbol-label {
+        width: 35px !important;
+        height: 35px !important;
+    }
+    
+    /* Card padding reduction */
+    .card-body {
+        padding: 1rem !important;
+    }
+    
+    /* Process step icons smaller */
+    .process-step .symbol-50px {
+        width: 40px !important;
+        height: 40px !important;
+    }
+    
+    .process-step .symbol-50px .symbol-label {
+        width: 40px !important;
+        height: 40px !important;
+    }
+    
+    .process-step .fs-7 {
+        font-size: 0.7rem !important;
+    }
+    
+    .process-step {
+        min-width: 80px !important;
+    }
+}
+
+/* ============================================
+   Button Enhancements
+   ============================================ */
+.btn-success {
+    background: linear-gradient(135deg, var(--wa-green) 0%, var(--wa-green-dark) 100%) !important;
+    border: none !important;
+    transition: all 0.3s ease;
+}
+
+.btn-success:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(37, 211, 102, 0.35);
+}
+
+.btn-success:active {
+    transform: translateY(0);
+}
+
+/* ============================================
+   Form Input Enhancements
+   ============================================ */
+.form-control-solid:focus,
+.form-select-solid:focus {
+    border-color: var(--wa-green) !important;
+    box-shadow: 0 0 0 3px rgba(37, 211, 102, 0.15) !important;
+}
+
+/* ============================================
+   Header Sticky on Scroll
+   ============================================ */
+.app-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+/* ============================================
+   Loader / Spinner Styles
+   ============================================ */
+.spinner-border-sm {
+    width: 1rem;
+    height: 1rem;
+}
+
+/* ============================================
+   Progress Bar Animated
+   ============================================ */
+.progress-bar-animated {
+    background-image: linear-gradient(
+        45deg,
+        rgba(255, 255, 255, 0.15) 25%,
+        transparent 25%,
+        transparent 50%,
+        rgba(255, 255, 255, 0.15) 50%,
+        rgba(255, 255, 255, 0.15) 75%,
+        transparent 75%,
+        transparent
+    );
+    background-size: 1rem 1rem;
+    animation: progress-bar-stripes 1s linear infinite;
+}
+
+@keyframes progress-bar-stripes {
+    0% { background-position: 1rem 0; }
+    100% { background-position: 0 0; }
+}
+
+/* ============================================
+   Safe Area for Mobile (iOS)
+   ============================================ */
+@supports (padding: max(0px)) {
+    .app-footer {
+        padding-bottom: max(1rem, env(safe-area-inset-bottom));
+    }
+    
+    .card-body {
+        padding-left: max(1rem, env(safe-area-inset-left));
+        padding-right: max(1rem, env(safe-area-inset-right));
+    }
+}
+
+/* ============================================
+   Touch Device Optimizations
+   ============================================ */
+@media (hover: none) and (pointer: coarse) {
+    /* Larger touch targets */
+    .btn {
+        min-height: 48px;
+    }
+    
+    .form-control,
+    .form-select {
+        min-height: 48px;
+        font-size: 16px; /* Prevents zoom on iOS */
+    }
+    
+    /* Remove hover effects on touch devices */
+    .btn:hover {
+        transform: none;
+    }
+}
+
+/* ============================================
+   Dark Mode Support (if enabled)
+   ============================================ */
+[data-bs-theme="dark"] .auth-bg {
+    background: linear-gradient(135deg, #0d0d1a 0%, #1a1a2e 50%, #0f1f3d 100%);
+}
+
+[data-bs-theme="dark"] .qr-wrapper {
+    background-color: #1e1e2d;
+    border-color: #2d2d3a;
+}
+
+/* ============================================
+   Print Styles
+   ============================================ */
+@media print {
+    .app-header,
+    .app-footer,
+    .btn {
+        display: none !important;
+    }
+    
+    .card {
+        box-shadow: none !important;
+        border: 1px solid #ddd !important;
+    }
+}

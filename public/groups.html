@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Group Management - WhatsApp Gateway</title>
+	
+	<!-- Metronic 8 Styles -->
+	<link rel="stylesheet" href="assets/plugins/global/plugins.bundle.css">
+	<link rel="stylesheet" href="assets/css/style.bundle.css">
+	
+	<!-- SheetJS for Excel Export -->
+	<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+	
+	<style>
+		:root {
+			--wa-green: #25D366;
+			--wa-dark-green: #128C7E;
+			--wa-teal: #075E54;
+		}
+		
+		/* Group Card */
+		.group-card {
+			transition: all 0.2s ease;
+			cursor: pointer;
+			border: 1px solid #e9ecef;
+			border-radius: 10px;
+		}
+		.group-card:hover {
+			border-color: var(--wa-green);
+			box-shadow: 0 4px 15px rgba(37, 211, 102, 0.15);
+			transform: translateY(-2px);
+		}
+		
+		/* Group Avatar */
+		.group-avatar {
+			width: 55px;
+			height: 55px;
+			border-radius: 12px;
+			object-fit: cover;
+			background: linear-gradient(135deg, var(--wa-green) 0%, var(--wa-teal) 100%);
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			color: white;
+			font-size: 1.4rem;
+			font-weight: 600;
+			flex-shrink: 0;
+		}
+		.group-avatar img {
+			width: 100%;
+			height: 100%;
+			border-radius: 12px;
+			object-fit: cover;
+		}
+		
+		/* Stats Card */
+		.stats-card {
+			border-radius: 10px;
+			transition: all 0.2s;
+		}
+		.stats-card:hover {
+			transform: translateY(-3px);
+			box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+		}
+		
+		/* Participant Badge */
+		.participant-badge {
+			background: #f5f8fa;
+			padding: 3px 10px;
+			border-radius: 20px;
+			font-size: 0.8rem;
+			color: #7e8299;
+		}
+		.admin-badge {
+			background: #fff8dd;
+			color: #f1bc00;
+		}
+		.owner-badge {
+			background: #e8fff3;
+			color: #50cd89;
+		}
+		.member-badge {
+			background: #f1f3f5;
+			color: #7e8299;
+		}
+		
+		/* Participant Item */
+		.participant-item {
+			padding: 10px 12px;
+			border-radius: 8px;
+			margin-bottom: 6px;
+			background: #f9f9f9;
+			transition: all 0.2s;
+		}
+		.participant-item:hover {
+			background: #f1f3f5;
+		}
+		
+		/* Group Stats */
+		.group-stats {
+			display: flex;
+			gap: 12px;
+			flex-wrap: wrap;
+		}
+		.stat-item {
+			background: #f5f8fa;
+			padding: 6px 12px;
+			border-radius: 6px;
+			font-size: 0.85rem;
+		}
+		.stat-item i {
+			margin-right: 5px;
+			color: var(--wa-green);
+		}
+		
+		/* Action Button */
+		.action-btn {
+			width: 38px;
+			height: 38px;
+			border-radius: 8px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			border: none;
+			transition: all 0.2s;
+		}
+		
+		/* Search Box */
+		.search-input-wrapper {
+			position: relative;
+		}
+		.search-input-wrapper i {
+			position: absolute;
+			left: 15px;
+			top: 50%;
+			transform: translateY(-50%);
+			color: #b5b5c3;
+		}
+		.search-input-wrapper input {
+			padding-left: 45px;
+		}
+		
+		/* Empty State */
+		.empty-state {
+			text-align: center;
+			padding: 60px 20px;
+		}
+		.empty-state i {
+			font-size: 4rem;
+			color: #e4e6ef;
+			margin-bottom: 20px;
+		}
+		
+		/* Invite Link Box */
+		.invite-link-box {
+			background: #f5f8fa;
+			border-radius: 8px;
+			padding: 12px 15px;
+			display: flex;
+			align-items: center;
+			gap: 10px;
+		}
+		.invite-link-box input {
+			flex: 1;
+			border: none;
+			background: transparent;
+			font-size: 0.9rem;
+		}
+		
+		/* Modal Group Avatar */
+		.modal-group-avatar {
+			width: 50px;
+			height: 50px;
+			border-radius: 10px;
+			background: linear-gradient(135deg, var(--wa-green) 0%, var(--wa-teal) 100%);
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			color: white;
+			font-size: 1.3rem;
+			font-weight: 600;
+		}
+		
+		/* Mobile Responsive */
+		@media (max-width: 768px) {
+			.group-card .card-body {
+				padding: 15px;
+			}
+			.group-card .d-flex.align-items-center {
+				flex-wrap: wrap;
+			}
+			.group-avatar {
+				width: 45px;
+				height: 45px;
+				font-size: 1.1rem;
+			}
+			.group-stats {
+				margin-top: 10px;
+				width: 100%;
+			}
+			.action-buttons {
+				margin-top: 10px;
+				width: 100%;
+				justify-content: flex-end;
+			}
+		}
+	</style>
+</head>
+<body id="kt_app_body" data-kt-app-layout="dark-sidebar" data-kt-app-header-fixed="true" data-kt-app-sidebar-enabled="true" data-kt-app-sidebar-fixed="true" data-kt-app-sidebar-hoverable="true" data-kt-app-sidebar-push-header="true" data-kt-app-sidebar-push-toolbar="true" data-kt-app-sidebar-push-footer="true" data-kt-app-toolbar-enabled="true" class="app-default">
+    
+    <!--begin::App-->
+    <div class="d-flex flex-column flex-root app-root" id="kt_app_root">
+        <!--begin::Page-->
+        <div class="app-page flex-column flex-column-fluid" id="kt_app_page">
+            
+            <!-- Header Component -->
+            <div id="header-container"></div>
+            
+            <!--begin::Wrapper-->
+            <div class="app-wrapper flex-column flex-row-fluid" id="kt_app_wrapper">
+                
+                <!-- Sidebar Component -->
+                <div id="sidebar-container"></div>
+				
+				<!-- Main Content -->
+				<div class="app-main flex-column flex-row-fluid" id="kt_app_main">
+					<div class="d-flex flex-column flex-column-fluid">
+						
+						<!-- Toolbar -->
+						<div id="kt_app_toolbar" class="app-toolbar py-3 py-lg-4">
+							<div class="app-container container-fluid d-flex flex-stack">
+								<div class="page-title d-flex flex-column justify-content-center flex-wrap me-3">
+									<h1 class="page-heading d-flex text-gray-900 fw-bold fs-3 flex-column justify-content-center my-0">
+										<span class="d-flex align-items-center">
+											<i class="bi bi-people-fill fs-2 text-success me-3"></i>
+											GROUP MANAGEMENT
+										</span>
+									</h1>
+									<ul class="breadcrumb breadcrumb-separatorless fw-semibold fs-7 my-0 pt-1">
+										<li class="breadcrumb-item text-muted">
+											<a href="index.html" class="text-muted text-hover-primary">Dashboard</a>
+										</li>
+										<li class="breadcrumb-item"><span class="bullet bg-gray-400 w-5px h-2px"></span></li>
+										<li class="breadcrumb-item text-muted">Groups</li>
+									</ul>
+								</div>
+								
+								<!-- Action Buttons -->
+								<div class="d-flex align-items-center gap-2 gap-lg-3">
+									<button class="btn btn-sm btn-flex btn-light-info" onclick="showExportModal()" title="Export Nomor HP ke Excel">
+										<i class="bi bi-file-earmark-excel me-1"></i>
+										<span class="d-none d-md-inline">Export Excel</span>
+									</button>
+									<button class="btn btn-sm btn-flex btn-light-primary" onclick="showJoinGroupModal()">
+										<i class="bi bi-box-arrow-in-right me-1"></i>
+										<span class="d-none d-md-inline">Join Grup</span>
+									</button>
+									<button class="btn btn-sm btn-flex btn-success" onclick="showCreateGroupModal()">
+										<i class="bi bi-plus-lg me-1"></i>
+										<span class="d-none d-md-inline">Buat Grup</span>
+									</button>
+								</div>
+							</div>
+						</div>
+						
+						<!-- Content -->
+						<div id="kt_app_content" class="app-content flex-column-fluid">
+							<div class="app-container container-fluid">
+								
+								<!-- Session & Search Card -->
+								<div class="card mb-5">
+									<div class="card-body py-4">
+										<div class="row g-4 align-items-end">
+											<div class="col-md-4">
+												<label class="form-label fw-semibold text-gray-700">Pilih Session</label>
+												<select id="sessionSelect" class="form-select form-select-solid" onchange="loadGroups()">
+													<option value="">-- Pilih Session --</option>
+												</select>
+											</div>
+											<div class="col-md-5">
+												<label class="form-label fw-semibold text-gray-700">Cari Grup</label>
+												<div class="search-input-wrapper">
+													<i class="bi bi-search"></i>
+													<input type="text" id="searchInput" class="form-control form-control-solid" placeholder="Cari berdasarkan nama grup..." onkeyup="filterGroups()">
+												</div>
+											</div>
+											<div class="col-md-3">
+												<label class="form-label fw-semibold text-gray-700">Filter</label>
+												<select id="filterSelect" class="form-select form-select-solid" onchange="filterGroups()">
+													<option value="all">Semua Grup</option>
+													<option value="admin">Saya Admin</option>
+													<option value="member">Saya Member</option>
+												</select>
+											</div>
+										</div>
+									</div>
+								</div>
+								
+								<!-- Stats Row -->
+								<div class="row g-4 mb-5" id="statsRow" style="display: none;">
+									<div class="col-6 col-md-3">
+										<div class="card stats-card bg-light-primary border-0 h-100">
+											<div class="card-body py-4">
+												<div class="d-flex align-items-center">
+													<div class="flex-grow-1">
+														<div class="fs-2 fw-bold text-primary" id="totalGroups">0</div>
+														<div class="text-gray-600 fs-7">Total Grup</div>
+													</div>
+													<i class="bi bi-people-fill fs-1 text-primary opacity-25"></i>
+												</div>
+											</div>
+										</div>
+									</div>
+									<div class="col-6 col-md-3">
+										<div class="card stats-card bg-light-success border-0 h-100">
+											<div class="card-body py-4">
+												<div class="d-flex align-items-center">
+													<div class="flex-grow-1">
+														<div class="fs-2 fw-bold text-success" id="adminGroups">0</div>
+														<div class="text-gray-600 fs-7">Saya Admin</div>
+													</div>
+													<i class="bi bi-shield-check fs-1 text-success opacity-25"></i>
+												</div>
+											</div>
+										</div>
+									</div>
+									<div class="col-6 col-md-3">
+										<div class="card stats-card bg-light-info border-0 h-100">
+											<div class="card-body py-4">
+												<div class="d-flex align-items-center">
+													<div class="flex-grow-1">
+														<div class="fs-2 fw-bold text-info" id="totalParticipants">0</div>
+														<div class="text-gray-600 fs-7">Total Member</div>
+													</div>
+													<i class="bi bi-person-fill fs-1 text-info opacity-25"></i>
+												</div>
+											</div>
+										</div>
+									</div>
+									<div class="col-6 col-md-3">
+										<div class="card stats-card bg-light-warning border-0 h-100">
+											<div class="card-body py-4">
+												<div class="d-flex align-items-center">
+													<div class="flex-grow-1">
+														<div class="fs-2 fw-bold text-warning" id="avgMembers">0</div>
+														<div class="text-gray-600 fs-7">Avg Member</div>
+													</div>
+													<i class="bi bi-graph-up fs-1 text-warning opacity-25"></i>
+												</div>
+											</div>
+										</div>
+									</div>
+								</div>
+								
+								<!-- Groups Container -->
+								<div id="groupsContainer">
+									<div class="card">
+										<div class="card-body">
+											<div class="empty-state">
+												<i class="bi bi-people"></i>
+												<h5 class="text-gray-600 mb-2">Pilih session untuk melihat grup</h5>
+												<p class="text-gray-500 fs-7">Pilih session WhatsApp yang terhubung untuk menampilkan daftar grup</p>
+											</div>
+										</div>
+									</div>
+								</div>
+								
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	
+	<!-- Group Detail Modal -->
+	<div class="modal fade" id="groupDetailModal" tabindex="-1">
+		<div class="modal-dialog modal-lg modal-dialog-scrollable">
+			<div class="modal-content">
+				<div class="modal-header border-0 pb-0">
+					<div class="d-flex align-items-center gap-3">
+						<div class="modal-group-avatar" id="modalGroupAvatar">
+							<i class="bi bi-people-fill"></i>
+						</div>
+						<div>
+							<h5 class="modal-title fw-bold mb-1" id="modalGroupName">Nama Grup</h5>
+							<small class="text-muted fs-7" id="modalGroupId">ID Grup</small>
+						</div>
+					</div>
+					<button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+				</div>
+				<div class="modal-body pt-5">
+					<!-- Tabs -->
+					<ul class="nav nav-tabs nav-line-tabs nav-line-tabs-2x mb-5 fs-6" id="groupTabs">
+						<li class="nav-item">
+							<a class="nav-link active" data-bs-toggle="tab" href="#tabInfo">
+								<i class="bi bi-info-circle me-2"></i>Info
+							</a>
+						</li>
+						<li class="nav-item">
+							<a class="nav-link" data-bs-toggle="tab" href="#tabParticipants">
+								<i class="bi bi-people me-2"></i>Peserta <span class="badge badge-success ms-2" id="participantCount">0</span>
+							</a>
+						</li>
+						<li class="nav-item">
+							<a class="nav-link" data-bs-toggle="tab" href="#tabInvite">
+								<i class="bi bi-link-45deg me-2"></i>Invite
+							</a>
+						</li>
+						<li class="nav-item">
+							<a class="nav-link" data-bs-toggle="tab" href="#tabSettings">
+								<i class="bi bi-gear me-2"></i>Pengaturan
+							</a>
+						</li>
+					</ul>
+					
+					<div class="tab-content">
+						<!-- Info Tab -->
+						<div class="tab-pane fade show active" id="tabInfo">
+							<div class="mb-5">
+								<label class="form-label fw-semibold">Nama Grup</label>
+								<div class="input-group">
+									<input type="text" class="form-control form-control-solid" id="editGroupSubject" placeholder="Nama grup">
+									<button class="btn btn-success" onclick="updateGroupSubject()">
+										<i class="bi bi-check-lg"></i>
+									</button>
+								</div>
+							</div>
+							<div class="mb-5">
+								<label class="form-label fw-semibold">Deskripsi</label>
+								<div class="input-group">
+									<textarea class="form-control form-control-solid" id="editGroupDesc" rows="3" placeholder="Deskripsi grup..."></textarea>
+									<button class="btn btn-success" onclick="updateGroupDescription()">
+										<i class="bi bi-check-lg"></i>
+									</button>
+								</div>
+							</div>
+							<div class="row mb-5">
+								<div class="col-md-6 mb-3 mb-md-0">
+									<label class="form-label fw-semibold text-gray-600">Dibuat oleh</label>
+									<p class="mb-0 text-gray-800" id="groupOwner">-</p>
+								</div>
+								<div class="col-md-6">
+									<label class="form-label fw-semibold text-gray-600">Tanggal dibuat</label>
+									<p class="mb-0 text-gray-800" id="groupCreated">-</p>
+								</div>
+							</div>
+							
+							<!-- Send Message -->
+							<div class="separator my-5"></div>
+							<div>
+								<label class="form-label fw-semibold">Kirim Pesan ke Grup</label>
+								<div class="input-group">
+									<textarea class="form-control form-control-solid" id="groupMessage" rows="2" placeholder="Ketik pesan..."></textarea>
+									<button class="btn btn-success" onclick="sendGroupMessage()">
+										<i class="bi bi-send-fill"></i>
+									</button>
+								</div>
+							</div>
+						</div>
+						
+						<!-- Participants Tab -->
+						<div class="tab-pane fade" id="tabParticipants">
+							<div class="mb-4">
+								<div class="d-flex gap-2">
+									<div class="flex-grow-1">
+										<div class="input-group">
+											<span class="input-group-text bg-light border-0"><i class="bi bi-search text-gray-500"></i></span>
+											<input type="text" class="form-control form-control-solid" id="searchParticipant" placeholder="Cari peserta..." onkeyup="filterParticipants()">
+										</div>
+									</div>
+									<button class="btn btn-sm btn-light-info" onclick="exportCurrentGroupToExcel()" title="Export Peserta ke Excel">
+										<i class="bi bi-file-earmark-excel"></i>
+									</button>
+								</div>
+							</div>
+							
+							<!-- Bulk Actions -->
+							<div class="mb-4 d-flex gap-2 flex-wrap" id="bulkActions" style="display: none !important;">
+								<button class="btn btn-sm btn-light-danger" onclick="removeSelectedParticipants()">
+									<i class="bi bi-person-dash me-1"></i>Keluarkan
+								</button>
+								<button class="btn btn-sm btn-light-success" onclick="promoteSelectedParticipants()">
+									<i class="bi bi-arrow-up-circle me-1"></i>Jadikan Admin
+								</button>
+								<button class="btn btn-sm btn-light-warning" onclick="demoteSelectedParticipants()">
+									<i class="bi bi-arrow-down-circle me-1"></i>Hapus Admin
+								</button>
+							</div>
+							
+							<div id="participantsList" class="mh-300px overflow-auto"></div>
+							
+							<!-- Add Participant -->
+							<div class="separator my-5"></div>
+							<div>
+								<label class="form-label fw-semibold">Tambah Peserta</label>
+								<div class="input-group">
+									<input type="text" class="form-control form-control-solid" id="newParticipantNumber" placeholder="Nomor (628xxx) atau pisahkan dengan koma">
+									<button class="btn btn-primary" onclick="addParticipants()">
+										<i class="bi bi-person-plus me-1"></i>Tambah
+									</button>
+								</div>
+								<small class="text-muted">Contoh: 6281234567890, 6289876543210</small>
+							</div>
+						</div>
+						
+						<!-- Invite Tab -->
+						<div class="tab-pane fade" id="tabInvite">
+							<div class="mb-5">
+								<label class="form-label fw-semibold">Link Invite Grup</label>
+								<div class="invite-link-box">
+									<i class="bi bi-link-45deg text-success fs-4"></i>
+									<input type="text" id="inviteLink" readonly placeholder="Klik untuk mendapatkan link" class="form-control-plaintext">
+									<button class="btn btn-sm btn-icon btn-light-primary" onclick="copyInviteLink()">
+										<i class="bi bi-clipboard"></i>
+									</button>
+								</div>
+							</div>
+							<div class="d-flex gap-2 flex-wrap">
+								<button class="btn btn-success" onclick="getInviteCode()">
+									<i class="bi bi-link-45deg me-2"></i>Dapatkan Link
+								</button>
+								<button class="btn btn-light-danger" onclick="revokeInviteCode()">
+									<i class="bi bi-arrow-clockwise me-2"></i>Reset Link
+								</button>
+							</div>
+						</div>
+						
+						<!-- Settings Tab -->
+						<div class="tab-pane fade" id="tabSettings">
+							<div class="mb-5">
+								<label class="form-label fw-semibold">Siapa yang bisa kirim pesan?</label>
+								<div class="d-flex gap-2">
+									<button class="btn btn-outline btn-outline-primary" onclick="updateGroupSetting('not_announcement')" id="btnAllCanSend">
+										<i class="bi bi-people me-2"></i>Semua Peserta
+									</button>
+									<button class="btn btn-outline btn-outline-primary" onclick="updateGroupSetting('announcement')" id="btnAdminOnly">
+										<i class="bi bi-shield me-2"></i>Hanya Admin
+									</button>
+								</div>
+							</div>
+							<div class="mb-5">
+								<label class="form-label fw-semibold">Siapa yang bisa edit info grup?</label>
+								<div class="d-flex gap-2">
+									<button class="btn btn-outline btn-outline-primary" onclick="updateGroupSetting('unlocked')" id="btnAllCanEdit">
+										<i class="bi bi-people me-2"></i>Semua Peserta
+									</button>
+									<button class="btn btn-outline btn-outline-primary" onclick="updateGroupSetting('locked')" id="btnAdminOnlyEdit">
+										<i class="bi bi-shield me-2"></i>Hanya Admin
+									</button>
+								</div>
+							</div>
+							<div class="separator my-5"></div>
+							<button class="btn btn-danger" onclick="leaveGroup()">
+								<i class="bi bi-box-arrow-left me-2"></i>Keluar dari Grup
+							</button>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	
+	<!-- Create Group Modal -->
+	<div class="modal fade" id="createGroupModal" tabindex="-1">
+		<div class="modal-dialog">
+			<div class="modal-content">
+				<div class="modal-header">
+					<h5 class="modal-title fw-bold">
+						<i class="bi bi-plus-circle text-success me-2"></i>Buat Grup Baru
+					</h5>
+					<button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+				</div>
+				<div class="modal-body">
+					<div class="mb-5">
+						<label class="form-label fw-semibold required">Nama Grup</label>
+						<input type="text" class="form-control form-control-solid" id="newGroupName" placeholder="Masukkan nama grup">
+					</div>
+					<div>
+						<label class="form-label fw-semibold">Peserta (opsional)</label>
+						<textarea class="form-control form-control-solid" id="newGroupParticipants" rows="4" placeholder="Masukkan nomor peserta (satu per baris atau pisahkan dengan koma)&#10;Contoh:&#10;6281234567890&#10;6289876543210"></textarea>
+						<div class="form-text">Format: 628xxx (tanpa + atau spasi)</div>
+					</div>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
+					<button type="button" class="btn btn-success" onclick="createGroup()">
+						<i class="bi bi-plus-lg me-2"></i>Buat Grup
+					</button>
+				</div>
+			</div>
+		</div>
+	</div>
+	
+	<!-- Join Group Modal -->
+	<div class="modal fade" id="joinGroupModal" tabindex="-1">
+		<div class="modal-dialog">
+			<div class="modal-content">
+				<div class="modal-header">
+					<h5 class="modal-title fw-bold">
+						<i class="bi bi-box-arrow-in-right text-primary me-2"></i>Join Grup
+					</h5>
+					<button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+				</div>
+				<div class="modal-body">
+					<div>
+						<label class="form-label fw-semibold">Link atau Kode Invite</label>
+						<input type="text" class="form-control form-control-solid" id="joinInviteCode" placeholder="https://chat.whatsapp.com/xxx atau kode invite">
+						<div class="form-text">Masukkan link invite WhatsApp atau kode invite saja</div>
+					</div>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
+					<button type="button" class="btn btn-primary" onclick="joinGroup()">
+						<i class="bi bi-box-arrow-in-right me-2"></i>Join
+					</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- Export Modal -->
+	<div class="modal fade" id="exportModal" tabindex="-1">
+		<div class="modal-dialog modal-lg">
+			<div class="modal-content">
+				<div class="modal-header">
+					<h5 class="modal-title fw-bold">
+						<i class="bi bi-file-earmark-excel text-success me-2"></i>Export Nomor HP ke Excel
+					</h5>
+					<button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+				</div>
+				<div class="modal-body">
+					<!-- Export Options -->
+					<div class="mb-4">
+						<label class="form-label fw-semibold">Pilih Opsi Export</label>
+						<div class="d-flex gap-3">
+							<label class="form-check form-check-custom form-check-solid">
+								<input class="form-check-input" type="radio" name="exportType" value="all" checked onchange="toggleGroupSelection()">
+								<span class="form-check-label">Semua Grup</span>
+							</label>
+							<label class="form-check form-check-custom form-check-solid">
+								<input class="form-check-input" type="radio" name="exportType" value="selected" onchange="toggleGroupSelection()">
+								<span class="form-check-label">Pilih Grup</span>
+							</label>
+						</div>
+					</div>
+					
+					<!-- Group Selection -->
+					<div id="groupSelectionContainer" style="display: none;">
+						<div class="mb-3">
+							<div class="d-flex justify-content-between align-items-center mb-2">
+								<label class="form-label fw-semibold mb-0">Pilih Grup untuk Export</label>
+								<div>
+									<button type="button" class="btn btn-sm btn-light-primary" onclick="selectAllGroups()">Pilih Semua</button>
+									<button type="button" class="btn btn-sm btn-light" onclick="deselectAllGroups()">Hapus Semua</button>
+								</div>
+							</div>
+							<div class="border rounded p-3 mh-300px overflow-auto" id="exportGroupList">
+								<!-- Groups will be populated here -->
+							</div>
+						</div>
+					</div>
+					
+					<!-- Export Format Options -->
+					<div class="mb-4">
+						<label class="form-label fw-semibold">Format Export</label>
+						<p class="text-muted fs-7 mb-2">Sheet utama "Data Nomor HP" dengan 3 kolom (Nama Grup, ID Grup, Nomor HP) akan selalu dibuat</p>
+						<div class="d-flex gap-3 flex-wrap">
+							<label class="form-check form-check-custom form-check-solid">
+								<input class="form-check-input" type="checkbox" id="exportSummary" checked>
+								<span class="form-check-label">+ Sheet Ringkasan</span>
+							</label>
+							<label class="form-check form-check-custom form-check-solid" style="display:none;">
+								<input class="form-check-input" type="checkbox" id="exportAllInOne" checked>
+								<span class="form-check-label">Semua Peserta (1 Sheet)</span>
+							</label>
+							<label class="form-check form-check-custom form-check-solid">
+								<input class="form-check-input" type="checkbox" id="exportPerGroup">
+								<span class="form-check-label">+ Sheet per Grup (detail)</span>
+							</label>
+						</div>
+					</div>
+					
+					<!-- Filter Options -->
+					<div class="mb-4">
+						<label class="form-label fw-semibold">Filter Peserta</label>
+						<div class="d-flex gap-3 flex-wrap">
+							<label class="form-check form-check-custom form-check-solid">
+								<input class="form-check-input" type="checkbox" id="filterOwner" checked>
+								<span class="form-check-label">Owner</span>
+							</label>
+							<label class="form-check form-check-custom form-check-solid">
+								<input class="form-check-input" type="checkbox" id="filterAdmin" checked>
+								<span class="form-check-label">Admin</span>
+							</label>
+							<label class="form-check form-check-custom form-check-solid">
+								<input class="form-check-input" type="checkbox" id="filterMember" checked>
+								<span class="form-check-label">Member</span>
+							</label>
+						</div>
+					</div>
+					
+					<!-- Exclude LID Option -->
+					<div class="mb-3">
+						<label class="form-check form-check-custom form-check-solid">
+							<input class="form-check-input" type="checkbox" id="excludeLid">
+							<span class="form-check-label">Hanya nomor HP yang valid (exclude LID yang tidak ter-resolve)</span>
+						</label>
+					</div>
+					
+					<!-- Info about LID -->
+					<div class="alert alert-warning mb-3">
+						<div class="d-flex">
+							<i class="bi bi-exclamation-triangle fs-3 me-3 text-warning"></i>
+							<div>
+								<h6 class="fw-bold mb-1">Tentang LID (Linked Identity)</h6>
+								<p class="mb-1 fs-7">Beberapa peserta mungkin tampil sebagai "LID" bukan nomor HP. Ini adalah fitur privasi WhatsApp.</p>
+								<p class="mb-0 fs-7">Nomor HP hanya terlihat jika: <strong>pernah chat langsung, ada di kontak, atau sudah interaksi di grup</strong>.</p>
+							</div>
+						</div>
+					</div>
+					
+					<!-- Preview Stats -->
+					<div class="alert alert-light d-flex align-items-center" id="exportPreview">
+						<i class="bi bi-info-circle fs-4 me-3 text-primary"></i>
+						<div>
+							<span id="exportStats">Pilih grup untuk melihat preview</span>
+						</div>
+					</div>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
+					<button type="button" class="btn btn-success" onclick="executeExport()" id="btnStartExport">
+						<i class="bi bi-download me-2"></i>Download Excel
+					</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- Export Progress Modal -->
+	<div class="modal fade" id="exportProgressModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+		<div class="modal-dialog modal-dialog-centered">
+			<div class="modal-content">
+				<div class="modal-body p-5">
+					<div class="text-center mb-4">
+						<div class="export-animation mb-4">
+							<div class="spinner-wrapper">
+								<div class="spinner-border text-success" role="status" style="width: 3rem; height: 3rem;">
+									<span class="visually-hidden">Loading...</span>
+								</div>
+								<div class="pulse-ring"></div>
+							</div>
+						</div>
+						<h4 class="fw-bold text-gray-800 mb-2" id="progressTitle">Mengekspor Data...</h4>
+						<p class="text-muted fs-6" id="progressSubtitle">Mohon tunggu, sedang memproses grup</p>
+					</div>
+					
+					<!-- Progress Bar -->
+					<div class="mb-3">
+						<div class="d-flex justify-content-between mb-2">
+							<span class="fw-semibold text-gray-700" id="progressLabel">Memproses...</span>
+							<span class="fw-bold text-primary" id="progressPercent">0%</span>
+						</div>
+						<div class="progress" style="height: 12px; border-radius: 6px;">
+							<div class="progress-bar progress-bar-striped progress-bar-animated bg-success" 
+								 role="progressbar" 
+								 id="exportProgressBar"
+								 style="width: 0%; transition: width 0.3s ease;"
+								 aria-valuenow="0" 
+								 aria-valuemin="0" 
+								 aria-valuemax="100">
+							</div>
+						</div>
+					</div>
+					
+					<!-- Stats -->
+					<div class="row g-3 mt-3">
+						<div class="col-4">
+							<div class="bg-light-success rounded p-3 text-center">
+								<div class="fw-bold fs-4 text-success" id="statGroups">0</div>
+								<div class="text-muted fs-7">Grup</div>
+							</div>
+						</div>
+						<div class="col-4">
+							<div class="bg-light-primary rounded p-3 text-center">
+								<div class="fw-bold fs-4 text-primary" id="statNumbers">0</div>
+								<div class="text-muted fs-7">Nomor HP</div>
+							</div>
+						</div>
+						<div class="col-4">
+							<div class="bg-light-warning rounded p-3 text-center">
+								<div class="fw-bold fs-4 text-warning" id="statLid">0</div>
+								<div class="text-muted fs-7">LID</div>
+							</div>
+						</div>
+					</div>
+					
+					<!-- Current Group Name -->
+					<div class="mt-4 p-3 bg-light rounded">
+						<div class="d-flex align-items-center">
+							<div class="spinner-border spinner-border-sm text-success me-3" role="status" id="currentGroupSpinner">
+								<span class="visually-hidden">Loading...</span>
+							</div>
+							<div class="flex-grow-1 min-w-0">
+								<div class="text-muted fs-7">Sedang memproses:</div>
+								<div class="fw-semibold text-truncate" id="currentGroupName">-</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- Export Complete Modal -->
+	<div class="modal fade" id="exportCompleteModal" tabindex="-1">
+		<div class="modal-dialog modal-dialog-centered">
+			<div class="modal-content">
+				<div class="modal-body p-5 text-center">
+					<div class="mb-4">
+						<div class="symbol symbol-100px">
+							<div class="symbol-label bg-light-success">
+								<i class="bi bi-check-circle-fill text-success" style="font-size: 4rem;"></i>
+							</div>
+						</div>
+					</div>
+					<h3 class="fw-bold text-gray-800 mb-2">Export Berhasil!</h3>
+					<p class="text-muted fs-6 mb-4" id="exportResultMessage">Data berhasil diekspor ke file Excel</p>
+					
+					<div class="row g-3 mb-4">
+						<div class="col-4">
+							<div class="border rounded p-3">
+								<div class="fw-bold fs-3 text-success" id="finalGroups">0</div>
+								<div class="text-muted fs-7">Total Grup</div>
+							</div>
+						</div>
+						<div class="col-4">
+							<div class="border rounded p-3">
+								<div class="fw-bold fs-3 text-primary" id="finalNumbers">0</div>
+								<div class="text-muted fs-7">Nomor HP</div>
+							</div>
+						</div>
+						<div class="col-4">
+							<div class="border rounded p-3">
+								<div class="fw-bold fs-3 text-warning" id="finalLid">0</div>
+								<div class="text-muted fs-7">LID</div>
+							</div>
+						</div>
+					</div>
+					
+					<button type="button" class="btn btn-success" data-bs-dismiss="modal">
+						<i class="bi bi-check me-2"></i>Tutup
+					</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<style>
+		/* Export Animation Styles */
+		.export-animation {
+			position: relative;
+			display: inline-block;
+		}
+		
+		.spinner-wrapper {
+			position: relative;
+			display: inline-block;
+		}
+		
+		.pulse-ring {
+			position: absolute;
+			top: 50%;
+			left: 50%;
+			transform: translate(-50%, -50%);
+			width: 80px;
+			height: 80px;
+			border: 3px solid #50cd89;
+			border-radius: 50%;
+			animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+		}
+		
+		@keyframes pulse-ring {
+			0% {
+				transform: translate(-50%, -50%) scale(0.5);
+				opacity: 1;
+			}
+			100% {
+				transform: translate(-50%, -50%) scale(1.3);
+				opacity: 0;
+			}
+		}
+		
+		.progress-bar-animated {
+			background-image: linear-gradient(
+				45deg,
+				rgba(255, 255, 255, 0.15) 25%,
+				transparent 25%,
+				transparent 50%,
+				rgba(255, 255, 255, 0.15) 50%,
+				rgba(255, 255, 255, 0.15) 75%,
+				transparent 75%,
+				transparent
+			);
+			background-size: 1rem 1rem;
+			animation: progress-bar-stripes 1s linear infinite;
+		}
+		
+		@keyframes progress-bar-stripes {
+			0% { background-position: 1rem 0; }
+			100% { background-position: 0 0; }
+		}
+		
+		.symbol-100px {
+			width: 100px;
+			height: 100px;
+		}
+		
+		.symbol-label {
+			width: 100%;
+			height: 100%;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			border-radius: 50%;
+		}
+		
+		.bg-light-success { background-color: #e8fff3 !important; }
+		.bg-light-primary { background-color: #f1faff !important; }
+		.bg-light-warning { background-color: #fff8dd !important; }
+	</style>
+
+	<!-- Scripts -->
+	<script src="assets/plugins/global/plugins.bundle.js"></script>
+	<script src="assets/js/scripts.bundle.js"></script>
+	<script src="/js/groups.js"></script>
+</body>
+</html>

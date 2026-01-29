@@ -1,0 +1,1584 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dokumentasi API - WhatsApp Multi Session</title>
+    
+    <!-- Fonts -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,400,500,600,700" />
+    
+    <!-- Metronic CSS -->
+    <link href="assets/plugins/global/plugins.bundle.css" rel="stylesheet" type="text/css" />
+    <link href="assets/css/style.bundle.css" rel="stylesheet" type="text/css" />
+    
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    
+    <!-- Prism.js for Syntax Highlighting -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    
+    <style>
+        .nav-line-tabs .nav-item .nav-link {
+            color: #7E8299;
+            font-weight: 600;
+            font-size: 1.1rem;
+            padding: 0.75rem 1.5rem;
+        }
+        .nav-line-tabs .nav-item .nav-link.active {
+            color: #009EF7;
+            border-bottom: 3px solid #009EF7;
+        }
+        pre[class*="language-"] {
+            border-radius: 0.625rem;
+            margin: 1rem 0;
+        }
+        .code-toolbar {
+            margin-bottom: 1.5rem;
+        }
+        .endpoint-badge {
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            padding: 0.5rem 1rem;
+            background: #F1F1F4;
+            border-radius: 0.425rem;
+            display: inline-block;
+        }
+        .step-number {
+            width: 35px;
+            height: 35px;
+            background: #009EF7;
+            color: white;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 1rem;
+        }
+    </style>
+</head>
+
+<body id="kt_app_body" data-kt-app-layout="dark-sidebar" data-kt-app-header-fixed="true" data-kt-app-sidebar-enabled="true" data-kt-app-sidebar-fixed="true" data-kt-app-sidebar-hoverable="true" data-kt-app-sidebar-push-header="true" data-kt-app-sidebar-push-toolbar="true" data-kt-app-sidebar-push-footer="true" data-kt-app-toolbar-enabled="true" class="app-default">
+    
+    <div class="d-flex flex-column flex-root app-root" id="kt_app_root">
+        <div class="app-page flex-column flex-column-fluid" id="kt_app_page">
+            
+            <!-- Header -->
+            <div id="header-container"></div>
+            
+            <div class="app-wrapper flex-column flex-row-fluid" id="kt_app_wrapper">
+                
+                <!-- Sidebar -->
+                <div id="sidebar-container"></div>
+                
+                <!-- Main Content -->
+                <div class="app-main flex-column flex-row-fluid" id="kt_app_main">
+                    <div class="d-flex flex-column flex-column-fluid">
+                        
+                        <!-- Toolbar -->
+                        <div id="kt_app_toolbar" class="app-toolbar py-3 py-lg-6">
+                            <div id="kt_app_toolbar_container" class="app-container container-fluid d-flex flex-stack">
+                                <div class="page-title d-flex flex-column justify-content-center flex-wrap me-3">
+                                    <h1 class="page-heading d-flex text-dark fw-bold fs-3 flex-column justify-content-center my-0">
+                                        Dokumentasi API
+                                    </h1>
+                                    <ul class="breadcrumb breadcrumb-separatorless fw-semibold fs-7 my-0 pt-1">
+                                        <li class="breadcrumb-item text-muted">
+                                            <a href="index.html" class="text-muted text-hover-primary">Home</a>
+                                        </li>
+                                        <li class="breadcrumb-item">
+                                            <span class="bullet bg-gray-400 w-5px h-2px"></span>
+                                        </li>
+                                        <li class="breadcrumb-item text-muted">Dokumentasi API</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Content -->
+                        <div id="kt_app_content" class="app-content flex-column-fluid">
+                            <div id="kt_app_content_container" class="app-container container-fluid">
+                                
+                                <!-- Introduction Card -->
+                                <div class="card mb-5 mb-xl-10">
+                                    <div class="card-body">
+                                        <div class="d-flex align-items-center mb-5">
+                                            <div class="symbol symbol-60px me-5">
+                                                <span class="symbol-label bg-light-primary">
+                                                    <i class="bi bi-book fs-2x text-primary"></i>
+                                                </span>
+                                            </div>
+                                            <div class="flex-grow-1">
+                                                <h2 class="fw-bold mb-1">WhatsApp API Documentation</h2>
+                                                <p class="text-muted mb-0">Panduan lengkap integrasi WhatsApp API (Baileys) dengan berbagai framework dan bahasa pemrograman</p>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="notice d-flex bg-light-info rounded border-info border border-dashed p-6">
+                                            <i class="bi bi-info-circle fs-2tx text-info me-4"></i>
+                                            <div class="d-flex flex-stack flex-grow-1">
+                                                <div class="fw-semibold">
+                                                    <h4 class="text-gray-900 fw-bold">Base URL API</h4>
+                                                    <div class="fs-6 text-gray-700">
+                                                        <code class="endpoint-badge">http://localhost:3000</code>
+                                                        <p class="mt-3 mb-0">Semua request menggunakan WebSocket (Socket.IO) untuk komunikasi real-time. Server berjalan pada port 3000.</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- API Endpoints Card -->
+                                <div class="card mb-5 mb-xl-10">
+                                    <div class="card-header">
+                                        <h3 class="card-title fw-bold">Available Endpoints</h3>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="table-responsive">
+                                            <table class="table table-row-bordered table-row-gray-300 gy-5">
+                                                <thead>
+                                                    <tr class="fw-bold fs-6 text-gray-800">
+                                                        <th>Event</th>
+                                                        <th>Deskripsi</th>
+                                                        <th>Parameter</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr>
+                                                        <td><code class="text-primary">send-message</code></td>
+                                                        <td>Mengirim pesan teks</td>
+                                                        <td><code>sessionId, to, message</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><code class="text-primary">send-image</code></td>
+                                                        <td>Mengirim gambar dengan caption</td>
+                                                        <td><code>sessionId, to, imageUrl, caption</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><code class="text-primary">create-session</code></td>
+                                                        <td>Membuat session baru</td>
+                                                        <td><code>sessionId, method, phoneNumber</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><code class="text-primary">get-sessions</code></td>
+                                                        <td>Mendapatkan semua session</td>
+                                                        <td><code>-</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><code class="text-primary">logout-session</code></td>
+                                                        <td>Logout session tertentu</td>
+                                                        <td><code>sessionId</code></td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Tabs for Frameworks -->
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h3 class="card-title fw-bold">Panduan Integrasi</h3>
+                                    </div>
+                                    <div class="card-body">
+                                        
+                                        <!-- Nav Tabs -->
+                                        <ul class="nav nav-tabs nav-line-tabs mb-5 fs-6">
+                                            <li class="nav-item">
+                                                <a class="nav-link active" data-bs-toggle="tab" href="#tab_ci3">
+                                                    <i class="bi bi-code-square me-2"></i>CodeIgniter 3
+                                                </a>
+                                            </li>
+                                            <li class="nav-item">
+                                                <a class="nav-link" data-bs-toggle="tab" href="#tab_ci4">
+                                                    <i class="bi bi-code-square me-2"></i>CodeIgniter 4
+                                                </a>
+                                            </li>
+                                            <li class="nav-item">
+                                                <a class="nav-link" data-bs-toggle="tab" href="#tab_laravel">
+                                                    <i class="bi bi-code-slash me-2"></i>Laravel 11
+                                                </a>
+                                            </li>
+                                            <li class="nav-item">
+                                                <a class="nav-link" data-bs-toggle="tab" href="#tab_nextjs">
+                                                    <i class="bi bi-braces me-2"></i>Next.js
+                                                </a>
+                                            </li>
+                                            <li class="nav-item">
+                                                <a class="nav-link" data-bs-toggle="tab" href="#tab_vuejs">
+                                                    <i class="bi bi-braces me-2"></i>Vue.js
+                                                </a>
+                                            </li>
+                                            <li class="nav-item">
+                                                <a class="nav-link" data-bs-toggle="tab" href="#tab_php">
+                                                    <i class="bi bi-file-code me-2"></i>PHP Native
+                                                </a>
+                                            </li>
+                                            <li class="nav-item">
+                                                <a class="nav-link" data-bs-toggle="tab" href="#tab_nodejs">
+                                                    <i class="bi bi-terminal me-2"></i>Node.js
+                                                </a>
+                                            </li>
+                                        </ul>
+                                        
+                                        <!-- Tab Content -->
+                                        <div class="tab-content" id="myTabContent">
+                                            
+                                            <!-- CodeIgniter 3 -->
+                                            <div class="tab-pane fade show active" id="tab_ci3" role="tabpanel">
+                                                <div class="mb-10">
+                                                    <h3 class="fw-bold mb-5">
+                                                        <span class="step-number">1</span>
+                                                        Instalasi Library
+                                                    </h3>
+                                                    <p class="text-gray-700 mb-5">Install Socket.IO client untuk PHP menggunakan Composer:</p>
+                                                    <pre><code class="language-bash">composer require wisembly/elephant.io</code></pre>
+                                                </div>
+                                                
+                                                <div class="mb-10">
+                                                    <h3 class="fw-bold mb-5">
+                                                        <span class="step-number">2</span>
+                                                        Buat Helper (Optional)
+                                                    </h3>
+                                                    <p class="text-gray-700 mb-5">File: <code>application/helpers/whatsapp_helper.php</code></p>
+                                                    <pre><code class="language-php">&lt;?php
+defined('BASEPATH') OR exit('No direct script access allowed');
+
+use ElephantIO\Client;
+use ElephantIO\Engine\SocketIO\Version2X;
+
+function send_whatsapp_message($sessionId, $to, $message) {
+    $client = new Client(new Version2X('http://localhost:3000'));
+    
+    try {
+        $client->initialize();
+        
+        $client->emit('send-message', [
+            'sessionId' => $sessionId,
+            'to' => $to,
+            'message' => $message
+        ]);
+        
+        // Listen for response
+        $response = $client->wait('message-sent');
+        
+        $client->close();
+        
+        return [
+            'success' => true,
+            'data' => $response
+        ];
+    } catch (Exception $e) {
+        return [
+            'success' => false,
+            'error' => $e->getMessage()
+        ];
+    }
+}</code></pre>
+                                                </div>
+                                                
+                                                <div class="mb-10">
+                                                    <h3 class="fw-bold mb-5">
+                                                        <span class="step-number">3</span>
+                                                        Implementasi di Controller
+                                                    </h3>
+                                                    <p class="text-gray-700 mb-5">File: <code>application/controllers/Whatsapp.php</code></p>
+                                                    <pre><code class="language-php">&lt;?php
+defined('BASEPATH') OR exit('No direct script access allowed');
+
+class Whatsapp extends CI_Controller {
+    
+    public function __construct() {
+        parent::__construct();
+        $this->load->helper('whatsapp');
+    }
+    
+    public function send_message() {
+        $sessionId = $this->input->post('session_id');
+        $to = $this->input->post('to');
+        $message = $this->input->post('message');
+        
+        $result = send_whatsapp_message($sessionId, $to, $message);
+        
+        $this->output
+            ->set_content_type('application/json')
+            ->set_output(json_encode($result));
+    }
+    
+    public function send_image() {
+        $sessionId = $this->input->post('session_id');
+        $to = $this->input->post('to');
+        $imageUrl = $this->input->post('image_url');
+        $caption = $this->input->post('caption');
+        
+        $client = new ElephantIO\Client(
+            new ElephantIO\Engine\SocketIO\Version2X('http://localhost:3000')
+        );
+        
+        $client->initialize();
+        
+        $client->emit('send-image', [
+            'sessionId' => $sessionId,
+            'to' => $to,
+            'imageUrl' => $imageUrl,
+            'caption' => $caption
+        ]);
+        
+        $response = $client->wait('image-sent');
+        $client->close();
+        
+        $this->output
+            ->set_content_type('application/json')
+            ->set_output(json_encode($response));
+    }
+}</code></pre>
+                                                </div>
+                                                
+                                                <div class="notice d-flex bg-light-warning rounded border-warning border border-dashed p-6">
+                                                    <i class="bi bi-exclamation-triangle fs-2tx text-warning me-4"></i>
+                                                    <div class="flex-grow-1">
+                                                        <h5 class="mb-1">Catatan Penting</h5>
+                                                        <p class="mb-0">Pastikan Socket.IO server sudah running di <code>http://localhost:3000</code> sebelum mengirim request.</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- CodeIgniter 4 -->
+                                            <div class="tab-pane fade" id="tab_ci4" role="tabpanel">
+                                                <div class="mb-10">
+                                                    <h3 class="fw-bold mb-5">
+                                                        <span class="step-number">1</span>
+                                                        Instalasi Library
+                                                    </h3>
+                                                    <pre><code class="language-bash">composer require wisembly/elephant.io</code></pre>
+                                                </div>
+                                                
+                                                <div class="mb-10">
+                                                    <h3 class="fw-bold mb-5">
+                                                        <span class="step-number">2</span>
+                                                        Buat Library
+                                                    </h3>
+                                                    <p class="text-gray-700 mb-5">File: <code>app/Libraries/WhatsappService.php</code></p>
+                                                    <pre><code class="language-php">&lt;?php
+
+namespace App\Libraries;
+
+use ElephantIO\Client;
+use ElephantIO\Engine\SocketIO\Version2X;
+
+class WhatsappService {
+    
+    protected $client;
+    protected $serverUrl = 'http://localhost:3000';
+    
+    public function __construct() {
+        $this->client = new Client(new Version2X($this->serverUrl));
+    }
+    
+    public function sendMessage($sessionId, $to, $message) {
+        try {
+            $this->client->initialize();
+            
+            $this->client->emit('send-message', [
+                'sessionId' => $sessionId,
+                'to' => $to,
+                'message' => $message
+            ]);
+            
+            $response = $this->client->wait('message-sent');
+            $this->client->close();
+            
+            return [
+                'success' => true,
+                'data' => $response
+            ];
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'error' => $e->getMessage()
+            ];
+        }
+    }
+    
+    public function sendImage($sessionId, $to, $imageUrl, $caption = '') {
+        try {
+            $this->client->initialize();
+            
+            $this->client->emit('send-image', [
+                'sessionId' => $sessionId,
+                'to' => $to,
+                'imageUrl' => $imageUrl,
+                'caption' => $caption
+            ]);
+            
+            $response = $this->client->wait('image-sent');
+            $this->client->close();
+            
+            return [
+                'success' => true,
+                'data' => $response
+            ];
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'error' => $e->getMessage()
+            ];
+        }
+    }
+    
+    public function getSessions() {
+        try {
+            $this->client->initialize();
+            $this->client->emit('get-sessions');
+            $response = $this->client->wait('all-sessions');
+            $this->client->close();
+            
+            return [
+                'success' => true,
+                'data' => $response
+            ];
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'error' => $e->getMessage()
+            ];
+        }
+    }
+}</code></pre>
+                                                </div>
+                                                
+                                                <div class="mb-10">
+                                                    <h3 class="fw-bold mb-5">
+                                                        <span class="step-number">3</span>
+                                                        Implementasi di Controller
+                                                    </h3>
+                                                    <p class="text-gray-700 mb-5">File: <code>app/Controllers/Whatsapp.php</code></p>
+                                                    <pre><code class="language-php">&lt;?php
+
+namespace App\Controllers;
+
+use App\Libraries\WhatsappService;
+
+class Whatsapp extends BaseController {
+    
+    protected $whatsapp;
+    
+    public function __construct() {
+        $this->whatsapp = new WhatsappService();
+    }
+    
+    public function sendMessage() {
+        $sessionId = $this->request->getPost('session_id');
+        $to = $this->request->getPost('to');
+        $message = $this->request->getPost('message');
+        
+        $result = $this->whatsapp->sendMessage($sessionId, $to, $message);
+        
+        return $this->response->setJSON($result);
+    }
+    
+    public function sendImage() {
+        $sessionId = $this->request->getPost('session_id');
+        $to = $this->request->getPost('to');
+        $imageUrl = $this->request->getPost('image_url');
+        $caption = $this->request->getPost('caption') ?? '';
+        
+        $result = $this->whatsapp->sendImage($sessionId, $to, $imageUrl, $caption);
+        
+        return $this->response->setJSON($result);
+    }
+    
+    public function getSessions() {
+        $result = $this->whatsapp->getSessions();
+        return $this->response->setJSON($result);
+    }
+}</code></pre>
+                                                </div>
+                                                
+                                                <div class="mb-10">
+                                                    <h3 class="fw-bold mb-5">
+                                                        <span class="step-number">4</span>
+                                                        Routes
+                                                    </h3>
+                                                    <p class="text-gray-700 mb-5">File: <code>app/Config/Routes.php</code></p>
+                                                    <pre><code class="language-php">$routes->post('whatsapp/send-message', 'Whatsapp::sendMessage');
+$routes->post('whatsapp/send-image', 'Whatsapp::sendImage');
+$routes->get('whatsapp/sessions', 'Whatsapp::getSessions');</code></pre>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Laravel 11 -->
+                                            <div class="tab-pane fade" id="tab_laravel" role="tabpanel">
+                                                <div class="mb-10">
+                                                    <h3 class="fw-bold mb-5">
+                                                        <span class="step-number">1</span>
+                                                        Instalasi Package
+                                                    </h3>
+                                                    <pre><code class="language-bash">composer require wisembly/elephant.io</code></pre>
+                                                </div>
+                                                
+                                                <div class="mb-10">
+                                                    <h3 class="fw-bold mb-5">
+                                                        <span class="step-number">2</span>
+                                                        Buat Service Class
+                                                    </h3>
+                                                    <p class="text-gray-700 mb-5">File: <code>app/Services/WhatsappService.php</code></p>
+                                                    <pre><code class="language-php">&lt;?php
+
+namespace App\Services;
+
+use ElephantIO\Client;
+use ElephantIO\Engine\SocketIO\Version2X;
+use Exception;
+
+class WhatsappService {
+    
+    protected $serverUrl;
+    
+    public function __construct() {
+        $this->serverUrl = config('services.whatsapp.server_url', 'http://localhost:3000');
+    }
+    
+    public function sendMessage(string $sessionId, string $to, string $message): array {
+        $client = new Client(new Version2X($this->serverUrl));
+        
+        try {
+            $client->initialize();
+            
+            $client->emit('send-message', [
+                'sessionId' => $sessionId,
+                'to' => $to,
+                'message' => $message
+            ]);
+            
+            $response = $client->wait('message-sent');
+            $client->close();
+            
+            return [
+                'success' => true,
+                'data' => $response
+            ];
+        } catch (Exception $e) {
+            return [
+                'success' => false,
+                'error' => $e->getMessage()
+            ];
+        }
+    }
+    
+    public function sendImage(string $sessionId, string $to, string $imageUrl, string $caption = ''): array {
+        $client = new Client(new Version2X($this->serverUrl));
+        
+        try {
+            $client->initialize();
+            
+            $client->emit('send-image', [
+                'sessionId' => $sessionId,
+                'to' => $to,
+                'imageUrl' => $imageUrl,
+                'caption' => $caption
+            ]);
+            
+            $response = $client->wait('image-sent');
+            $client->close();
+            
+            return [
+                'success' => true,
+                'data' => $response
+            ];
+        } catch (Exception $e) {
+            return [
+                'success' => false,
+                'error' => $e->getMessage()
+            ];
+        }
+    }
+}</code></pre>
+                                                </div>
+                                                
+                                                <div class="mb-10">
+                                                    <h3 class="fw-bold mb-5">
+                                                        <span class="step-number">3</span>
+                                                        Controller
+                                                    </h3>
+                                                    <p class="text-gray-700 mb-5">File: <code>app/Http/Controllers/WhatsappController.php</code></p>
+                                                    <pre><code class="language-php">&lt;?php
+
+namespace App\Http\Controllers;
+
+use App\Services\WhatsappService;
+use Illuminate\Http\Request;
+
+class WhatsappController extends Controller {
+    
+    protected $whatsapp;
+    
+    public function __construct(WhatsappService $whatsapp) {
+        $this->whatsapp = $whatsapp;
+    }
+    
+    public function sendMessage(Request $request) {
+        $validated = $request->validate([
+            'session_id' => 'required|string',
+            'to' => 'required|string',
+            'message' => 'required|string'
+        ]);
+        
+        $result = $this->whatsapp->sendMessage(
+            $validated['session_id'],
+            $validated['to'],
+            $validated['message']
+        );
+        
+        return response()->json($result);
+    }
+    
+    public function sendImage(Request $request) {
+        $validated = $request->validate([
+            'session_id' => 'required|string',
+            'to' => 'required|string',
+            'image_url' => 'required|url',
+            'caption' => 'nullable|string'
+        ]);
+        
+        $result = $this->whatsapp->sendImage(
+            $validated['session_id'],
+            $validated['to'],
+            $validated['image_url'],
+            $validated['caption'] ?? ''
+        );
+        
+        return response()->json($result);
+    }
+}</code></pre>
+                                                </div>
+                                                
+                                                <div class="mb-10">
+                                                    <h3 class="fw-bold mb-5">
+                                                        <span class="step-number">4</span>
+                                                        Routes
+                                                    </h3>
+                                                    <p class="text-gray-700 mb-5">File: <code>routes/api.php</code></p>
+                                                    <pre><code class="language-php">use App\Http\Controllers\WhatsappController;
+
+Route::prefix('whatsapp')->group(function () {
+    Route::post('/send-message', [WhatsappController::class, 'sendMessage']);
+    Route::post('/send-image', [WhatsappController::class, 'sendImage']);
+});</code></pre>
+                                                </div>
+                                                
+                                                <div class="mb-10">
+                                                    <h3 class="fw-bold mb-5">
+                                                        <span class="step-number">5</span>
+                                                        Config (Optional)
+                                                    </h3>
+                                                    <p class="text-gray-700 mb-5">File: <code>config/services.php</code></p>
+                                                    <pre><code class="language-php">'whatsapp' => [
+    'server_url' => env('WHATSAPP_SERVER_URL', 'http://localhost:3000'),
+],</code></pre>
+                                                    <p class="text-gray-700 mb-5">File: <code>.env</code></p>
+                                                    <pre><code class="language-bash">WHATSAPP_SERVER_URL=http://localhost:3000</code></pre>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Next.js -->
+                                            <div class="tab-pane fade" id="tab_nextjs" role="tabpanel">
+                                                <div class="mb-10">
+                                                    <h3 class="fw-bold mb-5">
+                                                        <span class="step-number">1</span>
+                                                        Instalasi Package
+                                                    </h3>
+                                                    <pre><code class="language-bash">npm install socket.io-client</code></pre>
+                                                </div>
+                                                
+                                                <div class="mb-10">
+                                                    <h3 class="fw-bold mb-5">
+                                                        <span class="step-number">2</span>
+                                                        Buat Service/Utility
+                                                    </h3>
+                                                    <p class="text-gray-700 mb-5">File: <code>lib/whatsapp.js</code></p>
+                                                    <pre><code class="language-javascript">import { io } from 'socket.io-client'
+
+let socket = null
+
+export const connectSocket = () => {
+  if (!socket) {
+    socket = io('http://localhost:3000')
+  }
+  return socket
+}
+
+export const sendMessage = (sessionId, to, message) => {
+  return new Promise((resolve, reject) => {
+    const socket = connectSocket()
+    
+    socket.emit('send-message', {
+      sessionId,
+      to,
+      message
+    })
+    
+    socket.once('message-sent', (response) => {
+      resolve(response)
+    })
+    
+    socket.once('error', (error) => {
+      reject(error)
+    })
+    
+    // Timeout after 30 seconds
+    setTimeout(() => {
+      reject(new Error('Request timeout'))
+    }, 30000)
+  })
+}
+
+export const sendImage = (sessionId, to, imageUrl, caption = '') => {
+  return new Promise((resolve, reject) => {
+    const socket = connectSocket()
+    
+    socket.emit('send-image', {
+      sessionId,
+      to,
+      imageUrl,
+      caption
+    })
+    
+    socket.once('image-sent', (response) => {
+      resolve(response)
+    })
+    
+    socket.once('error', (error) => {
+      reject(error)
+    })
+    
+    setTimeout(() => {
+      reject(new Error('Request timeout'))
+    }, 30000)
+  })
+}
+
+export const getSessions = () => {
+  return new Promise((resolve, reject) => {
+    const socket = connectSocket()
+    
+    socket.emit('get-sessions')
+    
+    socket.once('all-sessions', (sessions) => {
+      resolve(sessions)
+    })
+    
+    setTimeout(() => {
+      reject(new Error('Request timeout'))
+    }, 10000)
+  })
+}</code></pre>
+                                                </div>
+                                                
+                                                <div class="mb-10">
+                                                    <h3 class="fw-bold mb-5">
+                                                        <span class="step-number">3</span>
+                                                        API Route (App Router)
+                                                    </h3>
+                                                    <p class="text-gray-700 mb-5">File: <code>app/api/whatsapp/send-message/route.js</code></p>
+                                                    <pre><code class="language-javascript">import { NextResponse } from 'next/server'
+import { sendMessage } from '@/lib/whatsapp'
+
+export async function POST(request) {
+  try {
+    const { sessionId, to, message } = await request.json()
+    
+    if (!sessionId || !to || !message) {
+      return NextResponse.json(
+        { error: 'Missing required fields' },
+        { status: 400 }
+      )
+    }
+    
+    const result = await sendMessage(sessionId, to, message)
+    
+    return NextResponse.json({
+      success: true,
+      data: result
+    })
+  } catch (error) {
+    return NextResponse.json(
+      { error: error.message },
+      { status: 500 }
+    )
+  }
+}</code></pre>
+                                                </div>
+                                                
+                                                <div class="mb-10">
+                                                    <h3 class="fw-bold mb-5">
+                                                        <span class="step-number">4</span>
+                                                        Implementasi di Component
+                                                    </h3>
+                                                    <p class="text-gray-700 mb-5">File: <code>components/SendMessage.jsx</code></p>
+                                                    <pre><code class="language-javascript">'use client'
+
+import { useState } from 'react'
+
+export default function SendMessage() {
+  const [loading, setLoading] = useState(false)
+  const [formData, setFormData] = useState({
+    sessionId: 'session1',
+    to: '',
+    message: ''
+  })
+  
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setLoading(true)
+    
+    try {
+      const response = await fetch('/api/whatsapp/send-message', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData)
+      })
+      
+      const result = await response.json()
+      
+      if (result.success) {
+        alert('Pesan berhasil dikirim!')
+        setFormData({ ...formData, to: '', message: '' })
+      } else {
+        alert('Gagal mengirim pesan: ' + result.error)
+      }
+    } catch (error) {
+      alert('Error: ' + error.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+  return (
+    &lt;form onSubmit={handleSubmit} className="space-y-4"&gt;
+      &lt;input
+        type="text"
+        placeholder="Session ID"
+        value={formData.sessionId}
+        onChange={(e) => setFormData({...formData, sessionId: e.target.value})}
+        className="w-full p-2 border rounded"
+      /&gt;
+      
+      &lt;input
+        type="text"
+        placeholder="Nomor WhatsApp (628xxx)"
+        value={formData.to}
+        onChange={(e) => setFormData({...formData, to: e.target.value})}
+        className="w-full p-2 border rounded"
+      /&gt;
+      
+      &lt;textarea
+        placeholder="Pesan"
+        value={formData.message}
+        onChange={(e) => setFormData({...formData, message: e.target.value})}
+        className="w-full p-2 border rounded"
+        rows="4"
+      /&gt;
+      
+      &lt;button
+        type="submit"
+        disabled={loading}
+        className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600"
+      &gt;
+        {loading ? 'Mengirim...' : 'Kirim Pesan'}
+      &lt;/button&gt;
+    &lt;/form&gt;
+  )
+}</code></pre>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Vue.js -->
+                                            <div class="tab-pane fade" id="tab_vuejs" role="tabpanel">
+                                                <div class="mb-10">
+                                                    <h3 class="fw-bold mb-5">
+                                                        <span class="step-number">1</span>
+                                                        Instalasi Package
+                                                    </h3>
+                                                    <pre><code class="language-bash">npm install socket.io-client</code></pre>
+                                                </div>
+                                                
+                                                <div class="mb-10">
+                                                    <h3 class="fw-bold mb-5">
+                                                        <span class="step-number">2</span>
+                                                        Buat Plugin
+                                                    </h3>
+                                                    <p class="text-gray-700 mb-5">File: <code>src/plugins/socket.js</code></p>
+                                                    <pre><code class="language-javascript">import { io } from 'socket.io-client'
+
+const socket = io('http://localhost:3000')
+
+export default {
+  install(app) {
+    app.config.globalProperties.$socket = socket
+    
+    app.config.globalProperties.$whatsapp = {
+      sendMessage(sessionId, to, message) {
+        return new Promise((resolve, reject) => {
+          socket.emit('send-message', { sessionId, to, message })
+          
+          socket.once('message-sent', (response) => {
+            resolve(response)
+          })
+          
+          socket.once('error', (error) => {
+            reject(error)
+          })
+          
+          setTimeout(() => reject(new Error('Timeout')), 30000)
+        })
+      },
+      
+      sendImage(sessionId, to, imageUrl, caption = '') {
+        return new Promise((resolve, reject) => {
+          socket.emit('send-image', { sessionId, to, imageUrl, caption })
+          
+          socket.once('image-sent', (response) => {
+            resolve(response)
+          })
+          
+          socket.once('error', (error) => {
+            reject(error)
+          })
+          
+          setTimeout(() => reject(new Error('Timeout')), 30000)
+        })
+      },
+      
+      getSessions() {
+        return new Promise((resolve, reject) => {
+          socket.emit('get-sessions')
+          
+          socket.once('all-sessions', (sessions) => {
+            resolve(sessions)
+          })
+          
+          setTimeout(() => reject(new Error('Timeout')), 10000)
+        })
+      }
+    }
+  }
+}</code></pre>
+                                                </div>
+                                                
+                                                <div class="mb-10">
+                                                    <h3 class="fw-bold mb-5">
+                                                        <span class="step-number">3</span>
+                                                        Register Plugin
+                                                    </h3>
+                                                    <p class="text-gray-700 mb-5">File: <code>src/main.js</code></p>
+                                                    <pre><code class="language-javascript">import { createApp } from 'vue'
+import App from './App.vue'
+import socketPlugin from './plugins/socket'
+
+const app = createApp(App)
+
+app.use(socketPlugin)
+app.mount('#app')</code></pre>
+                                                </div>
+                                                
+                                                <div class="mb-10">
+                                                    <h3 class="fw-bold mb-5">
+                                                        <span class="step-number">4</span>
+                                                        Implementasi di Component
+                                                    </h3>
+                                                    <p class="text-gray-700 mb-5">File: <code>src/components/SendMessage.vue</code></p>
+                                                    <pre><code class="language-javascript">&lt;template&gt;
+  &lt;div class="send-message"&gt;
+    &lt;h2&gt;Kirim Pesan WhatsApp&lt;/h2&gt;
+    
+    &lt;form @submit.prevent="handleSubmit"&gt;
+      &lt;div class="form-group"&gt;
+        &lt;label&gt;Session ID&lt;/label&gt;
+        &lt;input v-model="form.sessionId" type="text" required /&gt;
+      &lt;/div&gt;
+      
+      &lt;div class="form-group"&gt;
+        &lt;label&gt;Nomor WhatsApp&lt;/label&gt;
+        &lt;input v-model="form.to" type="text" placeholder="628xxx" required /&gt;
+      &lt;/div&gt;
+      
+      &lt;div class="form-group"&gt;
+        &lt;label&gt;Pesan&lt;/label&gt;
+        &lt;textarea v-model="form.message" rows="4" required&gt;&lt;/textarea&gt;
+      &lt;/div&gt;
+      
+      &lt;button type="submit" :disabled="loading"&gt;
+        {{ loading ? 'Mengirim...' : 'Kirim Pesan' }}
+      &lt;/button&gt;
+    &lt;/form&gt;
+    
+    &lt;div v-if="result" class="result"&gt;
+      &lt;p :class="result.success ? 'success' : 'error'"&gt;
+        {{ result.message }}
+      &lt;/p&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/template&gt;
+
+&lt;script&gt;
+export default {
+  name: 'SendMessage',
+  
+  data() {
+    return {
+      form: {
+        sessionId: 'session1',
+        to: '',
+        message: ''
+      },
+      loading: false,
+      result: null
+    }
+  },
+  
+  methods: {
+    async handleSubmit() {
+      this.loading = true
+      this.result = null
+      
+      try {
+        const response = await this.$whatsapp.sendMessage(
+          this.form.sessionId,
+          this.form.to,
+          this.form.message
+        )
+        
+        this.result = {
+          success: true,
+          message: 'Pesan berhasil dikirim!'
+        }
+        
+        // Reset form
+        this.form.to = ''
+        this.form.message = ''
+      } catch (error) {
+        this.result = {
+          success: false,
+          message: 'Gagal mengirim pesan: ' + error.message
+        }
+      } finally {
+        this.loading = false
+      }
+    }
+  }
+}
+&lt;/script&gt;
+
+&lt;style scoped&gt;
+.send-message {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.form-group {
+  margin-bottom: 15px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: bold;
+}
+
+.form-group input,
+.form-group textarea {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+button {
+  width: 100%;
+  padding: 12px;
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.result {
+  margin-top: 20px;
+  padding: 10px;
+  border-radius: 4px;
+}
+
+.success {
+  color: green;
+  background: #d4edda;
+}
+
+.error {
+  color: red;
+  background: #f8d7da;
+}
+&lt;/style&gt;</code></pre>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- PHP Native -->
+                                            <div class="tab-pane fade" id="tab_php" role="tabpanel">
+                                                <div class="mb-10">
+                                                    <h3 class="fw-bold mb-5">
+                                                        <span class="step-number">1</span>
+                                                        Instalasi Library
+                                                    </h3>
+                                                    <p class="text-gray-700 mb-5">Install Composer dan ElephantIO:</p>
+                                                    <pre><code class="language-bash">composer require wisembly/elephant.io</code></pre>
+                                                </div>
+                                                
+                                                <div class="mb-10">
+                                                    <h3 class="fw-bold mb-5">
+                                                        <span class="step-number">2</span>
+                                                        Autoload Composer
+                                                    </h3>
+                                                    <p class="text-gray-700 mb-5">Buat file <code>config.php</code>:</p>
+                                                    <pre><code class="language-php">&lt;?php
+require_once __DIR__ . '/vendor/autoload.php';
+
+use ElephantIO\Client;
+use ElephantIO\Engine\SocketIO\Version2X;
+
+define('SOCKET_SERVER', 'http://localhost:3000');</code></pre>
+                                                </div>
+                                                
+                                                <div class="mb-10">
+                                                    <h3 class="fw-bold mb-5">
+                                                        <span class="step-number">3</span>
+                                                        Kirim Pesan
+                                                    </h3>
+                                                    <p class="text-gray-700 mb-5">File: <code>send_message.php</code></p>
+                                                    <pre><code class="language-php">&lt;?php
+require_once 'config.php';
+
+header('Content-Type: application/json');
+
+try {
+    // Get POST data
+    $sessionId = $_POST['session_id'] ?? null;
+    $to = $_POST['to'] ?? null;
+    $message = $_POST['message'] ?? null;
+    
+    if (!$sessionId || !$to || !$message) {
+        throw new Exception('Missing required fields');
+    }
+    
+    // Connect to Socket.IO server
+    $client = new Client(new Version2X(SOCKET_SERVER));
+    $client->initialize();
+    
+    // Emit message
+    $client->emit('send-message', [
+        'sessionId' => $sessionId,
+        'to' => $to,
+        'message' => $message
+    ]);
+    
+    // Wait for response (optional)
+    $response = $client->wait('message-sent');
+    
+    // Close connection
+    $client->close();
+    
+    echo json_encode([
+        'success' => true,
+        'data' => $response
+    ]);
+    
+} catch (Exception $e) {
+    http_response_code(500);
+    echo json_encode([
+        'success' => false,
+        'error' => $e->getMessage()
+    ]);
+}</code></pre>
+                                                </div>
+                                                
+                                                <div class="mb-10">
+                                                    <h3 class="fw-bold mb-5">
+                                                        <span class="step-number">4</span>
+                                                        Kirim Gambar
+                                                    </h3>
+                                                    <p class="text-gray-700 mb-5">File: <code>send_image.php</code></p>
+                                                    <pre><code class="language-php">&lt;?php
+require_once 'config.php';
+
+header('Content-Type: application/json');
+
+try {
+    $sessionId = $_POST['session_id'] ?? null;
+    $to = $_POST['to'] ?? null;
+    $imageUrl = $_POST['image_url'] ?? null;
+    $caption = $_POST['caption'] ?? '';
+    
+    if (!$sessionId || !$to || !$imageUrl) {
+        throw new Exception('Missing required fields');
+    }
+    
+    $client = new Client(new Version2X(SOCKET_SERVER));
+    $client->initialize();
+    
+    $client->emit('send-image', [
+        'sessionId' => $sessionId,
+        'to' => $to,
+        'imageUrl' => $imageUrl,
+        'caption' => $caption
+    ]);
+    
+    $response = $client->wait('image-sent');
+    $client->close();
+    
+    echo json_encode([
+        'success' => true,
+        'data' => $response
+    ]);
+    
+} catch (Exception $e) {
+    http_response_code(500);
+    echo json_encode([
+        'success' => false,
+        'error' => $e->getMessage()
+    ]);
+}</code></pre>
+                                                </div>
+                                                
+                                                <div class="mb-10">
+                                                    <h3 class="fw-bold mb-5">
+                                                        <span class="step-number">5</span>
+                                                        Form HTML
+                                                    </h3>
+                                                    <p class="text-gray-700 mb-5">File: <code>index.html</code></p>
+                                                    <pre><code class="language-html">&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+    &lt;title&gt;WhatsApp API&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;h2&gt;Kirim Pesan WhatsApp&lt;/h2&gt;
+    
+    &lt;form id="messageForm"&gt;
+        &lt;input type="text" name="session_id" placeholder="Session ID" required&gt;&lt;br&gt;
+        &lt;input type="text" name="to" placeholder="Nomor (628xxx)" required&gt;&lt;br&gt;
+        &lt;textarea name="message" placeholder="Pesan" required&gt;&lt;/textarea&gt;&lt;br&gt;
+        &lt;button type="submit"&gt;Kirim&lt;/button&gt;
+    &lt;/form&gt;
+    
+    &lt;div id="result"&gt;&lt;/div&gt;
+    
+    &lt;script&gt;
+    document.getElementById('messageForm').addEventListener('submit', async (e) => {
+        e.preventDefault()
+        
+        const formData = new FormData(e.target)
+        
+        try {
+            const response = await fetch('send_message.php', {
+                method: 'POST',
+                body: formData
+            })
+            
+            const result = await response.json()
+            
+            document.getElementById('result').innerHTML = 
+                result.success ? '✅ Berhasil!' : '❌ Gagal: ' + result.error
+        } catch (error) {
+            document.getElementById('result').innerHTML = '❌ Error: ' + error.message
+        }
+    })
+    &lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;</code></pre>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Node.js -->
+                                            <div class="tab-pane fade" id="tab_nodejs" role="tabpanel">
+                                                <div class="mb-10">
+                                                    <h3 class="fw-bold mb-5">
+                                                        <span class="step-number">1</span>
+                                                        Instalasi Package
+                                                    </h3>
+                                                    <pre><code class="language-bash">npm install socket.io-client express</code></pre>
+                                                </div>
+                                                
+                                                <div class="mb-10">
+                                                    <h3 class="fw-bold mb-5">
+                                                        <span class="step-number">2</span>
+                                                        Buat Wrapper Service
+                                                    </h3>
+                                                    <p class="text-gray-700 mb-5">File: <code>whatsapp-service.js</code></p>
+                                                    <pre><code class="language-javascript">const { io } = require('socket.io-client')
+
+class WhatsappService {
+  constructor(serverUrl = 'http://localhost:3000') {
+    this.socket = io(serverUrl)
+    
+    this.socket.on('connect', () => {
+      console.log('✅ Connected to WhatsApp server')
+    })
+    
+    this.socket.on('disconnect', () => {
+      console.log('❌ Disconnected from WhatsApp server')
+    })
+  }
+  
+  sendMessage(sessionId, to, message) {
+    return new Promise((resolve, reject) => {
+      this.socket.emit('send-message', {
+        sessionId,
+        to,
+        message
+      })
+      
+      this.socket.once('message-sent', (response) => {
+        resolve(response)
+      })
+      
+      this.socket.once('error', (error) => {
+        reject(error)
+      })
+      
+      setTimeout(() => {
+        reject(new Error('Request timeout'))
+      }, 30000)
+    })
+  }
+  
+  sendImage(sessionId, to, imageUrl, caption = '') {
+    return new Promise((resolve, reject) => {
+      this.socket.emit('send-image', {
+        sessionId,
+        to,
+        imageUrl,
+        caption
+      })
+      
+      this.socket.once('image-sent', (response) => {
+        resolve(response)
+      })
+      
+      this.socket.once('error', (error) => {
+        reject(error)
+      })
+      
+      setTimeout(() => {
+        reject(new Error('Request timeout'))
+      }, 30000)
+    })
+  }
+  
+  getSessions() {
+    return new Promise((resolve, reject) => {
+      this.socket.emit('get-sessions')
+      
+      this.socket.once('all-sessions', (sessions) => {
+        resolve(sessions)
+      })
+      
+      setTimeout(() => {
+        reject(new Error('Request timeout'))
+      }, 10000)
+    })
+  }
+  
+  createSession(sessionId, method = 'qr', phoneNumber = null) {
+    return new Promise((resolve, reject) => {
+      this.socket.emit('create-session', {
+        sessionId,
+        method,
+        phoneNumber
+      })
+      
+      if (method === 'qr') {
+        this.socket.once('qr', (data) => {
+          resolve(data)
+        })
+      } else {
+        this.socket.once('pairing-code', (data) => {
+          resolve(data)
+        })
+      }
+      
+      this.socket.once('error', (error) => {
+        reject(error)
+      })
+      
+      setTimeout(() => {
+        reject(new Error('Request timeout'))
+      }, 60000)
+    })
+  }
+}
+
+module.exports = WhatsappService</code></pre>
+                                                </div>
+                                                
+                                                <div class="mb-10">
+                                                    <h3 class="fw-bold mb-5">
+                                                        <span class="step-number">3</span>
+                                                        Express API Server
+                                                    </h3>
+                                                    <p class="text-gray-700 mb-5">File: <code>server.js</code></p>
+                                                    <pre><code class="language-javascript">const express = require('express')
+const WhatsappService = require('./whatsapp-service')
+
+const app = express()
+const whatsapp = new WhatsappService()
+
+app.use(express.json())
+app.use(express.urlencoded({ extended: true }))
+
+// Send message endpoint
+app.post('/api/send-message', async (req, res) => {
+  try {
+    const { sessionId, to, message } = req.body
+    
+    if (!sessionId || !to || !message) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields'
+      })
+    }
+    
+    const result = await whatsapp.sendMessage(sessionId, to, message)
+    
+    res.json({
+      success: true,
+      data: result
+    })
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    })
+  }
+})
+
+// Send image endpoint
+app.post('/api/send-image', async (req, res) => {
+  try {
+    const { sessionId, to, imageUrl, caption } = req.body
+    
+    if (!sessionId || !to || !imageUrl) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields'
+      })
+    }
+    
+    const result = await whatsapp.sendImage(sessionId, to, imageUrl, caption || '')
+    
+    res.json({
+      success: true,
+      data: result
+    })
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    })
+  }
+})
+
+// Get sessions endpoint
+app.get('/api/sessions', async (req, res) => {
+  try {
+    const sessions = await whatsapp.getSessions()
+    
+    res.json({
+      success: true,
+      data: sessions
+    })
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    })
+  }
+})
+
+const PORT = process.env.PORT || 4000
+
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on http://localhost:${PORT}`)
+})</code></pre>
+                                                </div>
+                                                
+                                                <div class="mb-10">
+                                                    <h3 class="fw-bold mb-5">
+                                                        <span class="step-number">4</span>
+                                                        Jalankan Server
+                                                    </h3>
+                                                    <pre><code class="language-bash">node server.js</code></pre>
+                                                </div>
+                                                
+                                                <div class="mb-10">
+                                                    <h3 class="fw-bold mb-5">
+                                                        <span class="step-number">5</span>
+                                                        Test dengan cURL
+                                                    </h3>
+                                                    <pre><code class="language-bash"># Send message
+curl -X POST http://localhost:4000/api/send-message \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sessionId": "session1",
+    "to": "628123456789",
+    "message": "Hello from API!"
+  }'
+
+# Get sessions
+curl http://localhost:4000/api/sessions</code></pre>
+                                                </div>
+                                            </div>
+                                            
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                            </div>
+                        </div>
+                        
+                    </div>
+                    
+                    <!-- Footer -->
+                    <div id="footer-container"></div>
+                    
+                </div>
+                
+            </div>
+            
+        </div>
+    </div>
+    
+    <!-- Metronic JS -->
+    <script src="assets/plugins/global/plugins.bundle.js"></script>
+    <script src="assets/js/scripts.bundle.js"></script>
+    
+    <!-- Prism.js for Syntax Highlighting -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-php.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+    
+    <!-- Custom JS -->
+    <script src="api-docs.js"></script>
+    
+</body>
+</html>

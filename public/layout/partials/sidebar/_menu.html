@@ -1,0 +1,167 @@
+<!--begin::sidebar menu-->
+<div class="app-sidebar-menu overflow-hidden flex-column-fluid">
+    <!--begin::Menu wrapper-->
+    <div id="kt_app_sidebar_menu_wrapper" class="app-sidebar-wrapper">
+        <!--begin::Scroll wrapper-->
+        <div id="kt_app_sidebar_menu_scroll" class="scroll-y my-5 mx-3"
+            data-kt-scroll="true"
+            data-kt-scroll-activate="true"
+            data-kt-scroll-height="auto"
+            data-kt-scroll-dependencies="#kt_app_sidebar_logo, #kt_app_sidebar_footer"
+            data-kt-scroll-wrappers="#kt_app_sidebar_menu"
+            data-kt-scroll-offset="5px"
+            data-kt-scroll-save-state="true">
+            
+            <!--begin::Menu-->
+            <div class="menu menu-column menu-rounded menu-sub-indention fw-semibold fs-6"
+                id="#kt_app_sidebar_menu"
+                data-kt-menu="true"
+                data-kt-menu-expand="false">
+
+                <!--begin:Menu item - Home-->
+                <div class="menu-item">
+                    <a class="menu-link" href="/">
+                        <span class="menu-icon">
+                            <i class="ki-outline ki-home fs-2 text-primary"></i>
+                        </span>
+                        <span class="menu-title">Home</span>
+                    </a>
+                </div>
+                <!--end:Menu item - Home-->
+
+                <!--begin:Menu item - Dashboard-->
+                <div data-kt-menu-trigger="click" class="menu-item here show menu-accordion">
+                    <span class="menu-link">
+                        <span class="menu-icon">
+                            <i class="ki-outline ki-element-11 fs-2"></i>
+                        </span>
+                        <span class="menu-title">Dashboards</span>
+                        <span class="menu-arrow"></span>
+                    </span>
+                    <div class="menu-sub menu-sub-accordion">
+                        <div class="menu-item">
+                            <a class="menu-link active" href="/dashboard">
+                                <span class="menu-bullet"><span class="bullet bullet-dot"></span></span>
+                                <span class="menu-title">Default</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <!--end:Menu item - Dashboard-->
+
+                <!--begin:Menu Section - WhatsApp-->
+                <div class="menu-item pt-5">
+                    <div class="menu-content">
+                        <span class="menu-heading fw-bold text-uppercase fs-7">WhatsApp</span>
+                    </div>
+                </div>
+                <!--end:Menu Section - WhatsApp-->
+
+                <!--begin:Menu item - Hubungkan Session-->
+                <div class="menu-item">
+                    <a class="menu-link" href="connect-session.html">
+                        <span class="menu-icon">
+                            <i class="ki-outline ki-bluetooth fs-2 text-success"></i>
+                        </span>
+                        <span class="menu-title">Hubungkan Session</span>
+                    </a>
+                </div>
+                <!--end:Menu item - Hubungkan Session-->
+
+                <!--begin:Menu item - Kelola Export Grup-->
+                <div class="menu-item">
+                    <a class="menu-link" href="kelola-export.html">
+                        <span class="menu-icon">
+                            <i class="ki-outline ki-file-down fs-2 text-primary"></i>
+                        </span>
+                        <span class="menu-title">Kelola Export Grup</span>
+                    </a>
+                </div>
+                <!--end:Menu item - Kelola Export Grup-->
+
+                <!--begin:Menu item - Daftar Grup-->
+                <div class="menu-item">
+                    <a class="menu-link" href="groups.html">
+                        <span class="menu-icon">
+                            <i class="ki-outline ki-people fs-2 text-info"></i>
+                        </span>
+                        <span class="menu-title">Daftar Grup</span>
+                    </a>
+                </div>
+                <!--end:Menu item - Daftar Grup-->
+
+                <!--begin:Menu item - Chat Templates-->
+                <div class="menu-item">
+                    <a class="menu-link" href="templates.html">
+                        <span class="menu-icon">
+                            <i class="ki-outline ki-message-text-2 fs-2 text-warning"></i>
+                        </span>
+                        <span class="menu-title">Chat Templates</span>
+                    </a>
+                </div>
+                <!--end:Menu item - Chat Templates-->
+
+                <!--begin:Menu item - Auto Reply (Accordion)-->
+                <div data-kt-menu-trigger="click" class="menu-item menu-accordion">
+                    <span class="menu-link">
+                        <span class="menu-icon">
+                            <i class="ki-outline ki-message-programming fs-2 text-danger"></i>
+                        </span>
+                        <span class="menu-title">Auto Reply</span>
+                        <span class="menu-arrow"></span>
+                    </span>
+                    <div class="menu-sub menu-sub-accordion">
+                        <div class="menu-item">
+                            <a class="menu-link" href="auto-reply.html">
+                                <span class="menu-bullet"><span class="bullet bullet-dot"></span></span>
+                                <span class="menu-title">Kelola Rules</span>
+                            </a>
+                        </div>
+                        <div class="menu-item">
+                            <a class="menu-link" href="auto-reply-logs.html">
+                                <span class="menu-bullet"><span class="bullet bullet-dot"></span></span>
+                                <span class="menu-title">Logs</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <!--end:Menu item - Auto Reply-->
+
+                <!--begin:Menu Section - Help-->
+                <div class="menu-item pt-5">
+                    <div class="menu-content">
+                        <span class="menu-heading fw-bold text-uppercase fs-7">Help</span>
+                    </div>
+                </div>
+                <!--end:Menu Section - Help-->
+
+                <!--begin:Menu item - Components-->
+                <div class="menu-item">
+                    <a class="menu-link" href="https://preview.keenthemes.com/html/metronic/docs/base/utilities" target="_blank">
+                        <span class="menu-icon">
+                            <i class="ki-outline ki-rocket fs-2"></i>
+                        </span>
+                        <span class="menu-title">Components</span>
+                    </a>
+                </div>
+                <!--end:Menu item - Components-->
+
+                <!--begin:Menu item - Documentation-->
+                <div class="menu-item">
+                    <a class="menu-link" href="https://preview.keenthemes.com/html/metronic/docs" target="_blank">
+                        <span class="menu-icon">
+                            <i class="ki-outline ki-abstract-26 fs-2"></i>
+                        </span>
+                        <span class="menu-title">Documentation</span>
+                    </a>
+                </div>
+                <!--end:Menu item - Documentation-->
+
+            </div>
+            <!--end::Menu-->
+        </div>
+        <!--end::Scroll wrapper-->
+    </div>
+    <!--end::Menu wrapper-->
+</div>
+<!--end::sidebar menu-->
