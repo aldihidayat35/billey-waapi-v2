@@ -56,6 +56,8 @@ const protectStaticFiles = (req: any, res: any, next: any) => {
 	const publicPaths = [
 		'/auth/login',
 		'/auth/login.html',
+		'/api-docs.html',
+		'/api-docs',
 		'/assets/',
 		'/js/',
 		'/css/',
