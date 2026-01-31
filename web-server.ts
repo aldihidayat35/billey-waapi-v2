@@ -40,11 +40,81 @@ const io = new SocketIO(server, {
 
 const sessionManager = new SessionManager(io)
 
-// Serve static files
+// Parse cookies and JSON body FIRST
+app.use(cookieParser()) // Parse cookies for session management
+app.use(express.json({ limit: '50mb' })) // Increase limit for media uploads
+
+// ============================================
+// Authentication Middleware for Static Files
+// ============================================
+
+// Middleware to protect HTML pages (except login and public assets)
+const protectStaticFiles = (req: any, res: any, next: any) => {
+	const path = req.path.toLowerCase()
+	
+	// Allow these paths without authentication
+	const publicPaths = [
+		'/auth/login',
+		'/auth/login.html',
+		'/assets/',
+		'/js/',
+		'/css/',
+		'/fonts/',
+		'/media/',
+		'/plugins/',
+		'.css',
+		'.js',
+		'.png',
+		'.jpg',
+		'.jpeg',
+		'.gif',
+		'.svg',
+		'.ico',
+		'.woff',
+		'.woff2',
+		'.ttf',
+		'.eot'
+	]
+	
+	// Check if path is public
+	const isPublic = publicPaths.some(p => path.includes(p) || path.endsWith(p))
+	
+	if (isPublic) {
+		return next()
+	}
+	
+	// Check if it's an HTML file or a page route (no extension)
+	const isHtmlOrPage = path.endsWith('.html') || 
+						 (!path.includes('.') && path !== '/') ||
+						 path === '/'
+	
+	if (isHtmlOrPage) {
+		// Check authentication
+		const sessionToken = req.cookies?.[SESSION_COOKIE_NAME]
+		
+		if (!sessionToken) {
+			return res.redirect('/auth/login')
+		}
+		
+		const user = validateSession(sessionToken)
+		if (!user) {
+			res.clearCookie(SESSION_COOKIE_NAME)
+			return res.redirect('/auth/login')
+		}
+		
+		// User is authenticated, attach to request
+		req.user = user
+	}
+	
+	next()
+}
+
+// Apply protection middleware BEFORE static files
+app.use(protectStaticFiles)
+
+// Serve static files (now protected by middleware above)
 app.use(express.static('public'))
 app.use('/api', express.static('api')) // Serve API folder
-app.use(express.json({ limit: '50mb' })) // Increase limit for media uploads
-app.use(cookieParser()) // Parse cookies for session management
 
 // ============================================
 // Authentication Routes
