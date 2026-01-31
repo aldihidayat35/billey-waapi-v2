@@ -11,7 +11,7 @@ import makeWASocket, {
 } from './src'
 import { logger as activityLogger } from './logger'
 import { messageLogDb, chatTemplateDb, autoReplyDb, autoReplyLogDb, autoReplyCooldownDb, db } from './database.js'
-import { readFileSync, existsSync, readdirSync } from 'fs'
+import { readFileSync, existsSync, readdirSync, rmSync } from 'fs'
 import { join } from 'path'
 
 const pinoLogger = P({ level: 'silent' })
@@ -363,6 +363,23 @@ export class SessionManager {
 				}
 			}
 			this.sessions.delete(sessionId)
+		}
+
+		// Delete the auth folder for this session
+		const authFolder = `./baileys_auth_info_${sessionId}`
+		if (existsSync(authFolder)) {
+			try {
+				rmSync(authFolder, { recursive: true, force: true })
+				console.log(`🗑️ Deleted auth folder: ${authFolder}`)
+				
+				// Also clear LID mapping cache for this session
+				lidMappingCache.delete(sessionId)
+			} catch (error) {
+				console.error(`❌ Error deleting auth folder ${authFolder}:`, error)
+				throw new Error(`Failed to delete session folder: ${error}`)
+			}
+		} else {
+			console.log(`⚠️ Auth folder not found: ${authFolder}`)
 		}
 	}
 
