@@ -219,66 +219,1020 @@
                                     </div>
                                 </div>
                                 
-                                <!-- REST API Endpoints Card -->
-                                <div class="card mb-5 mb-xl-10">
+                                <!-- REST API Endpoints Card - COMPLETE REFERENCE -->
+                                <div class="card mb-5 mb-xl-10" id="rest-api-section">
                                     <div class="card-header">
                                         <h3 class="card-title fw-bold">
-                                            <i class="bi bi-lightning-charge text-warning me-2"></i>REST API Endpoints (Recommended)
+                                            <i class="bi bi-lightning-charge text-warning me-2"></i>REST API Endpoints - Referensi Lengkap
                                         </h3>
                                     </div>
                                     <div class="card-body">
                                         <div class="notice d-flex bg-light-primary rounded border-primary border border-dashed p-6 mb-5">
                                             <i class="bi bi-star fs-2tx text-primary me-4"></i>
                                             <div class="flex-grow-1">
-                                                <h5 class="mb-1">Cara Paling Mudah!</h5>
-                                                <p class="mb-0">Gunakan REST API untuk integrasi yang lebih sederhana. Cukup kirim HTTP request ke endpoint berikut.</p>
+                                                <h5 class="mb-1">Dokumentasi API Lengkap</h5>
+                                                <p class="mb-0">Semua endpoint REST API yang tersedia di aplikasi WhatsApp Multi Session.</p>
                                             </div>
                                         </div>
                                         
-                                        <div class="table-responsive">
-                                            <table class="table table-row-bordered table-row-gray-300 gy-5">
+                                        <!-- Quick Navigation -->
+                                        <div class="mb-8">
+                                            <h5 class="fw-bold mb-3">📚 Quick Navigation</h5>
+                                            <div class="d-flex flex-wrap gap-2">
+                                                <a href="#api-auth" class="btn btn-sm btn-light-primary">🔐 Authentication</a>
+                                                <a href="#api-users" class="btn btn-sm btn-light-info">👥 Users</a>
+                                                <a href="#api-sessions" class="btn btn-sm btn-light-success">📱 Sessions</a>
+                                                <a href="#api-messages" class="btn btn-sm btn-light-warning">💬 Messages</a>
+                                                <a href="#api-logs" class="btn btn-sm btn-light-danger">📊 Logs</a>
+                                                <a href="#api-database" class="btn btn-sm btn-light-dark">🗄️ Database</a>
+                                                <a href="#api-templates" class="btn btn-sm btn-light-primary">📝 Templates</a>
+                                                <a href="#api-autoreply" class="btn btn-sm btn-light-info">🤖 Auto Reply</a>
+                                                <a href="#api-groups" class="btn btn-sm btn-light-success">👥 Groups</a>
+                                                <a href="#api-exports" class="btn btn-sm btn-light-warning">📤 Exports</a>
+                                                <a href="#api-health" class="btn btn-sm btn-light-danger">❤️ Health</a>
+                                            </div>
+                                        </div>
+
+                                        <!-- ============================================ -->
+                                        <!-- AUTHENTICATION API -->
+                                        <!-- ============================================ -->
+                                        <div class="separator separator-dashed my-8"></div>
+                                        <h4 class="fw-bold mb-5" id="api-auth">
+                                            <i class="bi bi-shield-lock text-primary me-2"></i>🔐 Authentication API
+                                        </h4>
+                                        <div class="table-responsive mb-8">
+                                            <table class="table table-row-bordered table-row-gray-300 gy-4">
                                                 <thead>
-                                                    <tr class="fw-bold fs-6 text-gray-800">
-                                                        <th>Method</th>
-                                                        <th>Endpoint</th>
+                                                    <tr class="fw-bold fs-6 text-gray-800 bg-light">
+                                                        <th width="80">Method</th>
+                                                        <th width="280">Endpoint</th>
                                                         <th>Deskripsi</th>
+                                                        <th width="200">Parameters</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr>
+                                                        <td><span class="badge badge-primary">POST</span></td>
+                                                        <td><code>/api/auth/login</code></td>
+                                                        <td>Login user dan dapatkan session cookie</td>
+                                                        <td><code>email, password</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-primary">POST</span></td>
+                                                        <td><code>/api/auth/logout</code></td>
+                                                        <td>Logout user dan hapus session</td>
+                                                        <td>-</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">GET</span></td>
+                                                        <td><code>/api/auth/me</code></td>
+                                                        <td>Dapatkan info user yang sedang login</td>
+                                                        <td>-</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-primary">POST</span></td>
+                                                        <td><code>/api/auth/change-password</code></td>
+                                                        <td>Ganti password user sendiri</td>
+                                                        <td><code>currentPassword, newPassword, confirmPassword</code></td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        <!-- ============================================ -->
+                                        <!-- USER MANAGEMENT API -->
+                                        <!-- ============================================ -->
+                                        <div class="separator separator-dashed my-8"></div>
+                                        <h4 class="fw-bold mb-5" id="api-users">
+                                            <i class="bi bi-people text-info me-2"></i>👥 User Management API (Admin Only)
+                                        </h4>
+                                        <div class="table-responsive mb-8">
+                                            <table class="table table-row-bordered table-row-gray-300 gy-4">
+                                                <thead>
+                                                    <tr class="fw-bold fs-6 text-gray-800 bg-light">
+                                                        <th width="80">Method</th>
+                                                        <th width="280">Endpoint</th>
+                                                        <th>Deskripsi</th>
+                                                        <th width="200">Parameters</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">GET</span></td>
+                                                        <td><code>/api/users</code></td>
+                                                        <td>Dapatkan semua user dengan pagination</td>
+                                                        <td><code>?page, limit, role, status, search</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">GET</span></td>
+                                                        <td><code>/api/users/stats</code></td>
+                                                        <td>Statistik jumlah user per role</td>
+                                                        <td>-</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">GET</span></td>
+                                                        <td><code>/api/users/:id</code></td>
+                                                        <td>Dapatkan detail user berdasarkan ID</td>
+                                                        <td><code>:id</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-primary">POST</span></td>
+                                                        <td><code>/api/users</code></td>
+                                                        <td>Buat user baru</td>
+                                                        <td><code>name, email, password, role, status</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-warning">PUT</span></td>
+                                                        <td><code>/api/users/:id</code></td>
+                                                        <td>Update data user</td>
+                                                        <td><code>name, email, role, status</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-danger">DELETE</span></td>
+                                                        <td><code>/api/users/:id</code></td>
+                                                        <td>Hapus user</td>
+                                                        <td><code>:id</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-primary">POST</span></td>
+                                                        <td><code>/api/users/:id/reset-password</code></td>
+                                                        <td>Reset password user</td>
+                                                        <td><code>newPassword</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-primary">POST</span></td>
+                                                        <td><code>/api/users/:id/regenerate-token</code></td>
+                                                        <td>Generate ulang API token</td>
+                                                        <td><code>:id</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-primary">POST</span></td>
+                                                        <td><code>/api/users/:id/link-session</code></td>
+                                                        <td>Tautkan WA session ke user</td>
+                                                        <td><code>sessionId</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">GET</span></td>
+                                                        <td><code>/api/users/:id/sessions</code></td>
+                                                        <td>Dapatkan sessions milik user</td>
+                                                        <td><code>:id</code></td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        <!-- ============================================ -->
+                                        <!-- SESSIONS API -->
+                                        <!-- ============================================ -->
+                                        <div class="separator separator-dashed my-8"></div>
+                                        <h4 class="fw-bold mb-5" id="api-sessions">
+                                            <i class="bi bi-phone text-success me-2"></i>📱 Sessions API
+                                        </h4>
+                                        <div class="table-responsive mb-8">
+                                            <table class="table table-row-bordered table-row-gray-300 gy-4">
+                                                <thead>
+                                                    <tr class="fw-bold fs-6 text-gray-800 bg-light">
+                                                        <th width="80">Method</th>
+                                                        <th width="280">Endpoint</th>
+                                                        <th>Deskripsi</th>
+                                                        <th width="200">Parameters</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
                                                     <tr>
                                                         <td><span class="badge badge-success">GET</span></td>
                                                         <td><code>/api/sessions</code></td>
-                                                        <td>Mendapatkan semua session aktif</td>
+                                                        <td>Dapatkan semua sessions aktif</td>
+                                                        <td>-</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">GET</span></td>
+                                                        <td><code>/api/sessions/list</code></td>
+                                                        <td>Daftar sessions dari database</td>
+                                                        <td>-</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">GET</span></td>
+                                                        <td><code>/api/session/:sessionId</code></td>
+                                                        <td>Info detail session tertentu</td>
+                                                        <td><code>:sessionId</code></td>
                                                     </tr>
                                                     <tr>
                                                         <td><span class="badge badge-primary">POST</span></td>
-                                                        <td><code>/api/send-message</code></td>
-                                                        <td>Mengirim pesan teks</td>
+                                                        <td><code>/api/sessions/:sessionId/connect</code></td>
+                                                        <td>Connect/start session dengan QR</td>
+                                                        <td><code>:sessionId</code></td>
                                                     </tr>
                                                     <tr>
-                                                        <td><span class="badge badge-primary">POST</span></td>
-                                                        <td><code>/api/send-image</code></td>
-                                                        <td>Mengirim gambar dengan caption</td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td><span class="badge badge-primary">POST</span></td>
-                                                        <td><code>/api/send-document</code></td>
-                                                        <td>Mengirim file dokumen</td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td><span class="badge badge-primary">POST</span></td>
-                                                        <td><code>/api/send-video</code></td>
-                                                        <td>Mengirim video</td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td><span class="badge badge-primary">POST</span></td>
-                                                        <td><code>/api/send-audio</code></td>
-                                                        <td>Mengirim audio/voice note</td>
+                                                        <td><span class="badge badge-success">GET</span></td>
+                                                        <td><code>/api/sessions/:sessionId/groups</code></td>
+                                                        <td>Dapatkan groups dari session</td>
+                                                        <td><code>:sessionId</code></td>
                                                     </tr>
                                                 </tbody>
                                             </table>
                                         </div>
+
+                                        <!-- ============================================ -->
+                                        <!-- MESSAGES API -->
+                                        <!-- ============================================ -->
+                                        <div class="separator separator-dashed my-8"></div>
+                                        <h4 class="fw-bold mb-5" id="api-messages">
+                                            <i class="bi bi-chat-dots text-warning me-2"></i>💬 Messages API
+                                        </h4>
+                                        <div class="table-responsive mb-8">
+                                            <table class="table table-row-bordered table-row-gray-300 gy-4">
+                                                <thead>
+                                                    <tr class="fw-bold fs-6 text-gray-800 bg-light">
+                                                        <th width="80">Method</th>
+                                                        <th width="300">Endpoint</th>
+                                                        <th>Deskripsi</th>
+                                                        <th width="200">Parameters</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">GET</span></td>
+                                                        <td><code>/api/messages/conversations/:sessionId</code></td>
+                                                        <td>Daftar percakapan session</td>
+                                                        <td><code>:sessionId</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">GET</span></td>
+                                                        <td><code>/api/messages/chat/:sessionId/:phone</code></td>
+                                                        <td>Riwayat chat dengan nomor tertentu</td>
+                                                        <td><code>:sessionId, :phone</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">GET</span></td>
+                                                        <td><code>/api/chat/history/:sessionId/:contactNumber</code></td>
+                                                        <td>History chat dengan contact</td>
+                                                        <td><code>:sessionId, :contactNumber, ?limit</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">GET</span></td>
+                                                        <td><code>/api/contacts/:sessionId</code></td>
+                                                        <td>Daftar kontak dari session</td>
+                                                        <td><code>:sessionId</code></td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        <!-- ============================================ -->
+                                        <!-- LOGS API -->
+                                        <!-- ============================================ -->
+                                        <div class="separator separator-dashed my-8"></div>
+                                        <h4 class="fw-bold mb-5" id="api-logs">
+                                            <i class="bi bi-journal-text text-danger me-2"></i>📊 Logs API
+                                        </h4>
+                                        <div class="table-responsive mb-8">
+                                            <table class="table table-row-bordered table-row-gray-300 gy-4">
+                                                <thead>
+                                                    <tr class="fw-bold fs-6 text-gray-800 bg-light">
+                                                        <th width="80">Method</th>
+                                                        <th width="280">Endpoint</th>
+                                                        <th>Deskripsi</th>
+                                                        <th width="250">Parameters</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">GET</span></td>
+                                                        <td><code>/api/logs/messages</code></td>
+                                                        <td>Log semua pesan dengan filter</td>
+                                                        <td><code>?sessionId, contactNumber, direction, startDate, endDate, limit</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">GET</span></td>
+                                                        <td><code>/api/logs/sessions</code></td>
+                                                        <td>Log aktivitas session</td>
+                                                        <td><code>?limit</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">GET</span></td>
+                                                        <td><code>/api/logs/statistics</code></td>
+                                                        <td>Statistik pesan dan session</td>
+                                                        <td><code>?sessionId</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">GET</span></td>
+                                                        <td><code>/api/logs/date/:date</code></td>
+                                                        <td>Log berdasarkan tanggal</td>
+                                                        <td><code>:date (YYYY-MM-DD), ?type</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-danger">DELETE</span></td>
+                                                        <td><code>/api/logs/clear</code></td>
+                                                        <td>Hapus log lama</td>
+                                                        <td><code>?days (default: 30)</code></td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        <!-- ============================================ -->
+                                        <!-- DATABASE API -->
+                                        <!-- ============================================ -->
+                                        <div class="separator separator-dashed my-8"></div>
+                                        <h4 class="fw-bold mb-5" id="api-database">
+                                            <i class="bi bi-database text-dark me-2"></i>🗄️ Database Management API
+                                        </h4>
+                                        <div class="table-responsive mb-8">
+                                            <table class="table table-row-bordered table-row-gray-300 gy-4">
+                                                <thead>
+                                                    <tr class="fw-bold fs-6 text-gray-800 bg-light">
+                                                        <th width="80">Method</th>
+                                                        <th width="300">Endpoint</th>
+                                                        <th>Deskripsi</th>
+                                                        <th width="250">Parameters</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">GET</span></td>
+                                                        <td><code>/api/database/info</code></td>
+                                                        <td>Info database (tables, size)</td>
+                                                        <td>-</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">GET</span></td>
+                                                        <td><code>/api/database/stats</code></td>
+                                                        <td>Statistik database lengkap</td>
+                                                        <td>-</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">GET</span></td>
+                                                        <td><code>/api/database/schema/:tableName</code></td>
+                                                        <td>Schema/struktur tabel</td>
+                                                        <td><code>:tableName</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">GET</span></td>
+                                                        <td><code>/api/database/table/:tableName</code></td>
+                                                        <td>Data dari tabel dengan pagination</td>
+                                                        <td><code>:tableName, ?limit, offset, orderBy, orderDir</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-primary">POST</span></td>
+                                                        <td><code>/api/database/query</code></td>
+                                                        <td>Eksekusi SQL query (SELECT only)</td>
+                                                        <td><code>query</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">GET</span></td>
+                                                        <td><code>/api/database/export</code></td>
+                                                        <td>Download file database (.db)</td>
+                                                        <td>-</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-danger">DELETE</span></td>
+                                                        <td><code>/api/database/delete/:tableName/:id</code></td>
+                                                        <td>Hapus record berdasarkan ID</td>
+                                                        <td><code>:tableName, :id</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-primary">POST</span></td>
+                                                        <td><code>/api/database/delete-bulk/:tableName</code></td>
+                                                        <td>Hapus banyak record sekaligus</td>
+                                                        <td><code>ids[]</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-danger">DELETE</span></td>
+                                                        <td><code>/api/database/truncate/:tableName</code></td>
+                                                        <td>Hapus semua data tabel</td>
+                                                        <td><code>:tableName</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-primary">POST</span></td>
+                                                        <td><code>/api/database/cleanup</code></td>
+                                                        <td>Cleanup database (hapus log lama)</td>
+                                                        <td><code>messageDays, sessionDays, autoReplyDays, clearAllMedia, truncateMode</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-primary">POST</span></td>
+                                                        <td><code>/api/database/vacuum</code></td>
+                                                        <td>Vacuum & optimize database</td>
+                                                        <td>-</td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        <!-- ============================================ -->
+                                        <!-- TEMPLATES API -->
+                                        <!-- ============================================ -->
+                                        <div class="separator separator-dashed my-8"></div>
+                                        <h4 class="fw-bold mb-5" id="api-templates">
+                                            <i class="bi bi-file-text text-primary me-2"></i>📝 Chat Templates API
+                                        </h4>
+                                        <div class="table-responsive mb-8">
+                                            <table class="table table-row-bordered table-row-gray-300 gy-4">
+                                                <thead>
+                                                    <tr class="fw-bold fs-6 text-gray-800 bg-light">
+                                                        <th width="80">Method</th>
+                                                        <th width="280">Endpoint</th>
+                                                        <th>Deskripsi</th>
+                                                        <th width="250">Parameters</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">GET</span></td>
+                                                        <td><code>/api/templates</code></td>
+                                                        <td>Dapatkan semua template</td>
+                                                        <td><code>?activeOnly</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">GET</span></td>
+                                                        <td><code>/api/templates/:id</code></td>
+                                                        <td>Detail template by ID</td>
+                                                        <td><code>:id</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">GET</span></td>
+                                                        <td><code>/api/templates/code/:code</code></td>
+                                                        <td>Template berdasarkan kode</td>
+                                                        <td><code>:code</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">GET</span></td>
+                                                        <td><code>/api/templates/search/:query</code></td>
+                                                        <td>Cari template</td>
+                                                        <td><code>:query</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-primary">POST</span></td>
+                                                        <td><code>/api/templates</code></td>
+                                                        <td>Buat template baru</td>
+                                                        <td><code>code, title, content, description, is_active, media_data, media_mimetype, media_filename</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-warning">PUT</span></td>
+                                                        <td><code>/api/templates/:id</code></td>
+                                                        <td>Update template</td>
+                                                        <td><code>code, title, content, description, is_active, media_data, media_mimetype, media_filename</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-danger">DELETE</span></td>
+                                                        <td><code>/api/templates/:id</code></td>
+                                                        <td>Hapus template</td>
+                                                        <td><code>:id</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-info">PATCH</span></td>
+                                                        <td><code>/api/templates/:id/toggle</code></td>
+                                                        <td>Toggle aktif/non-aktif</td>
+                                                        <td><code>:id</code></td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        <!-- ============================================ -->
+                                        <!-- AUTO REPLY API -->
+                                        <!-- ============================================ -->
+                                        <div class="separator separator-dashed my-8"></div>
+                                        <h4 class="fw-bold mb-5" id="api-autoreply">
+                                            <i class="bi bi-robot text-info me-2"></i>🤖 Auto Reply API
+                                        </h4>
+                                        <div class="table-responsive mb-8">
+                                            <table class="table table-row-bordered table-row-gray-300 gy-4">
+                                                <thead>
+                                                    <tr class="fw-bold fs-6 text-gray-800 bg-light">
+                                                        <th width="80">Method</th>
+                                                        <th width="280">Endpoint</th>
+                                                        <th>Deskripsi</th>
+                                                        <th width="250">Parameters</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">GET</span></td>
+                                                        <td><code>/api/auto-reply</code></td>
+                                                        <td>Daftar semua rules auto reply</td>
+                                                        <td><code>?sessionId, enabledOnly, limit, offset</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">GET</span></td>
+                                                        <td><code>/api/auto-reply/:id</code></td>
+                                                        <td>Detail rule by ID</td>
+                                                        <td><code>:id</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-primary">POST</span></td>
+                                                        <td><code>/api/auto-reply</code></td>
+                                                        <td>Buat rule baru</td>
+                                                        <td><code>session_id, name, trigger_type, trigger_value, match_case, response_type, response_content, scope, enabled, priority, cooldown_seconds</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-warning">PUT</span></td>
+                                                        <td><code>/api/auto-reply/:id</code></td>
+                                                        <td>Update rule</td>
+                                                        <td>(same as POST)</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-danger">DELETE</span></td>
+                                                        <td><code>/api/auto-reply/:id</code></td>
+                                                        <td>Hapus rule</td>
+                                                        <td><code>:id</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-primary">POST</span></td>
+                                                        <td><code>/api/auto-reply/bulk-delete</code></td>
+                                                        <td>Hapus banyak rules</td>
+                                                        <td><code>ids[]</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-info">PATCH</span></td>
+                                                        <td><code>/api/auto-reply/:id/toggle</code></td>
+                                                        <td>Toggle enabled rule</td>
+                                                        <td><code>:id</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-primary">POST</span></td>
+                                                        <td><code>/api/auto-reply/:id/test</code></td>
+                                                        <td>Test rule matching</td>
+                                                        <td><code>message, isGroup</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-primary">POST</span></td>
+                                                        <td><code>/api/auto-reply/seed-defaults</code></td>
+                                                        <td>Buat rules default</td>
+                                                        <td>-</td>
+                                                    </tr>
+                                                    <tr class="bg-light-info">
+                                                        <td colspan="4" class="fw-bold text-info">Auto Reply Logs</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">GET</span></td>
+                                                        <td><code>/api/auto-reply-logs</code></td>
+                                                        <td>Daftar log auto reply</td>
+                                                        <td><code>?sessionId, ruleId, status, limit, offset, startDate, endDate</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">GET</span></td>
+                                                        <td><code>/api/auto-reply-stats</code></td>
+                                                        <td>Statistik auto reply</td>
+                                                        <td><code>?sessionId</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-danger">DELETE</span></td>
+                                                        <td><code>/api/auto-reply-logs/cleanup</code></td>
+                                                        <td>Hapus log lama</td>
+                                                        <td><code>?days</code></td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        <!-- ============================================ -->
+                                        <!-- GROUPS API -->
+                                        <!-- ============================================ -->
+                                        <div class="separator separator-dashed my-8"></div>
+                                        <h4 class="fw-bold mb-5" id="api-groups">
+                                            <i class="bi bi-people-fill text-success me-2"></i>👥 Group Management API
+                                        </h4>
+                                        <div class="table-responsive mb-8">
+                                            <table class="table table-row-bordered table-row-gray-300 gy-4">
+                                                <thead>
+                                                    <tr class="fw-bold fs-6 text-gray-800 bg-light">
+                                                        <th width="80">Method</th>
+                                                        <th width="350">Endpoint</th>
+                                                        <th>Deskripsi</th>
+                                                        <th width="200">Parameters</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">GET</span></td>
+                                                        <td><code>/api/groups/:sessionId</code></td>
+                                                        <td>Dapatkan semua grup session</td>
+                                                        <td><code>:sessionId</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">GET</span></td>
+                                                        <td><code>/api/groups/:sessionId/:groupId/metadata</code></td>
+                                                        <td>Metadata grup (participants, etc)</td>
+                                                        <td><code>:sessionId, :groupId</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">GET</span></td>
+                                                        <td><code>/api/groups/:sessionId/:groupId/invite</code></td>
+                                                        <td>Dapatkan invite code grup</td>
+                                                        <td><code>:sessionId, :groupId</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-primary">POST</span></td>
+                                                        <td><code>/api/groups/:sessionId/:groupId/revoke-invite</code></td>
+                                                        <td>Revoke & generate invite baru</td>
+                                                        <td><code>:sessionId, :groupId</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-primary">POST</span></td>
+                                                        <td><code>/api/groups/:sessionId/join</code></td>
+                                                        <td>Join grup via invite code</td>
+                                                        <td><code>inviteCode</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-primary">POST</span></td>
+                                                        <td><code>/api/groups/:sessionId/create</code></td>
+                                                        <td>Buat grup baru</td>
+                                                        <td><code>subject, participants[]</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-primary">POST</span></td>
+                                                        <td><code>/api/groups/:sessionId/:groupId/leave</code></td>
+                                                        <td>Keluar dari grup</td>
+                                                        <td><code>:sessionId, :groupId</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-warning">PUT</span></td>
+                                                        <td><code>/api/groups/:sessionId/:groupId/subject</code></td>
+                                                        <td>Update nama grup</td>
+                                                        <td><code>subject</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-warning">PUT</span></td>
+                                                        <td><code>/api/groups/:sessionId/:groupId/description</code></td>
+                                                        <td>Update deskripsi grup</td>
+                                                        <td><code>description</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-warning">PUT</span></td>
+                                                        <td><code>/api/groups/:sessionId/:groupId/settings</code></td>
+                                                        <td>Update settings grup</td>
+                                                        <td><code>setting (announcement|not_announcement|locked|unlocked)</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">GET</span></td>
+                                                        <td><code>/api/groups/:sessionId/:groupId/picture</code></td>
+                                                        <td>URL foto profil grup</td>
+                                                        <td><code>:sessionId, :groupId</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-primary">POST</span></td>
+                                                        <td><code>/api/groups/:sessionId/:groupId/send</code></td>
+                                                        <td>Kirim pesan ke grup</td>
+                                                        <td><code>message</code></td>
+                                                    </tr>
+                                                    <tr class="bg-light-warning">
+                                                        <td colspan="4" class="fw-bold text-warning">Participant Management</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-primary">POST</span></td>
+                                                        <td><code>/api/groups/:sessionId/:groupId/participants/add</code></td>
+                                                        <td>Tambah peserta ke grup</td>
+                                                        <td><code>participants[]</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-primary">POST</span></td>
+                                                        <td><code>/api/groups/:sessionId/:groupId/participants/remove</code></td>
+                                                        <td>Keluarkan peserta dari grup</td>
+                                                        <td><code>participants[]</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-primary">POST</span></td>
+                                                        <td><code>/api/groups/:sessionId/:groupId/participants/promote</code></td>
+                                                        <td>Jadikan admin</td>
+                                                        <td><code>participants[]</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-primary">POST</span></td>
+                                                        <td><code>/api/groups/:sessionId/:groupId/participants/demote</code></td>
+                                                        <td>Turunkan dari admin</td>
+                                                        <td><code>participants[]</code></td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        <!-- ============================================ -->
+                                        <!-- EXPORTS API -->
+                                        <!-- ============================================ -->
+                                        <div class="separator separator-dashed my-8"></div>
+                                        <h4 class="fw-bold mb-5" id="api-exports">
+                                            <i class="bi bi-download text-warning me-2"></i>📤 Exports API
+                                        </h4>
+                                        <div class="table-responsive mb-8">
+                                            <table class="table table-row-bordered table-row-gray-300 gy-4">
+                                                <thead>
+                                                    <tr class="fw-bold fs-6 text-gray-800 bg-light">
+                                                        <th width="80">Method</th>
+                                                        <th width="280">Endpoint</th>
+                                                        <th>Deskripsi</th>
+                                                        <th width="250">Parameters</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">GET</span></td>
+                                                        <td><code>/api/exports</code></td>
+                                                        <td>Daftar semua exports</td>
+                                                        <td><code>?limit</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">GET</span></td>
+                                                        <td><code>/api/exports/:id</code></td>
+                                                        <td>Detail export by ID</td>
+                                                        <td><code>:id</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-primary">POST</span></td>
+                                                        <td><code>/api/exports</code></td>
+                                                        <td>Buat export baru dari groups</td>
+                                                        <td><code>sessionId, groups[], userName, phoneNumber</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">GET</span></td>
+                                                        <td><code>/api/exports/:id/download</code></td>
+                                                        <td>Download file export (Excel)</td>
+                                                        <td><code>:id</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-danger">DELETE</span></td>
+                                                        <td><code>/api/exports/:id</code></td>
+                                                        <td>Hapus export</td>
+                                                        <td><code>:id</code></td>
+                                                    </tr>
+                                                    <tr class="bg-light-success">
+                                                        <td colspan="4" class="fw-bold text-success">Group Exports (Admin)</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">GET</span></td>
+                                                        <td><code>/api/group-exports</code></td>
+                                                        <td>Daftar exports dengan stats</td>
+                                                        <td><code>?sessionId, limit, offset</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">GET</span></td>
+                                                        <td><code>/api/group-exports/:id</code></td>
+                                                        <td>Detail export</td>
+                                                        <td><code>:id</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-primary">POST</span></td>
+                                                        <td><code>/api/group-exports</code></td>
+                                                        <td>Buat record export</td>
+                                                        <td><code>sessionId, phoneNumber, fileName, totalGroups, totalMembers, phoneNumbers, lidCount, groupsData</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-primary">POST</span></td>
+                                                        <td><code>/api/group-exports/:id/upload</code></td>
+                                                        <td>Upload file export</td>
+                                                        <td><code>fileData (base64)</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">GET</span></td>
+                                                        <td><code>/api/group-exports/:id/download</code></td>
+                                                        <td>Download file export</td>
+                                                        <td><code>:id</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-danger">DELETE</span></td>
+                                                        <td><code>/api/group-exports/:id</code></td>
+                                                        <td>Hapus export</td>
+                                                        <td><code>:id</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-primary">POST</span></td>
+                                                        <td><code>/api/group-exports/bulk-delete</code></td>
+                                                        <td>Hapus banyak exports</td>
+                                                        <td><code>ids[]</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">GET</span></td>
+                                                        <td><code>/api/group-exports/statistics</code></td>
+                                                        <td>Statistik exports</td>
+                                                        <td>-</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-primary">POST</span></td>
+                                                        <td><code>/api/export-groups-excel</code></td>
+                                                        <td>Export groups ke Excel format lengkap</td>
+                                                        <td><code>sessionId, phoneNumber, groups[], totalGroups, totalParticipants, totalPhoneNumbers, totalLid</code></td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        <!-- ============================================ -->
+                                        <!-- HEALTH CHECK API -->
+                                        <!-- ============================================ -->
+                                        <div class="separator separator-dashed my-8"></div>
+                                        <h4 class="fw-bold mb-5" id="api-health">
+                                            <i class="bi bi-heart-pulse text-danger me-2"></i>❤️ Health Check API
+                                        </h4>
+                                        <div class="table-responsive mb-8">
+                                            <table class="table table-row-bordered table-row-gray-300 gy-4">
+                                                <thead>
+                                                    <tr class="fw-bold fs-6 text-gray-800 bg-light">
+                                                        <th width="80">Method</th>
+                                                        <th width="280">Endpoint</th>
+                                                        <th>Deskripsi</th>
+                                                        <th width="200">Response</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">GET</span></td>
+                                                        <td><code>/api/health</code></td>
+                                                        <td>Status kesehatan server</td>
+                                                        <td><code>status, uptime, sessions, memory, timestamp</code></td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        <!-- Response Example -->
+                                        <div class="notice d-flex bg-light-success rounded border-success border border-dashed p-6 mb-8">
+                                            <i class="bi bi-check-circle fs-2tx text-success me-4"></i>
+                                            <div class="flex-grow-1">
+                                                <h5 class="fw-bold mb-3">Health Check Response Example:</h5>
+                                                <pre class="mb-0"><code class="language-json">{
+    "status": "ok",
+    "uptime": 86400,
+    "uptimeFormatted": "1d 0h 0m 0s",
+    "sessions": {
+        "total": 3,
+        "connected": 2
+    },
+    "memory": {
+        "used": 128,
+        "total": 256,
+        "unit": "MB"
+    },
+    "timestamp": "2024-01-15T12:00:00.000Z"
+}</code></pre>
+                                            </div>
+                                        </div>
                                         
+                                        <!-- ============================================ -->
+                                        <!-- SOCKET.IO EVENTS -->
+                                        <!-- ============================================ -->
+                                        <div class="separator separator-dashed my-8"></div>
+                                        <h4 class="fw-bold mb-5" id="api-socketio">
+                                            <i class="bi bi-broadcast text-info me-2"></i>🔌 Socket.IO Events (Real-time)
+                                        </h4>
+                                        <div class="table-responsive mb-8">
+                                            <table class="table table-row-bordered table-row-gray-300 gy-4">
+                                                <thead>
+                                                    <tr class="fw-bold fs-6 text-gray-800 bg-light">
+                                                        <th width="80">Type</th>
+                                                        <th width="200">Event</th>
+                                                        <th>Deskripsi</th>
+                                                        <th width="300">Parameters</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr class="bg-light-primary">
+                                                        <td colspan="4" class="fw-bold text-primary">📤 Client → Server (Emit)</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-primary">EMIT</span></td>
+                                                        <td><code>create-session</code></td>
+                                                        <td>Buat session baru</td>
+                                                        <td><code>sessionId</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-primary">EMIT</span></td>
+                                                        <td><code>start-session-qr</code></td>
+                                                        <td>Start session dengan QR code</td>
+                                                        <td><code>sessionId</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-primary">EMIT</span></td>
+                                                        <td><code>start-session-pairing</code></td>
+                                                        <td>Start session dengan pairing code</td>
+                                                        <td><code>{ sessionId, phoneNumber }</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-primary">EMIT</span></td>
+                                                        <td><code>logout</code></td>
+                                                        <td>Logout session</td>
+                                                        <td><code>sessionId</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-primary">EMIT</span></td>
+                                                        <td><code>delete-session</code></td>
+                                                        <td>Hapus session</td>
+                                                        <td><code>sessionId</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-primary">EMIT</span></td>
+                                                        <td><code>get-sessions</code></td>
+                                                        <td>Request semua sessions</td>
+                                                        <td>-</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-primary">EMIT</span></td>
+                                                        <td><code>send-message</code></td>
+                                                        <td>Kirim pesan teks</td>
+                                                        <td><code>{ sessionId, phone, message, tempId? }</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-primary">EMIT</span></td>
+                                                        <td><code>send-image</code></td>
+                                                        <td>Kirim gambar</td>
+                                                        <td><code>{ sessionId, phone, base64, caption?, mimetype?, filename?, tempId? }</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-primary">EMIT</span></td>
+                                                        <td><code>send-video</code></td>
+                                                        <td>Kirim video</td>
+                                                        <td><code>{ sessionId, phone, base64, caption?, mimetype?, filename?, tempId? }</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-primary">EMIT</span></td>
+                                                        <td><code>send-document</code></td>
+                                                        <td>Kirim dokumen</td>
+                                                        <td><code>{ sessionId, phone, base64, mimetype?, filename?, tempId? }</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-primary">EMIT</span></td>
+                                                        <td><code>get-chat-history</code></td>
+                                                        <td>Request chat history</td>
+                                                        <td><code>{ sessionId, phone, limit? }</code></td>
+                                                    </tr>
+                                                    <tr class="bg-light-success">
+                                                        <td colspan="4" class="fw-bold text-success">📥 Server → Client (Listen)</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">ON</span></td>
+                                                        <td><code>all-sessions</code></td>
+                                                        <td>Daftar semua sessions</td>
+                                                        <td><code>sessions[]</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">ON</span></td>
+                                                        <td><code>qr</code></td>
+                                                        <td>QR code untuk scan</td>
+                                                        <td><code>{ sessionId, qr }</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">ON</span></td>
+                                                        <td><code>pairing-code</code></td>
+                                                        <td>Pairing code untuk login</td>
+                                                        <td><code>{ sessionId, pairingCode }</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">ON</span></td>
+                                                        <td><code>session-status</code></td>
+                                                        <td>Status session berubah</td>
+                                                        <td><code>{ sessionId, status }</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">ON</span></td>
+                                                        <td><code>message-sent</code></td>
+                                                        <td>Pesan berhasil dikirim</td>
+                                                        <td><code>{ success, sessionId, to, messageId, ... }</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">ON</span></td>
+                                                        <td><code>send-error</code></td>
+                                                        <td>Error saat kirim pesan</td>
+                                                        <td><code>{ phone, tempId?, error }</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">ON</span></td>
+                                                        <td><code>incoming-message</code></td>
+                                                        <td>Pesan masuk baru</td>
+                                                        <td><code>{ sessionId, from, message, timestamp, ... }</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">ON</span></td>
+                                                        <td><code>chat-history</code></td>
+                                                        <td>Riwayat chat</td>
+                                                        <td><code>{ sessionId, phone, messages[] }</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">ON</span></td>
+                                                        <td><code>template-sent</code></td>
+                                                        <td>Template berhasil dikirim</td>
+                                                        <td><code>{ success, sessionId, templateCode, ... }</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">ON</span></td>
+                                                        <td><code>template-not-found</code></td>
+                                                        <td>Template tidak ditemukan</td>
+                                                        <td><code>{ phone, codes[], message }</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">ON</span></td>
+                                                        <td><code>error</code></td>
+                                                        <td>Error umum</td>
+                                                        <td><code>message</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><span class="badge badge-success">ON</span></td>
+                                                        <td><code>message</code></td>
+                                                        <td>Info/notifikasi</td>
+                                                        <td><code>message</code></td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+
                                         <h4 class="fw-bold mt-8 mb-5"><i class="bi bi-code-slash me-2"></i>Contoh Penggunaan REST API</h4>
                                         
                                         <div class="mb-5">
@@ -364,55 +1318,6 @@ console.log(result);</code></pre>
     "success": false,
     "error": "Session tidak ditemukan atau tidak terhubung"
 }</code></pre>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <!-- Socket.IO Endpoints Card -->
-                                <div class="card mb-5 mb-xl-10">
-                                    <div class="card-header">
-                                        <h3 class="card-title fw-bold">
-                                            <i class="bi bi-broadcast text-info me-2"></i>Socket.IO Events (Real-time)
-                                        </h3>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="table-responsive">
-                                            <table class="table table-row-bordered table-row-gray-300 gy-5">
-                                                <thead>
-                                                    <tr class="fw-bold fs-6 text-gray-800">
-                                                        <th>Event</th>
-                                                        <th>Deskripsi</th>
-                                                        <th>Parameter</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    <tr>
-                                                        <td><code class="text-primary">send-message</code></td>
-                                                        <td>Mengirim pesan teks</td>
-                                                        <td><code>sessionId, to, message</code></td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td><code class="text-primary">send-image</code></td>
-                                                        <td>Mengirim gambar dengan caption</td>
-                                                        <td><code>sessionId, to, imageUrl, caption</code></td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td><code class="text-primary">create-session</code></td>
-                                                        <td>Membuat session baru</td>
-                                                        <td><code>sessionId, method, phoneNumber</code></td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td><code class="text-primary">get-sessions</code></td>
-                                                        <td>Mendapatkan semua session</td>
-                                                        <td><code>-</code></td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td><code class="text-primary">logout-session</code></td>
-                                                        <td>Logout session tertentu</td>
-                                                        <td><code>sessionId</code></td>
-                                                    </tr>
-                                                </tbody>
-                                            </table>
                                         </div>
                                     </div>
                                 </div>
