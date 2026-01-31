@@ -633,6 +633,7 @@
     <!-- Scripts -->
     <script src="assets/plugins/global/plugins.bundle.js"></script>
     <script src="assets/js/scripts.bundle.js"></script>
+    <script src="js/header.js"></script>
     
     <script>
         // Global state
@@ -645,6 +646,8 @@
             await Promise.all([
                 fetch('components/header.html').then(r => r.text()).then(html => {
                     document.getElementById('header-container').innerHTML = html;
+                    // Initialize header after loading
+                    if (typeof initializeHeader === 'function') initializeHeader();
                 }),
                 fetch('components/sidebar.html').then(r => r.text()).then(html => {
                     document.getElementById('sidebar-container').innerHTML = html;

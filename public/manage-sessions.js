@@ -23,6 +23,11 @@ async function loadComponents() {
         console.log('✅ Components loaded')
         
         initializeComponents()
+        
+        // Initialize header functionality (user info, logout, change password)
+        if (typeof initializeHeader === 'function') {
+            initializeHeader()
+        }
     } catch (error) {
         console.error('❌ Error loading components:', error)
     }

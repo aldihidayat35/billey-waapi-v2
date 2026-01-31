@@ -91,6 +91,12 @@ function loadComponents() {
             .then(html => {
                 const el = document.getElementById(`${comp}-container`);
                 if (el) el.innerHTML = html;
+                if (comp === 'header') {
+                    // Initialize header functionality after loading
+                    if (typeof initializeHeader === 'function') {
+                        initializeHeader();
+                    }
+                }
                 if (comp === 'sidebar') {
                     setTimeout(() => {
                         const link = document.querySelector('a[href="inbox.html"]');

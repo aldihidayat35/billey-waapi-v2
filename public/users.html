@@ -362,6 +362,7 @@
     <script src="/assets/plugins/global/plugins.bundle.js"></script>
     <script src="/assets/js/scripts.bundle.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="/js/header.js"></script>
     
     <script>
         // State
@@ -383,6 +384,9 @@
                 document.getElementById('header-container').innerHTML = await headerRes.text();
                 document.getElementById('sidebar-container').innerHTML = await sidebarRes.text();
                 document.getElementById('footer-container').innerHTML = await footerRes.text();
+                
+                // Initialize header functionality
+                if (typeof initializeHeader === 'function') initializeHeader();
                 
                 if (typeof KTMenu !== 'undefined') KTMenu.createInstances();
                 if (typeof KTDrawer !== 'undefined') KTDrawer.createInstances();
