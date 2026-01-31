@@ -19,7 +19,7 @@ RUN apk add --no-cache \
     wget
 
 # Set environment
-ENV NODE_ENV=production
+ENV NODE_ENV=development
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
@@ -29,11 +29,17 @@ WORKDIR /app
 # Install TypeScript and tsx globally (needed for build and runtime)
 RUN npm install -g typescript tsx tsc-esm-fix
 
-# Copy ALL source files first (needed for preinstall script)
+# Copy ALL source files first
 COPY . .
 
-# Install ALL dependencies
-RUN npm install --legacy-peer-deps
+# Install dependencies WITHOUT running scripts (skip prepare/build)
+RUN npm install --legacy-peer-deps --ignore-scripts
+
+# Now manually rebuild native modules and run build
+RUN npm rebuild && npm run build
+
+# Set production mode after build
+ENV NODE_ENV=production
 
 # Create data directory for SQLite & sessions
 RUN mkdir -p /app/data && \
