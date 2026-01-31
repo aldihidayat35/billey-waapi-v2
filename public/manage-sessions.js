@@ -5,20 +5,43 @@ const socket = io()
 let allSessions = []
 let qrModal, pairingModal
 
+// Helper function to load HTML and execute scripts
+function loadHTMLWithScripts(containerId, html) {
+    const container = document.getElementById(containerId)
+    if (!container) return
+    
+    const temp = document.createElement('div')
+    temp.innerHTML = html
+    
+    const scripts = temp.querySelectorAll('script')
+    scripts.forEach(script => script.remove())
+    container.innerHTML = temp.innerHTML
+    
+    scripts.forEach(oldScript => {
+        const newScript = document.createElement('script')
+        if (oldScript.src) {
+            newScript.src = oldScript.src
+        } else {
+            newScript.textContent = oldScript.textContent
+        }
+        document.body.appendChild(newScript)
+    })
+}
+
 // Load components
 async function loadComponents() {
     try {
         const headerResponse = await fetch('components/header.html')
         const headerHTML = await headerResponse.text()
-        document.getElementById('header-container').innerHTML = headerHTML
+        loadHTMLWithScripts('header-container', headerHTML)
         
         const sidebarResponse = await fetch('components/sidebar.html')
         const sidebarHTML = await sidebarResponse.text()
-        document.getElementById('sidebar-container').innerHTML = sidebarHTML
+        loadHTMLWithScripts('sidebar-container', sidebarHTML)
         
         const footerResponse = await fetch('components/footer.html')
         const footerHTML = await footerResponse.text()
-        document.getElementById('footer-container').innerHTML = footerHTML
+        loadHTMLWithScripts('footer-container', footerHTML)
         
         console.log('✅ Components loaded')
         

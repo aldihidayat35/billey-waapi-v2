@@ -372,6 +372,29 @@
         const limit = 20;
         let userModal, resetPasswordModal;
         
+        // Helper function to load HTML and execute scripts
+        function loadHTMLWithScripts(containerId, html) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            
+            const temp = document.createElement('div');
+            temp.innerHTML = html;
+            
+            const scripts = temp.querySelectorAll('script');
+            scripts.forEach(script => script.remove());
+            container.innerHTML = temp.innerHTML;
+            
+            scripts.forEach(oldScript => {
+                const newScript = document.createElement('script');
+                if (oldScript.src) {
+                    newScript.src = oldScript.src;
+                } else {
+                    newScript.textContent = oldScript.textContent;
+                }
+                document.body.appendChild(newScript);
+            });
+        }
+        
         // Load components
         async function loadComponents() {
             try {
@@ -381,9 +404,9 @@
                     fetch('/components/footer.html')
                 ]);
                 
-                document.getElementById('header-container').innerHTML = await headerRes.text();
-                document.getElementById('sidebar-container').innerHTML = await sidebarRes.text();
-                document.getElementById('footer-container').innerHTML = await footerRes.text();
+                loadHTMLWithScripts('header-container', await headerRes.text());
+                loadHTMLWithScripts('sidebar-container', await sidebarRes.text());
+                loadHTMLWithScripts('footer-container', await footerRes.text());
                 
                 // Initialize header functionality
                 if (typeof initializeHeader === 'function') initializeHeader();

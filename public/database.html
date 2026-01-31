@@ -572,6 +572,7 @@
                                 <div class="col-md-4">
                                     <label class="form-label">Simpan Message Log (hari)</label>
                                     <select class="form-select form-select-sm" id="cleanup-message-days">
+                                        <option value="1">1 hari terakhir</option>
                                         <option value="3">3 hari terakhir</option>
                                         <option value="7" selected>7 hari terakhir</option>
                                         <option value="14">14 hari terakhir</option>
@@ -583,6 +584,7 @@
                                 <div class="col-md-4">
                                     <label class="form-label">Simpan Session Log (hari)</label>
                                     <select class="form-select form-select-sm" id="cleanup-session-days">
+                                        <option value="1">1 hari terakhir</option>
                                         <option value="3">3 hari terakhir</option>
                                         <option value="7" selected>7 hari terakhir</option>
                                         <option value="14">14 hari terakhir</option>
@@ -592,8 +594,8 @@
                                 <div class="col-md-4">
                                     <label class="form-label">Simpan Auto Reply Log (hari)</label>
                                     <select class="form-select form-select-sm" id="cleanup-autoreply-days">
-                                        <option value="1">1 hari terakhir</option>
-                                        <option value="3" selected>3 hari terakhir</option>
+                                        <option value="1" selected>1 hari terakhir</option>
+                                        <option value="3">3 hari terakhir</option>
                                         <option value="7">7 hari terakhir</option>
                                         <option value="14">14 hari terakhir</option>
                                     </select>
@@ -601,13 +603,30 @@
                             </div>
                             
                             <div class="mt-3">
-                                <div class="form-check">
+                                <div class="form-check mb-2">
                                     <input class="form-check-input" type="checkbox" id="cleanup-clear-media" checked>
                                     <label class="form-check-label" for="cleanup-clear-media">
-                                        <strong>Hapus data media lama</strong> (gambar/video dalam log pesan)
-                                        <small class="text-muted d-block">Ini akan menghemat ruang paling banyak. Metadata pesan tetap tersimpan.</small>
+                                        <strong>Hapus data media lama</strong> (gambar/video dalam log pesan lama)
+                                        <small class="text-muted d-block">Metadata pesan tetap tersimpan.</small>
                                     </label>
                                 </div>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" id="cleanup-clear-all-media">
+                                    <label class="form-check-label text-danger" for="cleanup-clear-all-media">
+                                        <strong>Hapus SEMUA data media</strong> (termasuk yang baru)
+                                        <small class="text-muted d-block">Hemat ruang paling banyak. Hanya metadata yang tersisa.</small>
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <hr class="my-3">
+                            
+                            <div class="form-check">
+                                <input class="form-check-input bg-danger border-danger" type="checkbox" id="cleanup-truncate-mode">
+                                <label class="form-check-label text-danger fw-bold" for="cleanup-truncate-mode">
+                                    <i class="bi bi-exclamation-triangle me-1"></i>MODE TRUNCATE - Hapus SEMUA data log
+                                    <small class="text-muted d-block fw-normal">Menghapus semua message_logs, session_logs, auto_reply_logs & cooldowns. Database akan dikosongkan.</small>
+                                </label>
                             </div>
                         </div>
                     </div>

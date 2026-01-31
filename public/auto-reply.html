@@ -734,15 +734,38 @@
     <script src="js/header.js"></script>
     
     <script>
+        // Helper function to load HTML and execute scripts
+        function loadHTMLWithScripts(containerId, html) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            
+            const temp = document.createElement('div');
+            temp.innerHTML = html;
+            
+            const scripts = temp.querySelectorAll('script');
+            scripts.forEach(script => script.remove());
+            container.innerHTML = temp.innerHTML;
+            
+            scripts.forEach(oldScript => {
+                const newScript = document.createElement('script');
+                if (oldScript.src) {
+                    newScript.src = oldScript.src;
+                } else {
+                    newScript.textContent = oldScript.textContent;
+                }
+                document.body.appendChild(newScript);
+            });
+        }
+        
         // Load components
         fetch('components/header.html').then(r => r.text()).then(html => {
-            document.getElementById('header-container').innerHTML = html;
+            loadHTMLWithScripts('header-container', html);
             // Initialize header after loading
             if (typeof initializeHeader === 'function') initializeHeader();
         });
         
         fetch('components/sidebar.html').then(r => r.text()).then(html => {
-            document.getElementById('sidebar-container').innerHTML = html;
+            loadHTMLWithScripts('sidebar-container', html);
             setTimeout(() => {
                 document.querySelectorAll('.menu-link').forEach(link => {
                     if (link.getAttribute('href')?.includes('auto-reply')) {

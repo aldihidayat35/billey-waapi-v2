@@ -1463,7 +1463,7 @@ export const dbMaintenance = {
     },
 
     // Full cleanup and optimize
-    fullCleanup: (messageDays: number = 30, sessionDays: number = 30, autoReplyDays: number = 7): {
+    fullCleanup: (messageDays: number = 30, sessionDays: number = 30, autoReplyDays: number = 7, clearAllMedia: boolean = false, truncateMode: boolean = false): {
         messagesDeleted: number,
         sessionLogsDeleted: number,
         autoReplyLogsDeleted: number,
@@ -1473,18 +1473,54 @@ export const dbMaintenance = {
         sizeAfter: number
     } => {
         const sizeBefore = dbMaintenance.getSize().size
+        
+        let messagesDeleted = 0
+        let sessionLogsDeleted = 0
+        let autoReplyLogsDeleted = 0
+        let cooldownsDeleted = 0
+        let mediaCleared = 0
 
-        const messagesDeleted = dbMaintenance.cleanOldMessages(messageDays)
-        const sessionLogsDeleted = dbMaintenance.cleanOldSessionLogs(sessionDays)
-        const autoReplyLogsDeleted = dbMaintenance.cleanOldAutoReplyLogs(autoReplyDays)
-        const cooldownsDeleted = autoReplyCooldownDb.cleanOldCooldowns(24)
-        const mediaCleared = dbMaintenance.clearOldMedia(messageDays)
+        if (truncateMode) {
+            // TRUNCATE MODE: Delete all data from log tables
+            console.log('🗑️ TRUNCATE MODE: Deleting ALL log data...')
+            
+            const msgResult = db.prepare('DELETE FROM message_logs').run()
+            messagesDeleted = msgResult.changes
+            
+            const sessionResult = db.prepare('DELETE FROM session_logs').run()
+            sessionLogsDeleted = sessionResult.changes
+            
+            const autoReplyResult = db.prepare('DELETE FROM auto_reply_logs').run()
+            autoReplyLogsDeleted = autoReplyResult.changes
+            
+            const cooldownResult = db.prepare('DELETE FROM auto_reply_cooldowns').run()
+            cooldownsDeleted = cooldownResult.changes
+            
+            console.log(`✅ Truncated: messages=${messagesDeleted}, sessions=${sessionLogsDeleted}, autoReply=${autoReplyLogsDeleted}, cooldowns=${cooldownsDeleted}`)
+        } else {
+            // Normal cleanup mode
+            messagesDeleted = dbMaintenance.cleanOldMessages(messageDays)
+            sessionLogsDeleted = dbMaintenance.cleanOldSessionLogs(sessionDays)
+            autoReplyLogsDeleted = dbMaintenance.cleanOldAutoReplyLogs(autoReplyDays)
+            cooldownsDeleted = autoReplyCooldownDb.cleanOldCooldowns(24)
+        }
+
+        // Clear media data
+        if (clearAllMedia) {
+            // Clear ALL media data regardless of age
+            mediaCleared = dbMaintenance.clearAllMedia()
+        } else if (!truncateMode) {
+            // Clear only old media
+            mediaCleared = dbMaintenance.clearOldMedia(messageDays)
+        }
 
         // Vacuum to reclaim space
         dbMaintenance.vacuum()
         dbMaintenance.optimize()
 
         const sizeAfter = dbMaintenance.getSize().size
+        
+        console.log(`📊 Cleanup complete: Before=${(sizeBefore/1024/1024).toFixed(2)}MB, After=${(sizeAfter/1024/1024).toFixed(2)}MB, Saved=${((sizeBefore-sizeAfter)/1024/1024).toFixed(2)}MB`)
 
         return {
             messagesDeleted,
@@ -1504,6 +1540,15 @@ export const dbMaintenance = {
         
         const stmt = db.prepare('UPDATE message_logs SET media_data = NULL WHERE timestamp < ? AND media_data IS NOT NULL')
         const result = stmt.run(cutoffDate.toISOString())
+        return result.changes
+    },
+
+    // Clear ALL media data (for aggressive cleanup)
+    clearAllMedia: (): number => {
+        console.log('🗑️ Clearing ALL media data from message_logs...')
+        const stmt = db.prepare('UPDATE message_logs SET media_data = NULL WHERE media_data IS NOT NULL')
+        const result = stmt.run()
+        console.log(`✅ Cleared media from ${result.changes} messages`)
         return result.changes
     },
 

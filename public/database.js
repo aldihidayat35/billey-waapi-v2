@@ -35,7 +35,10 @@ function loadComponents() {
             .then(r => r.text())
             .then(html => {
                 const el = document.getElementById(`${comp}-container`);
-                if (el) el.innerHTML = html;
+                if (el) {
+                    // Load HTML with script execution
+                    loadHTMLWithScripts(`${comp}-container`, html);
+                }
                 if (comp === 'sidebar') {
                     setTimeout(() => {
                         const link = document.querySelector('a[href="database.html"]');
@@ -44,6 +47,29 @@ function loadComponents() {
                 }
             })
             .catch(() => {});
+    });
+}
+
+// Helper function to load HTML and execute scripts
+function loadHTMLWithScripts(containerId, html) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    
+    const temp = document.createElement('div');
+    temp.innerHTML = html;
+    
+    const scripts = temp.querySelectorAll('script');
+    scripts.forEach(script => script.remove());
+    container.innerHTML = temp.innerHTML;
+    
+    scripts.forEach(oldScript => {
+        const newScript = document.createElement('script');
+        if (oldScript.src) {
+            newScript.src = oldScript.src;
+        } else {
+            newScript.textContent = oldScript.textContent;
+        }
+        document.body.appendChild(newScript);
     });
 }
 
@@ -1025,9 +1051,20 @@ async function loadCleanupStats() {
         const data = await response.json();
         
         if (data.success) {
-            // Update size
+            // Calculate media size percentage
+            const mediaSize = data.mediaSize || { totalSize: 0, count: 0 };
+            const totalSize = data.size.bytes || 0;
+            const mediaPercent = totalSize > 0 ? ((mediaSize.totalSize / totalSize) * 100).toFixed(1) : 0;
+            
+            // Update size with media info
             document.getElementById('cleanup-current-size').innerHTML = `
-                <strong class="text-primary">${data.size.mb} MB</strong>
+                <strong class="text-primary fs-3">${data.size.mb} MB</strong>
+                <div class="mt-2 small">
+                    <span class="badge bg-warning text-dark">
+                        <i class="bi bi-image me-1"></i>Media: ${formatBytes(mediaSize.totalSize)} (${mediaPercent}%)
+                    </span>
+                    <span class="badge bg-info ms-1">${formatNumber(mediaSize.count)} file</span>
+                </div>
             `;
             
             // Update table stats
@@ -1036,12 +1073,14 @@ async function loadCleanupStats() {
             
             data.tables.forEach(table => {
                 const icon = getTableIcon(table.table);
+                const isLarge = table.rowCount > 1000;
                 html += `
                     <div class="col-md-4 col-6">
-                        <div class="border rounded p-3 text-center">
-                            <i class="bi ${icon} fs-4 text-primary"></i>
-                            <div class="fw-bold">${formatNumber(table.rowCount)}</div>
+                        <div class="border rounded p-3 text-center ${isLarge ? 'border-warning' : ''}">
+                            <i class="bi ${icon} fs-4 ${isLarge ? 'text-warning' : 'text-primary'}"></i>
+                            <div class="fw-bold ${isLarge ? 'text-warning' : ''}">${formatNumber(table.rowCount)}</div>
                             <small class="text-muted">${formatTableName(table.table)}</small>
+                            ${isLarge ? '<br><span class="badge bg-warning text-dark" style="font-size:10px">Large</span>' : ''}
                         </div>
                     </div>
                 `;
@@ -1076,23 +1115,40 @@ async function runCleanup() {
     const messageDays = parseInt(document.getElementById('cleanup-message-days').value);
     const sessionDays = parseInt(document.getElementById('cleanup-session-days').value);
     const autoReplyDays = parseInt(document.getElementById('cleanup-autoreply-days').value);
+    const clearAllMedia = document.getElementById('cleanup-clear-all-media')?.checked || false;
+    const truncateMode = document.getElementById('cleanup-truncate-mode')?.checked || false;
     
-    // Confirm
-    const result = await Swal.fire({
-        icon: 'warning',
-        title: 'Konfirmasi Cleanup',
-        html: `
+    // Confirm with appropriate warning
+    let warningHtml = '';
+    if (truncateMode) {
+        warningHtml = `
+            <p class="text-danger fw-bold">MODE TRUNCATE AKTIF!</p>
+            <p>Semua data akan dihapus secara permanen:</p>
+            <ul class="text-start">
+                <li>SEMUA Message logs</li>
+                <li>SEMUA Session logs</li>
+                <li>SEMUA Auto reply logs & cooldowns</li>
+            </ul>
+        `;
+    } else {
+        warningHtml = `
             <p>Anda akan menghapus:</p>
             <ul class="text-start">
                 <li>Message logs lebih dari <strong>${messageDays} hari</strong></li>
                 <li>Session logs lebih dari <strong>${sessionDays} hari</strong></li>
                 <li>Auto reply logs lebih dari <strong>${autoReplyDays} hari</strong></li>
-                ${document.getElementById('cleanup-clear-media').checked ? '<li>Data media (gambar/video) lama</li>' : ''}
+                ${clearAllMedia ? '<li><strong class="text-danger">SEMUA data media (gambar/video)</strong></li>' : document.getElementById('cleanup-clear-media').checked ? '<li>Data media lama</li>' : ''}
             </ul>
-            <p class="text-danger"><strong>Data yang dihapus tidak dapat dikembalikan!</strong></p>
-        `,
+        `;
+    }
+    warningHtml += '<p class="text-danger"><strong>Data yang dihapus tidak dapat dikembalikan!</strong></p>';
+    
+    const result = await Swal.fire({
+        icon: 'warning',
+        title: truncateMode ? '⚠️ TRUNCATE DATABASE' : 'Konfirmasi Cleanup',
+        html: warningHtml,
         showCancelButton: true,
-        confirmButtonText: 'Ya, Jalankan Cleanup',
+        confirmButtonText: truncateMode ? 'Ya, HAPUS SEMUA' : 'Ya, Jalankan Cleanup',
         cancelButtonText: 'Batal',
         confirmButtonColor: '#dc3545'
     });
@@ -1110,9 +1166,11 @@ async function runCleanup() {
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
             body: JSON.stringify({
-                messageDays,
-                sessionDays,
-                autoReplyDays
+                messageDays: truncateMode ? 0 : messageDays,
+                sessionDays: truncateMode ? 0 : sessionDays,
+                autoReplyDays: truncateMode ? 0 : autoReplyDays,
+                clearAllMedia: clearAllMedia,
+                truncateMode: truncateMode
             })
         });
         

@@ -1477,6 +1477,7 @@ app.get('/api/database/stats', (req, res) => {
 	try {
 		const sizeInfo = dbMaintenance.getSize()
 		const tableStats = dbMaintenance.getTableStats()
+		const mediaSize = dbMaintenance.getMediaSize()
 		
 		res.json({
 			success: true,
@@ -1486,7 +1487,11 @@ app.get('/api/database/stats', (req, res) => {
 				pageCount: sizeInfo.pageCount,
 				pageSize: sizeInfo.pageSize
 			},
-			tables: tableStats
+			tables: tableStats,
+			mediaSize: {
+				totalSize: mediaSize.totalSize,
+				count: mediaSize.count
+			}
 		})
 	} catch (error: any) {
 		console.error('Error getting database stats:', error)
@@ -1497,13 +1502,19 @@ app.get('/api/database/stats', (req, res) => {
 // Clean old logs
 app.post('/api/database/cleanup', (req, res) => {
 	try {
-		const { messageDays = 30, sessionDays = 30, autoReplyDays = 7 } = req.body
+		const { 
+			messageDays = 30, 
+			sessionDays = 30, 
+			autoReplyDays = 7,
+			clearAllMedia = false,
+			truncateMode = false
+		} = req.body
 		
-		const result = dbMaintenance.fullCleanup(messageDays, sessionDays, autoReplyDays)
+		const result = dbMaintenance.fullCleanup(messageDays, sessionDays, autoReplyDays, clearAllMedia, truncateMode)
 		
 		res.json({
 			success: true,
-			message: 'Database cleanup completed',
+			message: truncateMode ? 'Database truncated successfully' : 'Database cleanup completed',
 			result: {
 				messagesDeleted: result.messagesDeleted,
 				sessionLogsDeleted: result.sessionLogsDeleted,
