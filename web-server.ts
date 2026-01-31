@@ -3566,6 +3566,48 @@ app.post('/api/export-groups-excel', async (req, res) => {
 	}
 })
 
+// ============================================
+// Health Check Endpoint (untuk Docker)
+// ============================================
+const startTime = Date.now()
+
+app.get('/api/health', (req, res) => {
+	const uptime = Math.floor((Date.now() - startTime) / 1000)
+	const sessions = sessionManager.getAllSessionsStatus()
+	const connectedSessions = sessions.filter(s => s.status === 'connected').length
+	
+	res.json({
+		status: 'ok',
+		uptime: uptime,
+		uptimeFormatted: formatUptime(uptime),
+		sessions: {
+			total: sessions.length,
+			connected: connectedSessions
+		},
+		memory: {
+			used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+			total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024),
+			unit: 'MB'
+		},
+		timestamp: new Date().toISOString()
+	})
+})
+
+function formatUptime(seconds: number): string {
+	const days = Math.floor(seconds / 86400)
+	const hours = Math.floor((seconds % 86400) / 3600)
+	const minutes = Math.floor((seconds % 3600) / 60)
+	const secs = seconds % 60
+	
+	const parts = []
+	if (days > 0) parts.push(`${days}d`)
+	if (hours > 0) parts.push(`${hours}h`)
+	if (minutes > 0) parts.push(`${minutes}m`)
+	parts.push(`${secs}s`)
+	
+	return parts.join(' ')
+}
+
 const PORT = process.env.PORT || 8080
 
 server.listen(PORT, async () => {
