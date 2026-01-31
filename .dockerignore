@@ -29,10 +29,14 @@ coverage
 # Documentation
 *.md
 !README.md
+!INSTALL.md
 
 # Development files
 *.bat
 *.sh
+
+# Keep engine-requirements.js (needed for npm install)
+!engine-requirements.js
 
 # Session data (will be mounted as volume)
 baileys_auth_info*
