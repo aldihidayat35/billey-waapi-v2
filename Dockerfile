@@ -26,17 +26,11 @@ ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 # Create app directory
 WORKDIR /app
 
-# Copy package files AND engine-requirements.js (needed for preinstall script)
-COPY package*.json ./
-COPY yarn.lock* ./
-COPY engine-requirements.js ./
-
-# Install dependencies (ignore preinstall script that checks node version)
-RUN npm install --ignore-scripts && \
-    npm rebuild
-
-# Copy source code
+# Copy ALL source files first (needed for preinstall script)
 COPY . .
+
+# Install ALL dependencies including devDependencies (tsx needed)
+RUN npm install --legacy-peer-deps
 
 # Create data directory for SQLite & sessions
 RUN mkdir -p /app/data && \
