@@ -56,6 +56,38 @@
             font-weight: bold;
             margin-right: 1rem;
         }
+        
+        /* PDF Export Styles */
+        .pdf-content {
+            background: white;
+        }
+        
+        .pdf-content pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-size: 10px;
+        }
+        
+        @media print {
+            .no-print, .app-sidebar, .app-header, #header-container, #sidebar-container, #footer-container {
+                display: none !important;
+            }
+            
+            .app-main {
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            
+            pre[class*="language-"] {
+                white-space: pre-wrap;
+                font-size: 9px;
+            }
+        }
+        
+        .download-btn-group {
+            display: flex;
+            gap: 10px;
+        }
     </style>
 </head>
 
@@ -92,6 +124,63 @@
                                         </li>
                                         <li class="breadcrumb-item text-muted">Dokumentasi API</li>
                                     </ul>
+                                </div>
+                                
+                                <!-- Download Buttons -->
+                                <div class="download-btn-group no-print">
+                                    <div class="dropdown">
+                                        <button class="btn btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                            <i class="bi bi-download me-2"></i>Download Dokumentasi
+                                        </button>
+                                        <ul class="dropdown-menu dropdown-menu-end">
+                                            <li>
+                                                <a class="dropdown-item" href="#" onclick="downloadPDF('all')">
+                                                    <i class="bi bi-file-earmark-pdf text-danger me-2"></i>PDF - Semua Dokumentasi
+                                                </a>
+                                            </li>
+                                            <li><hr class="dropdown-divider"></li>
+                                            <li>
+                                                <a class="dropdown-item" href="#" onclick="downloadPDF('rest-api')">
+                                                    <i class="bi bi-file-earmark-pdf text-danger me-2"></i>PDF - REST API Only
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a class="dropdown-item" href="#" onclick="downloadPDF('ci3')">
+                                                    <i class="bi bi-file-earmark-pdf text-danger me-2"></i>PDF - CodeIgniter 3
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a class="dropdown-item" href="#" onclick="downloadPDF('ci4')">
+                                                    <i class="bi bi-file-earmark-pdf text-danger me-2"></i>PDF - CodeIgniter 4
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a class="dropdown-item" href="#" onclick="downloadPDF('laravel')">
+                                                    <i class="bi bi-file-earmark-pdf text-danger me-2"></i>PDF - Laravel 11
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a class="dropdown-item" href="#" onclick="downloadPDF('nextjs')">
+                                                    <i class="bi bi-file-earmark-pdf text-danger me-2"></i>PDF - Next.js
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a class="dropdown-item" href="#" onclick="downloadPDF('vuejs')">
+                                                    <i class="bi bi-file-earmark-pdf text-danger me-2"></i>PDF - Vue.js
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a class="dropdown-item" href="#" onclick="downloadPDF('php')">
+                                                    <i class="bi bi-file-earmark-pdf text-danger me-2"></i>PDF - PHP Native
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a class="dropdown-item" href="#" onclick="downloadPDF('nodejs')">
+                                                    <i class="bi bi-file-earmark-pdf text-danger me-2"></i>PDF - Node.js
+                                                </a>
+                                            </li>
+                                        </ul>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1728,8 +1817,182 @@ curl http://localhost:4000/api/sessions</code></pre>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
     
+    <!-- html2pdf.js for PDF Generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    
     <!-- Custom JS -->
     <script src="api-docs.js"></script>
+    
+    <!-- PDF Download Script -->
+    <script>
+    async function downloadPDF(type) {
+        // Show loading
+        Swal.fire({
+            title: 'Generating PDF...',
+            html: 'Mohon tunggu, sedang memproses dokumentasi...',
+            allowOutsideClick: false,
+            didOpen: () => {
+                Swal.showLoading();
+            }
+        });
+        
+        // Create PDF content container
+        const pdfContainer = document.createElement('div');
+        pdfContainer.className = 'pdf-content';
+        pdfContainer.style.padding = '20px';
+        pdfContainer.style.background = 'white';
+        pdfContainer.style.width = '210mm';
+        
+        // Header
+        let headerHTML = `
+            <div style="text-align: center; margin-bottom: 30px; border-bottom: 2px solid #009EF7; padding-bottom: 20px;">
+                <h1 style="color: #009EF7; margin-bottom: 10px;">WhatsApp API Documentation</h1>
+                <p style="color: #666; margin: 0;">https://jokiin35.space</p>
+                <p style="color: #999; font-size: 12px; margin-top: 5px;">Generated: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+            </div>
+        `;
+        
+        let contentHTML = '';
+        let filename = 'WhatsApp-API-Documentation';
+        
+        const frameworkTitles = {
+            'ci3': 'CodeIgniter 3',
+            'ci4': 'CodeIgniter 4',
+            'laravel': 'Laravel 11',
+            'nextjs': 'Next.js',
+            'vuejs': 'Vue.js',
+            'php': 'PHP Native',
+            'nodejs': 'Node.js'
+        };
+        
+        if (type === 'all') {
+            // Get all content
+            const introCard = document.querySelector('.card.mb-5.mb-xl-10 .card-body');
+            const restApiCard = document.querySelector('.card.mb-5.mb-xl-10:nth-child(2)');
+            const socketCard = document.querySelector('.card.mb-5.mb-xl-10:nth-child(3)');
+            
+            contentHTML += `<div style="margin-bottom: 30px;">${introCard ? introCard.innerHTML : ''}</div>`;
+            contentHTML += `<div style="margin-bottom: 30px;">${restApiCard ? restApiCard.innerHTML : ''}</div>`;
+            contentHTML += `<div style="margin-bottom: 30px;">${socketCard ? socketCard.innerHTML : ''}</div>`;
+            
+            // Add all frameworks
+            for (const [key, title] of Object.entries(frameworkTitles)) {
+                const tabContent = document.getElementById('tab_' + key);
+                if (tabContent) {
+                    contentHTML += `
+                        <div style="page-break-before: always; margin-top: 30px;">
+                            <h2 style="color: #009EF7; border-bottom: 2px solid #009EF7; padding-bottom: 10px;">${title}</h2>
+                            ${tabContent.innerHTML}
+                        </div>
+                    `;
+                }
+            }
+            filename = 'WhatsApp-API-Documentation-Complete';
+            
+        } else if (type === 'rest-api') {
+            const introCard = document.querySelector('.card.mb-5.mb-xl-10 .card-body');
+            const restApiCard = document.querySelector('.card.mb-5.mb-xl-10:nth-child(2)');
+            
+            contentHTML += `<div style="margin-bottom: 30px;">${introCard ? introCard.innerHTML : ''}</div>`;
+            contentHTML += `<div style="margin-bottom: 30px;">${restApiCard ? restApiCard.innerHTML : ''}</div>`;
+            filename = 'WhatsApp-REST-API-Documentation';
+            
+        } else {
+            // Specific framework
+            const introCard = document.querySelector('.card.mb-5.mb-xl-10 .card-body');
+            const tabContent = document.getElementById('tab_' + type);
+            
+            contentHTML += `<div style="margin-bottom: 30px;">${introCard ? introCard.innerHTML : ''}</div>`;
+            
+            if (tabContent) {
+                contentHTML += `
+                    <div style="margin-top: 30px;">
+                        <h2 style="color: #009EF7; border-bottom: 2px solid #009EF7; padding-bottom: 10px;">Panduan ${frameworkTitles[type] || type}</h2>
+                        ${tabContent.innerHTML}
+                    </div>
+                `;
+            }
+            filename = 'WhatsApp-API-' + (frameworkTitles[type] || type).replace(/\s+/g, '-');
+        }
+        
+        pdfContainer.innerHTML = headerHTML + contentHTML;
+        
+        // Clean up content for PDF
+        pdfContainer.querySelectorAll('.no-print, .dropdown, button').forEach(el => el.remove());
+        pdfContainer.querySelectorAll('pre').forEach(pre => {
+            pre.style.whiteSpace = 'pre-wrap';
+            pre.style.wordWrap = 'break-word';
+            pre.style.fontSize = '10px';
+            pre.style.background = '#2d2d2d';
+            pre.style.color = '#f8f8f2';
+            pre.style.padding = '15px';
+            pre.style.borderRadius = '8px';
+            pre.style.overflow = 'hidden';
+        });
+        pdfContainer.querySelectorAll('code').forEach(code => {
+            code.style.fontSize = '10px';
+        });
+        pdfContainer.querySelectorAll('.badge').forEach(badge => {
+            badge.style.display = 'inline-block';
+            badge.style.padding = '3px 8px';
+            badge.style.borderRadius = '4px';
+            badge.style.fontSize = '10px';
+        });
+        pdfContainer.querySelectorAll('table').forEach(table => {
+            table.style.width = '100%';
+            table.style.fontSize = '11px';
+            table.style.borderCollapse = 'collapse';
+        });
+        pdfContainer.querySelectorAll('th, td').forEach(cell => {
+            cell.style.border = '1px solid #ddd';
+            cell.style.padding = '8px';
+        });
+        
+        // Append to body temporarily
+        document.body.appendChild(pdfContainer);
+        
+        // PDF options
+        const opt = {
+            margin: [10, 10, 10, 10],
+            filename: filename + '.pdf',
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { 
+                scale: 2, 
+                useCORS: true,
+                letterRendering: true,
+                logging: false
+            },
+            jsPDF: { 
+                unit: 'mm', 
+                format: 'a4', 
+                orientation: 'portrait' 
+            },
+            pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+        };
+        
+        try {
+            await html2pdf().set(opt).from(pdfContainer).save();
+            
+            Swal.fire({
+                icon: 'success',
+                title: 'Download Berhasil!',
+                text: `File ${filename}.pdf telah didownload`,
+                timer: 2000,
+                showConfirmButton: false
+            });
+        } catch (error) {
+            console.error('PDF Error:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Gagal Generate PDF',
+                text: 'Terjadi kesalahan: ' + error.message
+            });
+        } finally {
+            // Remove temporary container
+            document.body.removeChild(pdfContainer);
+        }
+    }
+    </script>
     
 </body>
 </html>
