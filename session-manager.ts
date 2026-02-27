@@ -10,7 +10,7 @@ import makeWASocket, {
 	downloadMediaMessage
 } from './src'
 import { logger as activityLogger } from './logger'
-import { messageLogDb, chatTemplateDb, autoReplyDb, autoReplyLogDb, autoReplyCooldownDb, db } from './database.js'
+import { messageLogDb, chatTemplateDb, autoReplyDb, autoReplyLogDb, autoReplyCooldownDb, autoForwardConfigDb, autoForwardTokenDb, autoForwardLogDb, db } from './database.js'
 import { readFileSync, existsSync, readdirSync, rmSync } from 'fs'
 import { join } from 'path'
 
@@ -941,6 +941,132 @@ export class SessionManager {
 						} catch (autoReplyError) {
 							console.error('⚠️ Auto-reply processing error:', autoReplyError)
 						}
+					}
+					
+					// ============================================
+					// AUTO FORWARD HANDLER
+					// ============================================
+					try {
+						const forwardConfig = autoForwardConfigDb.get(sessionId)
+						if (forwardConfig && forwardConfig.enabled) {
+							const isGroup = remoteJid.includes('@g.us')
+							
+							// --- CASE 1: Admin replies with @TOKEN format ---
+							if (!fromMe && remoteJid === forwardConfig.admin_number && messageType === 'text' && messageContent) {
+								const replyMatch = messageContent.match(/^@([A-Za-z0-9]+)\s*[-–—]\s*(.+)/s)
+								if (replyMatch) {
+									const replyToken = replyMatch[1].toUpperCase()
+									const replyText = replyMatch[2].trim()
+									
+									const tokenEntry = autoForwardTokenDb.getBySenderToken(sessionId, replyToken)
+									if (tokenEntry) {
+										try {
+											const targetJid = tokenEntry.sender_number.includes('@') 
+												? tokenEntry.sender_number 
+												: tokenEntry.sender_number + '@s.whatsapp.net'
+											
+											await sock.sendMessage(targetJid, { text: replyText })
+											
+											// Track sent message
+											autoForwardTokenDb.updateLastMessage(sessionId, replyToken, `[Admin→User] ${replyText}`)
+											autoForwardLogDb.insert({
+												session_id: sessionId,
+												token: replyToken,
+												direction: 'admin_to_user',
+												sender_number: forwardConfig.admin_number,
+												message_content: replyText,
+												message_type: 'text',
+												status: 'success'
+											})
+											
+											// Confirm to admin
+											await sock.sendMessage(forwardConfig.admin_number, {
+												text: `✅ Balasan terkirim ke ${tokenEntry.sender_number.replace('@s.whatsapp.net', '')} [${replyToken}]`
+											})
+											
+											this.socketIO.emit('auto-forward-reply', {
+												sessionId, token: replyToken,
+												to: tokenEntry.sender_number, message: replyText
+											})
+											
+											console.log(`📨➡️ Auto-forward reply sent: ${replyToken} → ${tokenEntry.sender_number}`)
+										} catch (sendErr: any) {
+											autoForwardLogDb.insert({
+												session_id: sessionId, token: replyToken,
+												direction: 'admin_to_user',
+												sender_number: forwardConfig.admin_number,
+												message_content: replyText,
+												status: 'failed', error_message: sendErr.message
+											})
+											await sock.sendMessage(forwardConfig.admin_number, {
+												text: `❌ Gagal kirim balasan ke [${replyToken}]: ${sendErr.message}`
+											}).catch(() => {})
+											console.error(`❌ Auto-forward reply failed:`, sendErr)
+										}
+									} else {
+										// Token not found - notify admin
+										await sock.sendMessage(forwardConfig.admin_number, {
+											text: `⚠️ Token "${replyToken}" tidak ditemukan. Gunakan format: @TOKEN - pesan balasan`
+										}).catch(() => {})
+									}
+								}
+							}
+							
+							// --- CASE 2: Incoming message from user → forward to admin ---
+							else if (!fromMe && remoteJid !== forwardConfig.admin_number && messageContent) {
+								// Skip groups if not configured
+								if (isGroup && !forwardConfig.forward_groups) {
+									// skip group messages
+								} else {
+									const senderJid = isGroup ? (msg.key.participant || remoteJid) : remoteJid
+									const senderNumber = senderJid.replace('@s.whatsapp.net', '').replace('@lid', '')
+									const pushName = msg.pushName || ''
+									
+									// Get or create token
+									const tokenEntry = autoForwardTokenDb.getOrCreate(sessionId, senderJid, pushName)
+									const token = tokenEntry.token
+									
+									// Format: [TOKEN] - [Number] - [Message]
+									let forwardText = `${token} - ${senderNumber}`
+									if (pushName) forwardText += ` (${pushName})`
+									forwardText += ` - ${messageContent}`
+									if (isGroup) forwardText += `\n📌 Group: ${remoteJid.replace('@g.us', '')}`
+									
+									try {
+										await sock.sendMessage(forwardConfig.admin_number, { text: forwardText })
+										
+										autoForwardTokenDb.updateLastMessage(sessionId, token, messageContent.substring(0, 200))
+										autoForwardLogDb.insert({
+											session_id: sessionId,
+											token,
+											direction: 'user_to_admin',
+											sender_number: senderJid,
+											message_content: messageContent.substring(0, 1000),
+											message_type: messageType,
+											status: 'success'
+										})
+										
+										this.socketIO.emit('auto-forward-received', {
+											sessionId, token, from: senderNumber, name: pushName,
+											message: messageContent.substring(0, 200)
+										})
+										
+										console.log(`📨 Auto-forward: [${token}] ${senderNumber} → Admin`)
+									} catch (fwdErr: any) {
+										autoForwardLogDb.insert({
+											session_id: sessionId, token,
+											direction: 'user_to_admin',
+											sender_number: senderJid,
+											message_content: messageContent.substring(0, 1000),
+											status: 'failed', error_message: fwdErr.message
+										})
+										console.error(`❌ Auto-forward failed:`, fwdErr)
+									}
+								}
+							}
+						}
+					} catch (autoForwardError) {
+						console.error('⚠️ Auto-forward processing error:', autoForwardError)
 					}
 					
 					// Emit message for real-time updates

@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auto Forward - WhatsApp Gateway</title>
+    <link rel="stylesheet" href="assets/plugins/global/plugins.bundle.css">
+    <link rel="stylesheet" href="assets/css/style.bundle.css">
+    <style>
+        :root {
+            --wa-green: #25D366;
+            --wa-dark-green: #128C7E;
+            --wa-teal: #075E54;
+            --wa-blue: #34B7F1;
+            --wa-light-green: #DCF8C6;
+        }
+        .page-header {
+            background: linear-gradient(135deg, #1e3a5f 0%, #2c5282 100%);
+            padding: 25px 30px;
+            border-radius: 12px;
+            margin-bottom: 25px;
+            color: white;
+        }
+        .page-header h1 { margin: 0; font-size: 24px; font-weight: 600; }
+        .page-header p { margin: 5px 0 0; opacity: 0.9; font-size: 14px; }
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.05);
+            border: 1px solid #e9edef;
+            transition: all 0.3s;
+        }
+        .stat-card:hover { transform: translateY(-3px); box-shadow: 0 5px 25px rgba(0,0,0,0.1); }
+        .stat-card .stat-icon {
+            width: 50px; height: 50px; border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto 15px; font-size: 22px;
+        }
+        .stat-card .stat-icon.primary { background: rgba(0,158,247,0.1); color: #009ef7; }
+        .stat-card .stat-icon.success { background: rgba(37,211,102,0.1); color: var(--wa-green); }
+        .stat-card .stat-icon.info { background: rgba(52,183,241,0.1); color: var(--wa-blue); }
+        .stat-card .stat-icon.danger { background: rgba(241,65,108,0.1); color: #f1416c; }
+        .stat-card .stat-value { font-size: 32px; font-weight: 700; color: #181c32; line-height: 1; }
+        .stat-card .stat-label { font-size: 13px; color: #a1a5b7; margin-top: 8px; }
+
+        .config-card, .section-card {
+            background: white; border-radius: 12px;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.05); border: 1px solid #e9edef;
+        }
+        .card-hdr {
+            padding: 20px; border-bottom: 1px solid #e9edef;
+            display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;
+        }
+        .card-hdr h5 { margin: 0; font-weight: 600; color: #181c32; }
+        .card-body-inner { padding: 20px; }
+
+        .token-table { width: 100%; }
+        .token-table thead th {
+            background: #f9fafb; padding: 12px 16px; font-size: 12px;
+            font-weight: 600; color: #7e8299; text-transform: uppercase;
+            letter-spacing: 0.5px; border-bottom: 1px solid #e9edef;
+        }
+        .token-table tbody td {
+            padding: 14px 16px; border-bottom: 1px solid #f1f1f4; vertical-align: middle;
+        }
+        .token-table tbody tr:hover { background: #f9fafb; }
+
+        .token-badge {
+            display: inline-block; padding: 4px 10px; border-radius: 6px;
+            font-weight: 700; font-family: 'Consolas', monospace;
+            background: #e8f5e9; color: #2e7d32; font-size: 13px;
+        }
+        .direction-badge {
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;
+        }
+        .direction-badge.in { background: #f1faff; color: #009ef7; }
+        .direction-badge.out { background: #e8fff3; color: #50cd89; }
+        .direction-badge.fail { background: #fff5f8; color: #f1416c; }
+
+        .usage-hint {
+            background: linear-gradient(135deg, #f0f4ff 0%, #e8ecff 100%);
+            border: 1px solid #7e9cf5; border-radius: 10px;
+            padding: 18px 22px; margin-bottom: 25px;
+            display: flex; align-items: flex-start; gap: 14px;
+        }
+        .usage-hint i { color: #5b7bcf; font-size: 22px; flex-shrink: 0; margin-top: 2px; }
+        .usage-hint-content h6 { margin: 0 0 5px; font-size: 14px; color: #181c32; }
+        .usage-hint-content p { margin: 0; font-size: 13px; color: #5e6278; line-height: 1.6; }
+        .usage-hint-content code {
+            background: rgba(91,123,207,0.12); padding: 1px 6px; border-radius: 4px;
+            font-size: 12px; color: #3f51b5;
+        }
+
+        .empty-state { text-align: center; padding: 50px 20px; }
+        .empty-state i { font-size: 70px; color: #e4e6ef; margin-bottom: 15px; }
+        .empty-state h4 { color: #181c32; margin-bottom: 8px; }
+        .empty-state p { color: #a1a5b7; }
+
+        .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+        .status-dot.on { background: var(--wa-green); }
+        .status-dot.off { background: #ccc; }
+
+        @media (max-width: 768px) {
+            .card-hdr { flex-direction: column; align-items: stretch; }
+            .stat-card .stat-value { font-size: 24px; }
+        }
+    </style>
+</head>
+<body id="kt_app_body" data-kt-app-layout="dark-sidebar" data-kt-app-header-fixed="true"
+      data-kt-app-sidebar-enabled="true" data-kt-app-sidebar-fixed="true"
+      data-kt-app-sidebar-hoverable="true" data-kt-app-sidebar-push-header="true"
+      data-kt-app-sidebar-push-toolbar="true" data-kt-app-sidebar-push-footer="true"
+      class="app-default">
+    <div class="d-flex flex-column flex-root app-root" id="kt_app_root">
+        <div class="app-page flex-column flex-column-fluid" id="kt_app_page">
+            <div id="kt_app_header" class="app-header"><div id="header-container"></div></div>
+            <div class="app-wrapper flex-column flex-row-fluid" id="kt_app_wrapper">
+                <div id="sidebar-container"></div>
+                <div class="app-main flex-column flex-row-fluid" id="kt_app_main">
+                    <div class="d-flex flex-column flex-column-fluid">
+                        <div id="kt_app_content" class="app-content flex-column-fluid">
+                            <div id="kt_app_content_container" class="app-container container-fluid">
+
+                                <!-- Page Header -->
+                                <div class="page-header">
+                                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+                                        <div>
+                                            <h1><i class="bi bi-forward-fill me-2"></i>Auto Forward</h1>
+                                            <p>Teruskan pesan masuk ke Admin dengan sistem Token &amp; balas langsung via bot</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Usage Hint -->
+                                <div class="usage-hint">
+                                    <i class="bi bi-info-circle-fill"></i>
+                                    <div class="usage-hint-content">
+                                        <h6>Cara Kerja Auto Forward</h6>
+                                        <p>
+                                            <strong>1.</strong> Pesan masuk dari user diteruskan ke Admin dengan format: <code>CT1 - 08123456789 - Isi pesan</code><br>
+                                            <strong>2.</strong> Admin membalas dengan format: <code>@CT1 - Isi balasan</code><br>
+                                            <strong>3.</strong> Bot otomatis meneruskan balasan ke nomor pengirim asli.<br>
+                                            Setiap pengirim baru mendapatkan <strong>token unik</strong> (CT1, CT2, dst.) yang tersimpan permanen.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <!-- Stats Row -->
+                                <div class="row g-4 mb-4">
+                                    <div class="col-xl-3 col-md-6">
+                                        <div class="stat-card">
+                                            <div class="stat-icon primary"><i class="bi bi-ticket-perforated"></i></div>
+                                            <div class="stat-value" id="stat-tokens">0</div>
+                                            <div class="stat-label">Total Token</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-xl-3 col-md-6">
+                                        <div class="stat-card">
+                                            <div class="stat-icon info"><i class="bi bi-arrow-right-circle"></i></div>
+                                            <div class="stat-value" id="stat-forwarded">0</div>
+                                            <div class="stat-label">Pesan Diteruskan</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-xl-3 col-md-6">
+                                        <div class="stat-card">
+                                            <div class="stat-icon success"><i class="bi bi-reply-fill"></i></div>
+                                            <div class="stat-value" id="stat-replied">0</div>
+                                            <div class="stat-label">Balasan Terkirim</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-xl-3 col-md-6">
+                                        <div class="stat-card">
+                                            <div class="stat-icon danger"><i class="bi bi-x-circle"></i></div>
+                                            <div class="stat-value" id="stat-failed">0</div>
+                                            <div class="stat-label">Gagal</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="row g-4">
+                                    <!-- LEFT: Configuration -->
+                                    <div class="col-xl-4">
+                                        <div class="config-card mb-4">
+                                            <div class="card-hdr">
+                                                <h5><i class="bi bi-gear me-2"></i>Konfigurasi</h5>
+                                            </div>
+                                            <div class="card-body-inner">
+                                                <form id="configForm" onsubmit="saveConfig(event)">
+                                                    <div class="mb-3">
+                                                        <label class="form-label fw-bold">Session <span class="text-danger">*</span></label>
+                                                        <select class="form-select" id="cfg-session" required onchange="loadSessionConfig()">
+                                                            <option value="">-- Pilih Session --</option>
+                                                        </select>
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label fw-bold">Nomor Admin <span class="text-danger">*</span></label>
+                                                        <input type="text" class="form-control" id="cfg-admin" placeholder="Contoh: 6281234567890" required>
+                                                        <small class="text-muted">Nomor WA yang menerima pesan forward</small>
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label fw-bold">Token Prefix</label>
+                                                        <input type="text" class="form-control" id="cfg-prefix" placeholder="CT" value="CT" maxlength="5"
+                                                               style="text-transform:uppercase; font-family:monospace; font-weight:bold;">
+                                                        <small class="text-muted">Awalan kode token (maks 5 karakter). Contoh: CT → CT1, CT2</small>
+                                                    </div>
+                                                    <div class="row mb-3">
+                                                        <div class="col-6">
+                                                            <div class="form-check form-switch">
+                                                                <input class="form-check-input" type="checkbox" id="cfg-enabled" checked>
+                                                                <label class="form-check-label" for="cfg-enabled">Aktifkan</label>
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-6">
+                                                            <div class="form-check form-switch">
+                                                                <input class="form-check-input" type="checkbox" id="cfg-groups">
+                                                                <label class="form-check-label" for="cfg-groups">Forward Grup</label>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <button type="submit" class="btn btn-primary w-100">
+                                                        <i class="bi bi-check-lg me-1"></i>Simpan Konfigurasi
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </div>
+
+                                        <!-- Config Status -->
+                                        <div class="config-card" id="config-status-card" style="display:none">
+                                            <div class="card-hdr">
+                                                <h5><i class="bi bi-info-circle me-2"></i>Status</h5>
+                                                <span id="config-status-badge"></span>
+                                            </div>
+                                            <div class="card-body-inner" id="config-status-body"></div>
+                                        </div>
+                                    </div>
+
+                                    <!-- RIGHT: Tokens & Logs -->
+                                    <div class="col-xl-8">
+                                        <!-- Tokens Table -->
+                                        <div class="section-card mb-4">
+                                            <div class="card-hdr">
+                                                <h5><i class="bi bi-ticket-perforated me-2"></i>Daftar Token</h5>
+                                                <div class="d-flex gap-2">
+                                                    <input type="text" class="form-control form-control-sm" id="token-search"
+                                                           placeholder="Cari token / nomor..." style="width: 180px;"
+                                                           oninput="loadTokens()">
+                                                    <button class="btn btn-sm btn-light-primary" onclick="loadTokens()">
+                                                        <i class="bi bi-arrow-clockwise"></i>
+                                                    </button>
+                                                    <button class="btn btn-sm btn-light-danger" onclick="clearAllTokens()">
+                                                        <i class="bi bi-trash me-1"></i>Clear All
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div class="table-responsive">
+                                                <table class="token-table">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Token</th>
+                                                            <th>Nomor Pengirim</th>
+                                                            <th>Nama</th>
+                                                            <th>Pesan Terakhir</th>
+                                                            <th>Pesan</th>
+                                                            <th>Waktu</th>
+                                                            <th style="width:60px">Aksi</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody id="tokens-tbody"></tbody>
+                                                </table>
+                                            </div>
+                                            <div class="empty-state d-none" id="tokens-empty">
+                                                <i class="bi bi-ticket-perforated"></i>
+                                                <h4>Belum Ada Token</h4>
+                                                <p>Token akan dibuat otomatis saat ada pesan masuk</p>
+                                            </div>
+                                        </div>
+
+                                        <!-- Logs Table -->
+                                        <div class="section-card">
+                                            <div class="card-hdr">
+                                                <h5><i class="bi bi-clock-history me-2"></i>Log Aktivitas</h5>
+                                                <div class="d-flex gap-2">
+                                                    <select class="form-select form-select-sm" id="log-direction" style="width:160px" onchange="loadLogs()">
+                                                        <option value="">Semua Arah</option>
+                                                        <option value="user_to_admin">User → Admin</option>
+                                                        <option value="admin_to_user">Admin → User</option>
+                                                    </select>
+                                                    <button class="btn btn-sm btn-light-primary" onclick="loadLogs()">
+                                                        <i class="bi bi-arrow-clockwise"></i>
+                                                    </button>
+                                                    <button class="btn btn-sm btn-light-danger" onclick="cleanupLogs()">
+                                                        <i class="bi bi-trash me-1"></i>Cleanup
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div class="table-responsive">
+                                                <table class="token-table">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Token</th>
+                                                            <th>Arah</th>
+                                                            <th>Nomor</th>
+                                                            <th>Pesan</th>
+                                                            <th>Status</th>
+                                                            <th>Waktu</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody id="logs-tbody"></tbody>
+                                                </table>
+                                            </div>
+                                            <div class="empty-state d-none" id="logs-empty">
+                                                <i class="bi bi-clock-history"></i>
+                                                <h4>Belum Ada Log</h4>
+                                                <p>Log akan muncul saat auto-forward aktif</p>
+                                            </div>
+                                            <div class="d-flex justify-content-center p-3" id="logs-pagination"></div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="assets/plugins/global/plugins.bundle.js"></script>
+    <script src="assets/js/scripts.bundle.js"></script>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <script src="js/header.js"></script>
+    <script>
+        function loadHTMLWithScripts(containerId, html) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            const temp = document.createElement('div');
+            temp.innerHTML = html;
+            const scripts = temp.querySelectorAll('script');
+            scripts.forEach(s => s.remove());
+            container.innerHTML = temp.innerHTML;
+            scripts.forEach(old => {
+                const ns = document.createElement('script');
+                if (old.src) ns.src = old.src; else ns.textContent = old.textContent;
+                document.body.appendChild(ns);
+            });
+        }
+        fetch('components/header.html').then(r => r.text()).then(html => {
+            loadHTMLWithScripts('header-container', html);
+            if (typeof initializeHeader === 'function') initializeHeader();
+        });
+        fetch('components/sidebar.html').then(r => r.text()).then(html => {
+            loadHTMLWithScripts('sidebar-container', html);
+            setTimeout(() => {
+                document.querySelectorAll('.menu-link').forEach(link => {
+                    if (link.getAttribute('href')?.includes('auto-forward')) {
+                        link.classList.add('active');
+                        const acc = link.closest('.menu-accordion');
+                        if (acc) acc.classList.add('here', 'show');
+                    }
+                });
+            }, 100);
+        });
+    </script>
+    <script>
+        const socket = io();
+        let sessions = [];
+        let logsPage = 0;
+        const LOGS_PER_PAGE = 20;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSessions();
+            socket.on('auto-forward-received', () => { loadTokens(); loadLogs(); loadStats(); });
+            socket.on('auto-forward-reply', () => { loadTokens(); loadLogs(); loadStats(); });
+        });
+
+        // ====== Sessions ======
+        async function loadSessions() {
+            try {
+                const res = await fetch('/api/sessions', { credentials: 'include' });
+                const data = await res.json();
+                if (data.success && data.sessions) {
+                    sessions = data.sessions;
+                    const sel = document.getElementById('cfg-session');
+                    sel.innerHTML = '<option value="">-- Pilih Session --</option>';
+                    sessions.forEach(s => {
+                        const opt = document.createElement('option');
+                        opt.value = s.id;
+                        opt.textContent = `${s.id} ${s.isConnected ? '🟢' : '🔴'}`;
+                        sel.appendChild(opt);
+                    });
+                    // auto-select first if only one
+                    if (sessions.length === 1) {
+                        sel.value = sessions[0].id;
+                        loadSessionConfig();
+                    }
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        // ====== Config ======
+        async function loadSessionConfig() {
+            const sessionId = document.getElementById('cfg-session').value;
+            if (!sessionId) {
+                document.getElementById('config-status-card').style.display = 'none';
+                return;
+            }
+            try {
+                const res = await fetch(`/api/auto-forward/config?sessionId=${sessionId}`);
+                const data = await res.json();
+                if (data.success && data.config) {
+                    const c = data.config;
+                    document.getElementById('cfg-admin').value = c.admin_number.replace('@s.whatsapp.net', '');
+                    document.getElementById('cfg-prefix').value = c.token_prefix || 'CT';
+                    document.getElementById('cfg-enabled').checked = !!c.enabled;
+                    document.getElementById('cfg-groups').checked = !!c.forward_groups;
+                    showConfigStatus(c);
+                } else {
+                    document.getElementById('cfg-admin').value = '';
+                    document.getElementById('cfg-prefix').value = 'CT';
+                    document.getElementById('cfg-enabled').checked = true;
+                    document.getElementById('cfg-groups').checked = false;
+                    document.getElementById('config-status-card').style.display = 'none';
+                }
+                loadTokens();
+                loadLogs();
+                loadStats();
+            } catch (e) { console.error(e); }
+        }
+
+        function showConfigStatus(config) {
+            const card = document.getElementById('config-status-card');
+            card.style.display = '';
+            document.getElementById('config-status-badge').innerHTML = config.enabled
+                ? '<span class="badge badge-light-success">Aktif</span>'
+                : '<span class="badge badge-light-danger">Nonaktif</span>';
+            document.getElementById('config-status-body').innerHTML = `
+                <div class="d-flex flex-column gap-2" style="font-size:13px;">
+                    <div><strong>Admin:</strong> ${escapeHtml(config.admin_number.replace('@s.whatsapp.net', ''))}</div>
+                    <div><strong>Prefix:</strong> <span class="token-badge">${escapeHtml(config.token_prefix || 'CT')}</span></div>
+                    <div><strong>Forward Grup:</strong> ${config.forward_groups ? '✅ Ya' : '❌ Tidak'}</div>
+                    <div class="text-muted mt-1">Dibuat: ${config.created_at || '-'}</div>
+                </div>
+            `;
+        }
+
+        async function saveConfig(e) {
+            e.preventDefault();
+            const sessionId = document.getElementById('cfg-session').value;
+            if (!sessionId) return Swal.fire('Error', 'Pilih session terlebih dahulu', 'error');
+
+            const payload = {
+                session_id: sessionId,
+                admin_number: document.getElementById('cfg-admin').value.trim(),
+                token_prefix: document.getElementById('cfg-prefix').value.trim().toUpperCase() || 'CT',
+                enabled: document.getElementById('cfg-enabled').checked,
+                forward_groups: document.getElementById('cfg-groups').checked
+            };
+            if (!payload.admin_number) return Swal.fire('Error', 'Nomor admin wajib diisi', 'error');
+
+            try {
+                const res = await fetch('/api/auto-forward/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (data.success) {
+                    Swal.fire('Berhasil', data.message, 'success');
+                    loadSessionConfig();
+                } else {
+                    Swal.fire('Error', data.error, 'error');
+                }
+            } catch (err) { Swal.fire('Error', 'Gagal menyimpan', 'error'); }
+        }
+
+        // ====== Tokens ======
+        async function loadTokens() {
+            const sessionId = document.getElementById('cfg-session').value;
+            if (!sessionId) return;
+            const search = document.getElementById('token-search').value;
+            try {
+                const res = await fetch(`/api/auto-forward/tokens?sessionId=${sessionId}&search=${encodeURIComponent(search)}&limit=100`);
+                const data = await res.json();
+                const tbody = document.getElementById('tokens-tbody');
+                const empty = document.getElementById('tokens-empty');
+                if (data.success && data.tokens && data.tokens.length > 0) {
+                    empty.classList.add('d-none');
+                    tbody.innerHTML = data.tokens.map(t => `
+                        <tr>
+                            <td><span class="token-badge">${escapeHtml(t.token)}</span></td>
+                            <td style="font-family:monospace;font-size:13px">${escapeHtml((t.sender_number||'').replace('@s.whatsapp.net','').replace('@lid',''))}</td>
+                            <td>${escapeHtml(t.sender_name || '-')}</td>
+                            <td><div style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:#5e6278">${escapeHtml(t.last_message || '-')}</div></td>
+                            <td class="text-center">${t.message_count || 0}</td>
+                            <td style="font-size:12px;color:#a1a5b7">${formatTime(t.updated_at)}</td>
+                            <td>
+                                <button class="btn btn-icon btn-sm btn-light-danger" onclick="deleteToken(${t.id})" title="Hapus">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `).join('');
+                } else {
+                    tbody.innerHTML = '';
+                    empty.classList.remove('d-none');
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        async function deleteToken(id) {
+            const r = await Swal.fire({ title: 'Hapus token?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Hapus', confirmButtonColor: '#f1416c' });
+            if (!r.isConfirmed) return;
+            try {
+                await fetch(`/api/auto-forward/tokens/${id}`, { method: 'DELETE' });
+                loadTokens();
+            } catch (e) { console.error(e); }
+        }
+
+        async function clearAllTokens() {
+            const sessionId = document.getElementById('cfg-session').value;
+            if (!sessionId) return;
+            const r = await Swal.fire({ title: 'Hapus semua token?', text: 'Semua mapping token-nomor akan dihapus', icon: 'warning', showCancelButton: true, confirmButtonText: 'Ya, Hapus Semua', confirmButtonColor: '#f1416c' });
+            if (!r.isConfirmed) return;
+            try {
+                await fetch(`/api/auto-forward/tokens/clear/${sessionId}`, { method: 'DELETE' });
+                Swal.fire('Berhasil', 'Semua token dihapus', 'success');
+                loadTokens(); loadStats();
+            } catch (e) { console.error(e); }
+        }
+
+        // ====== Logs ======
+        async function loadLogs() {
+            const sessionId = document.getElementById('cfg-session').value;
+            if (!sessionId) return;
+            const direction = document.getElementById('log-direction').value;
+            try {
+                const res = await fetch(`/api/auto-forward/logs?sessionId=${sessionId}&direction=${direction}&limit=${LOGS_PER_PAGE}&offset=${logsPage * LOGS_PER_PAGE}`);
+                const data = await res.json();
+                const tbody = document.getElementById('logs-tbody');
+                const empty = document.getElementById('logs-empty');
+                if (data.success && data.logs && data.logs.length > 0) {
+                    empty.classList.add('d-none');
+                    tbody.innerHTML = data.logs.map(l => `
+                        <tr>
+                            <td><span class="token-badge">${escapeHtml(l.token)}</span></td>
+                            <td>
+                                <span class="direction-badge ${l.direction === 'user_to_admin' ? 'in' : 'out'}">
+                                    <i class="bi bi-${l.direction === 'user_to_admin' ? 'arrow-right' : 'reply'}"></i>
+                                    ${l.direction === 'user_to_admin' ? 'User→Admin' : 'Admin→User'}
+                                </span>
+                            </td>
+                            <td style="font-family:monospace;font-size:12px">${escapeHtml((l.sender_number||'').replace('@s.whatsapp.net',''))}</td>
+                            <td><div style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px">${escapeHtml(l.message_content || '-')}</div></td>
+                            <td>
+                                <span class="direction-badge ${l.status === 'success' ? 'out' : 'fail'}">
+                                    ${l.status === 'success' ? '✅' : '❌'} ${l.status}
+                                </span>
+                            </td>
+                            <td style="font-size:12px;color:#a1a5b7">${formatTime(l.created_at)}</td>
+                        </tr>
+                    `).join('');
+
+                    // Pagination
+                    const totalPages = Math.ceil((data.count || 0) / LOGS_PER_PAGE);
+                    const pag = document.getElementById('logs-pagination');
+                    if (totalPages > 1) {
+                        let btns = '';
+                        if (logsPage > 0) btns += `<button class="btn btn-sm btn-light me-1" onclick="goLogPage(${logsPage-1})">← Prev</button>`;
+                        btns += `<span class="btn btn-sm btn-primary me-1">${logsPage+1}/${totalPages}</span>`;
+                        if (logsPage < totalPages - 1) btns += `<button class="btn btn-sm btn-light" onclick="goLogPage(${logsPage+1})">Next →</button>`;
+                        pag.innerHTML = btns;
+                    } else { pag.innerHTML = ''; }
+                } else {
+                    tbody.innerHTML = '';
+                    empty.classList.remove('d-none');
+                    document.getElementById('logs-pagination').innerHTML = '';
+                }
+            } catch (e) { console.error(e); }
+        }
+        function goLogPage(p) { logsPage = p; loadLogs(); }
+
+        async function cleanupLogs() {
+            const r = await Swal.fire({ title: 'Cleanup logs?', input: 'number', inputValue: 30, inputLabel: 'Hapus log lebih dari (hari):', showCancelButton: true, confirmButtonText: 'Cleanup' });
+            if (r.isConfirmed) {
+                const res = await fetch(`/api/auto-forward/logs/cleanup?days=${r.value || 30}`, { method: 'DELETE' });
+                const data = await res.json();
+                Swal.fire('Berhasil', data.message, 'success');
+                loadLogs(); loadStats();
+            }
+        }
+
+        // ====== Stats ======
+        async function loadStats() {
+            const sessionId = document.getElementById('cfg-session').value;
+            if (!sessionId) return;
+            try {
+                const res = await fetch(`/api/auto-forward/stats?sessionId=${sessionId}`);
+                const data = await res.json();
+                if (data.success && data.stats) {
+                    document.getElementById('stat-tokens').textContent = data.stats.tokens || 0;
+                    document.getElementById('stat-forwarded').textContent = data.stats.user_to_admin || 0;
+                    document.getElementById('stat-replied').textContent = data.stats.admin_to_user || 0;
+                    document.getElementById('stat-failed').textContent = data.stats.failed || 0;
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        // ====== Helpers ======
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                      .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+        }
+        function formatTime(ts) {
+            if (!ts) return '-';
+            try {
+                const d = new Date(ts);
+                return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' }) + ' ' +
+                       d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+            } catch { return ts; }
+        }
+    </script>
+</body>
+</html>

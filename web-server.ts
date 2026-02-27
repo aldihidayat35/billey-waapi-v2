@@ -3,7 +3,7 @@ import { createServer } from 'http'
 import { Server as SocketIO } from 'socket.io'
 import { SessionManager } from './session-manager'
 import { logger as activityLogger } from './logger'
-import { messageLogDb, sessionLogDb, chatTemplateDb, groupExportDb, autoReplyDb, autoReplyLogDb, autoReplyCooldownDb, db, dbMaintenance } from './database.js'
+import { messageLogDb, sessionLogDb, chatTemplateDb, groupExportDb, autoReplyDb, autoReplyLogDb, autoReplyCooldownDb, autoForwardConfigDb, autoForwardTokenDb, autoForwardLogDb, db, dbMaintenance } from './database.js'
 import * as fs from 'fs'
 import * as path from 'path'
 import { fileURLToPath } from 'url'
@@ -3685,6 +3685,160 @@ app.post('/api/export-groups-excel', async (req, res) => {
 		}
 	} catch (error: any) {
 		console.error('Error creating Excel export:', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// ============================================
+// Auto Forward API Endpoints
+// ============================================
+
+// Get config for a session
+app.get('/api/auto-forward/config', (req, res) => {
+	try {
+		const { sessionId } = req.query
+		if (sessionId) {
+			const config = autoForwardConfigDb.get(sessionId as string)
+			res.json({ success: true, config })
+		} else {
+			const configs = autoForwardConfigDb.getAll()
+			res.json({ success: true, configs })
+		}
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Save / update config
+app.post('/api/auto-forward/config', (req, res) => {
+	try {
+		const { session_id, admin_number, enabled, token_prefix, forward_media, forward_groups } = req.body
+		if (!session_id) return res.status(400).json({ success: false, error: 'session_id wajib diisi' })
+		if (!admin_number || !admin_number.trim()) return res.status(400).json({ success: false, error: 'Nomor admin wajib diisi' })
+
+		// Normalize admin number to JID format
+		let adminJid = admin_number.replace(/[^0-9]/g, '')
+		if (!adminJid.includes('@')) adminJid = adminJid + '@s.whatsapp.net'
+
+		const result = autoForwardConfigDb.upsert({
+			session_id,
+			admin_number: adminJid,
+			enabled: enabled !== undefined ? (enabled ? 1 : 0) : 1,
+			token_prefix: (token_prefix || 'CT').toUpperCase().replace(/[^A-Z0-9]/g, '').substring(0, 5),
+			forward_media: forward_media !== undefined ? (forward_media ? 1 : 0) : 1,
+			forward_groups: forward_groups !== undefined ? (forward_groups ? 1 : 0) : 0
+		})
+
+		if (result.success) {
+			const config = autoForwardConfigDb.get(session_id)
+			res.json({ success: true, message: 'Konfigurasi auto-forward berhasil disimpan', config })
+		} else {
+			res.status(400).json({ success: false, error: result.error })
+		}
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Toggle auto-forward on/off
+app.patch('/api/auto-forward/config/toggle', (req, res) => {
+	try {
+		const { session_id, enabled } = req.body
+		if (!session_id) return res.status(400).json({ success: false, error: 'session_id wajib' })
+		const result = autoForwardConfigDb.toggle(session_id, !!enabled)
+		res.json({ success: result.success, message: enabled ? 'Auto-forward diaktifkan' : 'Auto-forward dinonaktifkan' })
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Delete config
+app.delete('/api/auto-forward/config/:sessionId', (req, res) => {
+	try {
+		autoForwardConfigDb.delete(req.params.sessionId)
+		autoForwardTokenDb.clearAll(req.params.sessionId)
+		res.json({ success: true, message: 'Konfigurasi auto-forward dihapus' })
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Get tokens for a session
+app.get('/api/auto-forward/tokens', (req, res) => {
+	try {
+		const { sessionId, search, limit, offset } = req.query
+		if (!sessionId) return res.status(400).json({ success: false, error: 'sessionId wajib' })
+		const tokens = autoForwardTokenDb.getAll(sessionId as string, {
+			search: search as string,
+			limit: limit ? parseInt(limit as string) : 50,
+			offset: offset ? parseInt(offset as string) : 0
+		})
+		const count = autoForwardTokenDb.getCount(sessionId as string)
+		res.json({ success: true, tokens, count })
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Delete a single token
+app.delete('/api/auto-forward/tokens/:id', (req, res) => {
+	try {
+		autoForwardTokenDb.delete(parseInt(req.params.id))
+		res.json({ success: true, message: 'Token dihapus' })
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Clear all tokens for a session
+app.delete('/api/auto-forward/tokens/clear/:sessionId', (req, res) => {
+	try {
+		const result = autoForwardTokenDb.clearAll(req.params.sessionId)
+		res.json({ success: true, message: `${result.deleted} token dihapus` })
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Get forward logs
+app.get('/api/auto-forward/logs', (req, res) => {
+	try {
+		const { sessionId, direction, limit, offset } = req.query
+		const logs = autoForwardLogDb.getAll({
+			sessionId: sessionId as string,
+			direction: direction as string,
+			limit: limit ? parseInt(limit as string) : 50,
+			offset: offset ? parseInt(offset as string) : 0
+		})
+		const count = autoForwardLogDb.getCount({
+			sessionId: sessionId as string,
+			direction: direction as string
+		})
+		res.json({ success: true, logs, count })
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Get stats
+app.get('/api/auto-forward/stats', (req, res) => {
+	try {
+		const { sessionId } = req.query
+		const stats = autoForwardLogDb.getStats(sessionId as string)
+		const tokenCount = sessionId ? autoForwardTokenDb.getCount(sessionId as string) : 0
+		res.json({ success: true, stats: { ...stats, tokens: tokenCount } })
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Cleanup logs
+app.delete('/api/auto-forward/logs/cleanup', (req, res) => {
+	try {
+		const days = parseInt(req.query.days as string) || 30
+		const deleted = autoForwardLogDb.cleanup(days)
+		res.json({ success: true, deleted, message: `${deleted} log dihapus` })
+	} catch (error: any) {
 		res.status(500).json({ success: false, error: error.message })
 	}
 })

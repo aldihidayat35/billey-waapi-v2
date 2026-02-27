@@ -161,6 +161,56 @@ db.exec(`
     CREATE INDEX IF NOT EXISTS idx_auto_reply_logs_session ON auto_reply_logs(session_id);
     CREATE INDEX IF NOT EXISTS idx_auto_reply_logs_created ON auto_reply_logs(created_at);
     CREATE INDEX IF NOT EXISTS idx_auto_reply_cooldowns_rule ON auto_reply_cooldowns(rule_id);
+
+    -- Auto Forward Config Table
+    CREATE TABLE IF NOT EXISTS auto_forward_config (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id TEXT NOT NULL,
+        admin_number TEXT NOT NULL,
+        enabled INTEGER DEFAULT 1,
+        token_prefix TEXT DEFAULT 'CT',
+        forward_media INTEGER DEFAULT 1,
+        forward_groups INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(session_id)
+    );
+
+    -- Auto Forward Tokens Table
+    CREATE TABLE IF NOT EXISTS auto_forward_tokens (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id TEXT NOT NULL,
+        token TEXT NOT NULL,
+        sender_number TEXT NOT NULL,
+        sender_name TEXT,
+        last_message TEXT,
+        message_count INTEGER DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(session_id, token),
+        UNIQUE(session_id, sender_number)
+    );
+
+    -- Auto Forward Logs Table
+    CREATE TABLE IF NOT EXISTS auto_forward_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id TEXT NOT NULL,
+        token TEXT NOT NULL,
+        direction TEXT NOT NULL CHECK(direction IN ('user_to_admin', 'admin_to_user')),
+        sender_number TEXT NOT NULL,
+        message_content TEXT,
+        message_type TEXT DEFAULT 'text',
+        status TEXT DEFAULT 'success' CHECK(status IN ('success', 'failed')),
+        error_message TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_auto_forward_config_session ON auto_forward_config(session_id);
+    CREATE INDEX IF NOT EXISTS idx_auto_forward_tokens_session ON auto_forward_tokens(session_id);
+    CREATE INDEX IF NOT EXISTS idx_auto_forward_tokens_token ON auto_forward_tokens(session_id, token);
+    CREATE INDEX IF NOT EXISTS idx_auto_forward_tokens_sender ON auto_forward_tokens(session_id, sender_number);
+    CREATE INDEX IF NOT EXISTS idx_auto_forward_logs_session ON auto_forward_logs(session_id);
+    CREATE INDEX IF NOT EXISTS idx_auto_forward_logs_created ON auto_forward_logs(created_at);
 `)
 
 // Migration: Add media columns to chat_templates if they don't exist
@@ -1591,6 +1641,265 @@ export const dbMaintenance = {
             totalSize: result?.total || 0,
             count: result?.count || 0
         }
+    }
+}
+
+// ============================================
+// Auto Forward Interfaces
+// ============================================
+export interface AutoForwardConfig {
+    id?: number
+    session_id: string
+    admin_number: string
+    enabled?: number
+    token_prefix?: string
+    forward_media?: number
+    forward_groups?: number
+    created_at?: string
+    updated_at?: string
+}
+
+export interface AutoForwardToken {
+    id?: number
+    session_id: string
+    token: string
+    sender_number: string
+    sender_name?: string
+    last_message?: string
+    message_count?: number
+    created_at?: string
+    updated_at?: string
+}
+
+export interface AutoForwardLogEntry {
+    id?: number
+    session_id: string
+    token: string
+    direction: 'user_to_admin' | 'admin_to_user'
+    sender_number: string
+    message_content?: string
+    message_type?: string
+    status?: 'success' | 'failed'
+    error_message?: string
+    created_at?: string
+}
+
+// ============================================
+// Auto Forward Config Functions
+// ============================================
+export const autoForwardConfigDb = {
+    get: (sessionId: string): AutoForwardConfig | null => {
+        try {
+            return db.prepare('SELECT * FROM auto_forward_config WHERE session_id = ?').get(sessionId) as AutoForwardConfig | null
+        } catch { return null }
+    },
+
+    getAll: (): AutoForwardConfig[] => {
+        try {
+            return db.prepare('SELECT * FROM auto_forward_config ORDER BY created_at DESC').all() as AutoForwardConfig[]
+        } catch { return [] }
+    },
+
+    upsert: (data: AutoForwardConfig): { success: boolean; error?: string } => {
+        try {
+            const existing = autoForwardConfigDb.get(data.session_id)
+            if (existing) {
+                db.prepare(`UPDATE auto_forward_config SET 
+                    admin_number = ?, enabled = ?, token_prefix = ?, forward_media = ?, forward_groups = ?,
+                    updated_at = datetime('now')
+                    WHERE session_id = ?`).run(
+                    data.admin_number, data.enabled ?? 1, data.token_prefix ?? 'CT',
+                    data.forward_media ?? 1, data.forward_groups ?? 0, data.session_id
+                )
+            } else {
+                db.prepare(`INSERT INTO auto_forward_config 
+                    (session_id, admin_number, enabled, token_prefix, forward_media, forward_groups, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`).run(
+                    data.session_id, data.admin_number, data.enabled ?? 1,
+                    data.token_prefix ?? 'CT', data.forward_media ?? 1, data.forward_groups ?? 0
+                )
+            }
+            return { success: true }
+        } catch (e: any) { return { success: false, error: e.message } }
+    },
+
+    toggle: (sessionId: string, enabled: boolean): { success: boolean } => {
+        try {
+            db.prepare(`UPDATE auto_forward_config SET enabled = ?, updated_at = datetime('now') WHERE session_id = ?`)
+                .run(enabled ? 1 : 0, sessionId)
+            return { success: true }
+        } catch { return { success: false } }
+    },
+
+    delete: (sessionId: string): { success: boolean } => {
+        try {
+            db.prepare('DELETE FROM auto_forward_config WHERE session_id = ?').run(sessionId)
+            return { success: true }
+        } catch { return { success: false } }
+    }
+}
+
+// ============================================
+// Auto Forward Token Functions
+// ============================================
+export const autoForwardTokenDb = {
+    // Get or create token for a sender
+    getOrCreate: (sessionId: string, senderNumber: string, senderName?: string): AutoForwardToken => {
+        // Check for existing token
+        const existing = db.prepare(
+            'SELECT * FROM auto_forward_tokens WHERE session_id = ? AND sender_number = ?'
+        ).get(sessionId, senderNumber) as AutoForwardToken | undefined
+        
+        if (existing) {
+            // Update message count and timestamp
+            db.prepare(`UPDATE auto_forward_tokens SET message_count = message_count + 1, 
+                sender_name = COALESCE(?, sender_name), updated_at = datetime('now') 
+                WHERE id = ?`).run(senderName || null, existing.id)
+            existing.message_count = (existing.message_count || 0) + 1
+            return existing
+        }
+        
+        // Get config for prefix
+        const config = autoForwardConfigDb.get(sessionId)
+        const prefix = config?.token_prefix || 'CT'
+        
+        // Generate next token number
+        const lastToken = db.prepare(
+            `SELECT token FROM auto_forward_tokens WHERE session_id = ? AND token LIKE ? ORDER BY id DESC LIMIT 1`
+        ).get(sessionId, `${prefix}%`) as { token: string } | undefined
+        
+        let nextNum = 1
+        if (lastToken) {
+            const numPart = lastToken.token.replace(prefix, '')
+            nextNum = (parseInt(numPart) || 0) + 1
+        }
+        
+        const token = `${prefix}${nextNum}`
+        
+        db.prepare(`INSERT INTO auto_forward_tokens 
+            (session_id, token, sender_number, sender_name, message_count, created_at, updated_at)
+            VALUES (?, ?, ?, ?, 1, datetime('now'), datetime('now'))`
+        ).run(sessionId, token, senderNumber, senderName || null)
+        
+        return { session_id: sessionId, token, sender_number: senderNumber, sender_name: senderName, message_count: 1 }
+    },
+
+    // Find sender by token
+    getBySenderToken: (sessionId: string, token: string): AutoForwardToken | null => {
+        try {
+            return db.prepare(
+                'SELECT * FROM auto_forward_tokens WHERE session_id = ? AND UPPER(token) = UPPER(?)'
+            ).get(sessionId, token) as AutoForwardToken | null
+        } catch { return null }
+    },
+
+    // Get all tokens for a session
+    getAll: (sessionId: string, opts?: { limit?: number; offset?: number; search?: string }): AutoForwardToken[] => {
+        try {
+            let query = 'SELECT * FROM auto_forward_tokens WHERE session_id = ?'
+            const params: any[] = [sessionId]
+            if (opts?.search) {
+                query += ' AND (token LIKE ? OR sender_number LIKE ? OR sender_name LIKE ?)'
+                params.push(`%${opts.search}%`, `%${opts.search}%`, `%${opts.search}%`)
+            }
+            query += ' ORDER BY updated_at DESC'
+            if (opts?.limit) { query += ' LIMIT ?'; params.push(opts.limit) }
+            if (opts?.offset) { query += ' OFFSET ?'; params.push(opts.offset) }
+            return db.prepare(query).all(...params) as AutoForwardToken[]
+        } catch { return [] }
+    },
+
+    getCount: (sessionId: string): number => {
+        try {
+            const r = db.prepare('SELECT COUNT(*) as count FROM auto_forward_tokens WHERE session_id = ?').get(sessionId) as any
+            return r?.count || 0
+        } catch { return 0 }
+    },
+
+    // Update last message for a token
+    updateLastMessage: (sessionId: string, token: string, message: string): void => {
+        try {
+            db.prepare(`UPDATE auto_forward_tokens SET last_message = ?, updated_at = datetime('now') 
+                WHERE session_id = ? AND token = ?`).run(message.substring(0, 500), sessionId, token)
+        } catch {}
+    },
+
+    // Delete a single token
+    delete: (id: number): { success: boolean } => {
+        try {
+            db.prepare('DELETE FROM auto_forward_tokens WHERE id = ?').run(id)
+            return { success: true }
+        } catch { return { success: false } }
+    },
+
+    // Clear all tokens for a session
+    clearAll: (sessionId: string): { success: boolean; deleted: number } => {
+        try {
+            const result = db.prepare('DELETE FROM auto_forward_tokens WHERE session_id = ?').run(sessionId)
+            return { success: true, deleted: result.changes }
+        } catch { return { success: false, deleted: 0 } }
+    }
+}
+
+// ============================================
+// Auto Forward Logs Functions
+// ============================================
+export const autoForwardLogDb = {
+    insert: (log: AutoForwardLogEntry): void => {
+        try {
+            db.prepare(`INSERT INTO auto_forward_logs 
+                (session_id, token, direction, sender_number, message_content, message_type, status, error_message, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
+            ).run(
+                log.session_id, log.token, log.direction, log.sender_number,
+                (log.message_content || '').substring(0, 1000), log.message_type || 'text',
+                log.status || 'success', log.error_message || null
+            )
+        } catch (e) { console.error('Auto-forward log insert error:', e) }
+    },
+
+    getAll: (opts: { sessionId?: string; direction?: string; limit?: number; offset?: number }): AutoForwardLogEntry[] => {
+        try {
+            let query = 'SELECT * FROM auto_forward_logs WHERE 1=1'
+            const params: any[] = []
+            if (opts.sessionId) { query += ' AND session_id = ?'; params.push(opts.sessionId) }
+            if (opts.direction) { query += ' AND direction = ?'; params.push(opts.direction) }
+            query += ' ORDER BY created_at DESC'
+            if (opts.limit) { query += ' LIMIT ?'; params.push(opts.limit) }
+            if (opts.offset) { query += ' OFFSET ?'; params.push(opts.offset) }
+            return db.prepare(query).all(...params) as AutoForwardLogEntry[]
+        } catch { return [] }
+    },
+
+    getCount: (opts: { sessionId?: string; direction?: string }): number => {
+        try {
+            let query = 'SELECT COUNT(*) as count FROM auto_forward_logs WHERE 1=1'
+            const params: any[] = []
+            if (opts.sessionId) { query += ' AND session_id = ?'; params.push(opts.sessionId) }
+            if (opts.direction) { query += ' AND direction = ?'; params.push(opts.direction) }
+            const r = db.prepare(query).get(...params) as any
+            return r?.count || 0
+        } catch { return 0 }
+    },
+
+    getStats: (sessionId?: string): { total: number; user_to_admin: number; admin_to_user: number; failed: number } => {
+        try {
+            let where = 'WHERE 1=1'
+            const params: any[] = []
+            if (sessionId) { where += ' AND session_id = ?'; params.push(sessionId) }
+            const total = (db.prepare(`SELECT COUNT(*) as c FROM auto_forward_logs ${where}`).get(...params) as any)?.c || 0
+            const u2a = (db.prepare(`SELECT COUNT(*) as c FROM auto_forward_logs ${where} AND direction='user_to_admin'`).get(...params) as any)?.c || 0
+            const a2u = (db.prepare(`SELECT COUNT(*) as c FROM auto_forward_logs ${where} AND direction='admin_to_user'`).get(...params) as any)?.c || 0
+            const failed = (db.prepare(`SELECT COUNT(*) as c FROM auto_forward_logs ${where} AND status='failed'`).get(...params) as any)?.c || 0
+            return { total, user_to_admin: u2a, admin_to_user: a2u, failed }
+        } catch { return { total: 0, user_to_admin: 0, admin_to_user: 0, failed: 0 } }
+    },
+
+    cleanup: (days: number = 30): number => {
+        try {
+            const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - days)
+            return db.prepare('DELETE FROM auto_forward_logs WHERE created_at < ?').run(cutoff.toISOString()).changes
+        } catch { return 0 }
     }
 }
 
