@@ -410,6 +410,88 @@
             color: #5e6278;
         }
         
+        /* Tag Input for Multiple Triggers */
+        .tag-input-container {
+            border: 1px solid #e9edef;
+            border-radius: 8px;
+            padding: 6px 10px;
+            min-height: 42px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 5px;
+            cursor: text;
+            background: white;
+            transition: border-color 0.15s;
+        }
+        .tag-input-container:focus-within {
+            border-color: var(--wa-green);
+            box-shadow: 0 0 0 3px rgba(37,211,102,0.15);
+        }
+        .tag-input-container #tag-text-input {
+            border: none;
+            outline: none;
+            flex: 1;
+            min-width: 120px;
+            font-size: 13px;
+            padding: 2px 0;
+            background: transparent;
+        }
+        .trigger-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: #e8fff3;
+            color: #1a7a4a;
+            border: 1px solid #b3e9cc;
+            padding: 3px 8px 3px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            font-family: 'Consolas', monospace;
+            max-width: 200px;
+        }
+        .trigger-chip .chip-text {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .trigger-chip .chip-remove {
+            cursor: pointer;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background: rgba(26,122,74,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 9px;
+            flex-shrink: 0;
+            transition: background 0.2s;
+        }
+        .trigger-chip .chip-remove:hover {
+            background: #f1416c;
+            color: white;
+        }
+        .multi-trigger-pills {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 3px;
+            margin-top: 4px;
+        }
+        .mini-trigger-pill {
+            font-family: monospace;
+            font-size: 11px;
+            background: #f1f1f4;
+            padding: 2px 7px;
+            border-radius: 4px;
+            color: #5e6278;
+            max-width: 120px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
             .rules-header {
@@ -644,11 +726,18 @@
                                 </select>
                             </div>
                             
-                            <!-- Trigger Value -->
+                            <!-- Trigger Value (Multi-Trigger) -->
                             <div class="col-md-5">
                                 <label class="form-label">Nilai Trigger <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="rule-trigger-value" 
-                                       placeholder="Contoh: hallo" required>
+                                <div class="tag-input-container" id="tag-input-container" 
+                                     onclick="document.getElementById('tag-text-input').focus()">
+                                    <span id="trigger-tags-wrapper"></span>
+                                    <input type="text" id="tag-text-input" 
+                                           placeholder="Ketik lalu Enter atau koma..."
+                                           onkeydown="handleTagKeydown(event)"
+                                           oninput="handleTagInput(event)">
+                                </div>
+                                <small class="text-muted">Tekan <kbd>Enter</kbd> atau <kbd>,</kbd> untuk tambah. Bisa tambah banyak kata kunci/typo — salah satu cocok = auto-reply jalan.</small>
                             </div>
                             
                             <!-- Match Case -->
@@ -781,6 +870,7 @@
     <script>
         let rules = [];
         let sessions = [];
+        let triggerTags = [];
         const socket = io();
         
         document.addEventListener('DOMContentLoaded', () => {
@@ -800,9 +890,71 @@
             });
         });
         
+        // ============================================================
+        // Multi-Trigger Tag Input Functions
+        // ============================================================
+        function addTriggerTag(value) {
+            const val = value.trim();
+            if (!val || triggerTags.includes(val)) return false;
+            triggerTags.push(val);
+            renderTriggerTags();
+            return true;
+        }
+
+        function removeTriggerTag(index) {
+            triggerTags.splice(index, 1);
+            renderTriggerTags();
+        }
+
+        function renderTriggerTags() {
+            const wrapper = document.getElementById('trigger-tags-wrapper');
+            if (!wrapper) return;
+            wrapper.innerHTML = triggerTags.map((tag, i) => `
+                <span class="trigger-chip" title="${escapeHtml(tag)}">
+                    <span class="chip-text">${escapeHtml(tag)}</span>
+                    <span class="chip-remove" onclick="removeTriggerTag(${i})">✕</span>
+                </span>
+            `).join('');
+        }
+
+        function getTriggerTags() {
+            return [...triggerTags];
+        }
+
+        function setTriggerTags(values) {
+            triggerTags = Array.isArray(values) ? values.filter(v => v && String(v).trim()) : [];
+            renderTriggerTags();
+        }
+
+        function parseTriggerValues(triggerValue) {
+            try {
+                const parsed = JSON.parse(triggerValue);
+                if (Array.isArray(parsed)) return parsed.filter(v => v && v.trim());
+            } catch (e) {}
+            return [triggerValue];
+        }
+
+        function handleTagKeydown(event) {
+            const input = event.target;
+            if (event.key === 'Enter' || event.key === ',') {
+                event.preventDefault();
+                if (addTriggerTag(input.value)) input.value = '';
+            } else if (event.key === 'Backspace' && input.value === '' && triggerTags.length > 0) {
+                removeTriggerTag(triggerTags.length - 1);
+            }
+        }
+
+        function handleTagInput(event) {
+            const input = event.target;
+            if (input.value.endsWith(',')) {
+                const value = input.value.slice(0, -1);
+                if (addTriggerTag(value)) input.value = '';
+            }
+        }
+        // ============================================================
+
         async function loadSessions() {
             try {
-                const response = await fetch('/api/sessions', { credentials: 'include' });
                 const data = await response.json();
                 
                 if (data.success && data.sessions) {
@@ -872,7 +1024,7 @@
             
             const filtered = rules.filter(rule => {
                 if (search && !rule.name.toLowerCase().includes(search) && 
-                    !rule.trigger_value.toLowerCase().includes(search)) return false;
+                    !parseTriggerValues(rule.trigger_value).some(v => v.toLowerCase().includes(search))) return false;
                 if (sessionFilter && rule.session_id !== sessionFilter) return false;
                 if (scopeFilter && rule.scope !== scopeFilter) return false;
                 if (statusFilter !== '' && rule.enabled !== parseInt(statusFilter)) return false;
@@ -913,8 +1065,10 @@
                         <span class="trigger-badge ${rule.trigger_type}">
                             ${rule.trigger_type}
                         </span>
-                        <div class="mt-1" style="font-family: monospace; font-size: 12px; color: #5e6278;">
-                            "${escapeHtml(rule.trigger_value.substring(0, 30))}${rule.trigger_value.length > 30 ? '...' : ''}"
+                        <div class="multi-trigger-pills">
+                            ${parseTriggerValues(rule.trigger_value).map(v => 
+                                `<span class="mini-trigger-pill" title="${escapeHtml(v)}">${escapeHtml(v.length > 20 ? v.substring(0,20)+'…' : v)}</span>`
+                            ).join('')}
                         </div>
                     </td>
                     <td>
@@ -965,6 +1119,8 @@
             document.getElementById('rule-id').value = '';
             document.getElementById('rule-enabled').checked = true;
             document.getElementById('test-result').classList.add('d-none');
+            setTriggerTags([]);
+            document.getElementById('tag-text-input').value = '';
             new bootstrap.Modal(document.getElementById('ruleModal')).show();
         }
         
@@ -977,7 +1133,9 @@
             document.getElementById('rule-name').value = rule.name;
             document.getElementById('rule-session').value = rule.session_id || '';
             document.getElementById('rule-trigger-type').value = rule.trigger_type;
-            document.getElementById('rule-trigger-value').value = rule.trigger_value;
+            // Populate multi-trigger tags
+            setTriggerTags(parseTriggerValues(rule.trigger_value));
+            document.getElementById('tag-text-input').value = '';
             document.getElementById('rule-match-case').value = rule.match_case ? '1' : '0';
             document.getElementById('rule-response').value = rule.response_content || '';
             document.getElementById('rule-chat-type').value = rule.scope || 'all';
@@ -991,11 +1149,17 @@
         
         async function saveRule() {
             const id = document.getElementById('rule-id').value;
+            
+            // Flush any pending input in the tag text field
+            const pendingInput = document.getElementById('tag-text-input').value.trim();
+            if (pendingInput) { addTriggerTag(pendingInput); document.getElementById('tag-text-input').value = ''; }
+            const triggerValueArr = getTriggerTags();
+            
             const data = {
                 name: document.getElementById('rule-name').value,
                 session_id: document.getElementById('rule-session').value || null,
                 trigger_type: document.getElementById('rule-trigger-type').value,
-                trigger_value: document.getElementById('rule-trigger-value').value,
+                trigger_value: triggerValueArr,
                 match_case: document.getElementById('rule-match-case').value === '1',
                 response_type: 'text',
                 response_content: document.getElementById('rule-response').value,
@@ -1005,8 +1169,8 @@
                 enabled: document.getElementById('rule-enabled').checked
             };
             
-            if (!data.name || !data.trigger_value || !data.response_content) {
-                Swal.fire('Error', 'Mohon lengkapi semua field yang wajib', 'error');
+            if (!data.name || triggerValueArr.length === 0 || !data.response_content) {
+                Swal.fire('Error', 'Mohon lengkapi semua field yang wajib (nama, minimal 1 nilai trigger, response)', 'error');
                 return;
             }
             
@@ -1082,7 +1246,6 @@
         
         function testRule() {
             const triggerType = document.getElementById('rule-trigger-type').value;
-            const triggerValue = document.getElementById('rule-trigger-value').value;
             const matchCase = document.getElementById('rule-match-case').value === '1';
             const testMessage = document.getElementById('test-message').value;
             const resultDiv = document.getElementById('test-result');
@@ -1092,26 +1255,40 @@
                 return;
             }
             
-            const msg = matchCase ? testMessage : testMessage.toLowerCase();
-            const trigger = matchCase ? triggerValue : triggerValue.toLowerCase();
+            // Include any pending text in tag input
+            const pendingInput = document.getElementById('tag-text-input').value.trim();
+            const allTags = pendingInput ? [...triggerTags, pendingInput] : [...triggerTags];
             
+            if (allTags.length === 0) {
+                resultDiv.classList.add('d-none');
+                return;
+            }
+            
+            const msg = matchCase ? testMessage : testMessage.toLowerCase();
             let matched = false;
-            switch (triggerType) {
-                case 'exact': matched = msg === trigger; break;
-                case 'contains': matched = msg.includes(trigger); break;
-                case 'starts_with': matched = msg.startsWith(trigger); break;
-                case 'ends_with': matched = msg.endsWith(trigger); break;
-                case 'regex':
-                    try { matched = new RegExp(triggerValue, matchCase ? '' : 'i').test(testMessage); }
-                    catch (e) { matched = false; }
-                    break;
+            let matchedBy = '';
+            
+            for (const rawVal of allTags) {
+                if (!rawVal.trim()) continue;
+                const trigger = matchCase ? rawVal.trim() : rawVal.trim().toLowerCase();
+                switch (triggerType) {
+                    case 'exact': matched = msg === trigger; break;
+                    case 'contains': matched = msg.includes(trigger); break;
+                    case 'starts_with': matched = msg.startsWith(trigger); break;
+                    case 'ends_with': matched = msg.endsWith(trigger); break;
+                    case 'regex':
+                        try { matched = new RegExp(rawVal.trim(), matchCase ? '' : 'i').test(testMessage); }
+                        catch (e) { matched = false; }
+                        break;
+                }
+                if (matched) { matchedBy = rawVal.trim(); break; }
             }
             
             resultDiv.classList.remove('d-none', 'success', 'failed');
             resultDiv.classList.add(matched ? 'success' : 'failed');
             resultDiv.innerHTML = matched 
-                ? '<i class="bi bi-check-circle me-2"></i>Match! Rule akan merespon pesan ini'
-                : '<i class="bi bi-x-circle me-2"></i>Tidak match. Rule tidak akan merespon';
+                ? `<i class="bi bi-check-circle me-2"></i>Match! Cocok dengan trigger "<strong>${escapeHtml(matchedBy)}</strong>" — rule akan merespon`
+                : '<i class="bi bi-x-circle me-2"></i>Tidak match dengan semua trigger. Rule tidak akan merespon';
         }
         
         async function testRuleById(id) {

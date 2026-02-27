@@ -1825,6 +1825,37 @@ app.get('/api/templates/search/:query', (req, res) => {
 // API Endpoints for Auto Reply Rules
 // ============================================
 
+// Helper: normalize trigger_value to JSON array string (supports multi-trigger)
+function normalizeTriggerValue(triggerValue: any): string {
+	if (Array.isArray(triggerValue)) {
+		const values = triggerValue.map((v: string) => String(v).trim()).filter((v: string) => v)
+		return JSON.stringify(values)
+	}
+	try {
+		const parsed = JSON.parse(triggerValue)
+		if (Array.isArray(parsed)) {
+			const values = parsed.map((v: string) => String(v).trim()).filter((v: string) => v)
+			return JSON.stringify(values)
+		}
+	} catch {}
+	// Plain string - wrap in array
+	return JSON.stringify([String(triggerValue).trim()])
+}
+
+// Helper: check if trigger_value (array or string) has at least one non-empty entry
+function isTriggerValueEmpty(triggerValue: any): boolean {
+	if (Array.isArray(triggerValue)) {
+		return triggerValue.filter((v: string) => String(v).trim()).length === 0
+	}
+	try {
+		const parsed = JSON.parse(triggerValue)
+		if (Array.isArray(parsed)) {
+			return parsed.filter((v: string) => String(v).trim()).length === 0
+		}
+	} catch {}
+	return !triggerValue || !String(triggerValue).trim()
+}
+
 // Get all auto reply rules
 app.get('/api/auto-reply', (req, res) => {
 	try {
@@ -1899,7 +1930,7 @@ app.post('/api/auto-reply', (req, res) => {
 			return res.status(400).json({ success: false, error: 'Tipe trigger tidak valid' })
 		}
 		
-		if (!trigger_value || !trigger_value.trim()) {
+		if (isTriggerValueEmpty(trigger_value)) {
 			return res.status(400).json({ success: false, error: 'Nilai trigger wajib diisi' })
 		}
 		
@@ -1907,10 +1938,14 @@ app.post('/api/auto-reply', (req, res) => {
 			return res.status(400).json({ success: false, error: 'Konten response wajib diisi' })
 		}
 		
+		// Normalize trigger_value to JSON array string (supports multi-trigger)
+		const normalizedTriggerValue = normalizeTriggerValue(trigger_value)
+		
 		// Validate regex if trigger_type is regex
 		if (trigger_type === 'regex') {
 			try {
-				new RegExp(trigger_value)
+				const vals = JSON.parse(normalizedTriggerValue) as string[]
+				for (const v of vals) { new RegExp(v) }
 			} catch (e) {
 				return res.status(400).json({ success: false, error: 'Regex pattern tidak valid' })
 			}
@@ -1920,7 +1955,7 @@ app.post('/api/auto-reply', (req, res) => {
 			session_id: session_id || null,
 			name: name.trim(),
 			trigger_type,
-			trigger_value: trigger_value.trim(),
+			trigger_value: normalizedTriggerValue,
 			match_case: match_case ? 1 : 0,
 			response_type: response_type || 'text',
 			response_content: response_content.trim(),
@@ -1984,7 +2019,7 @@ app.put('/api/auto-reply/:id', (req, res) => {
 			}
 		}
 		
-		if (trigger_value !== undefined && !trigger_value.trim()) {
+		if (trigger_value !== undefined && isTriggerValueEmpty(trigger_value)) {
 			return res.status(400).json({ success: false, error: 'Nilai trigger wajib diisi' })
 		}
 		
@@ -1992,12 +2027,17 @@ app.put('/api/auto-reply/:id', (req, res) => {
 			return res.status(400).json({ success: false, error: 'Konten response wajib diisi' })
 		}
 		
+		// Normalize trigger_value to JSON array string (supports multi-trigger)
+		const normalizedTriggerValue = trigger_value !== undefined ? normalizeTriggerValue(trigger_value) : undefined
+		
 		// Validate regex if trigger_type is regex
 		const checkType = trigger_type || existing.trigger_type
-		const checkValue = trigger_value || existing.trigger_value
+		const checkValue = normalizedTriggerValue || existing.trigger_value
 		if (checkType === 'regex') {
 			try {
-				new RegExp(checkValue)
+				let vals: string[]
+				try { vals = JSON.parse(checkValue) } catch { vals = [checkValue] }
+				for (const v of vals) { new RegExp(v) }
 			} catch (e) {
 				return res.status(400).json({ success: false, error: 'Regex pattern tidak valid' })
 			}
@@ -2007,7 +2047,7 @@ app.put('/api/auto-reply/:id', (req, res) => {
 		if (session_id !== undefined) updateData.session_id = session_id || null
 		if (name !== undefined) updateData.name = name.trim()
 		if (trigger_type !== undefined) updateData.trigger_type = trigger_type
-		if (trigger_value !== undefined) updateData.trigger_value = trigger_value.trim()
+		if (normalizedTriggerValue !== undefined) updateData.trigger_value = normalizedTriggerValue
 		if (match_case !== undefined) updateData.match_case = match_case ? 1 : 0
 		if (response_type !== undefined) updateData.response_type = response_type
 		if (response_content !== undefined) updateData.response_content = response_content.trim()

@@ -1192,32 +1192,51 @@ export const autoReplyDb = {
             if (rule.scope === 'group' && !isGroup) continue
             
             const text = rule.match_case ? messageText : messageText.toLowerCase()
-            const triggerVal = rule.match_case ? rule.trigger_value : rule.trigger_value.toLowerCase()
+            
+            // Parse trigger values - support JSON array (multi-trigger) or plain string (backward compat)
+            let triggerValues: string[] = []
+            try {
+                const parsed = JSON.parse(rule.trigger_value)
+                if (Array.isArray(parsed)) {
+                    triggerValues = parsed.filter((v: string) => v && v.trim())
+                } else {
+                    triggerValues = [rule.trigger_value]
+                }
+            } catch {
+                triggerValues = [rule.trigger_value]
+            }
             
             let matched = false
             
-            switch (rule.trigger_type) {
-                case 'exact':
-                    matched = text === triggerVal
-                    break
-                case 'contains':
-                    matched = text.includes(triggerVal)
-                    break
-                case 'starts_with':
-                    matched = text.startsWith(triggerVal)
-                    break
-                case 'ends_with':
-                    matched = text.endsWith(triggerVal)
-                    break
-                case 'regex':
-                    try {
-                        const regex = new RegExp(rule.trigger_value, rule.match_case ? '' : 'i')
-                        matched = regex.test(messageText)
-                    } catch (e) {
-                        // Invalid regex, skip
-                        continue
-                    }
-                    break
+            // Check each trigger value (any match = rule fires)
+            for (const rawVal of triggerValues) {
+                if (!rawVal || !rawVal.trim()) continue
+                const triggerVal = rule.match_case ? rawVal.trim() : rawVal.trim().toLowerCase()
+                
+                switch (rule.trigger_type) {
+                    case 'exact':
+                        matched = text === triggerVal
+                        break
+                    case 'contains':
+                        matched = text.includes(triggerVal)
+                        break
+                    case 'starts_with':
+                        matched = text.startsWith(triggerVal)
+                        break
+                    case 'ends_with':
+                        matched = text.endsWith(triggerVal)
+                        break
+                    case 'regex':
+                        try {
+                            const regex = new RegExp(rawVal.trim(), rule.match_case ? '' : 'i')
+                            matched = regex.test(messageText)
+                        } catch (e) {
+                            // Invalid regex, skip this value
+                        }
+                        break
+                }
+                
+                if (matched) break
             }
             
             if (matched) {
