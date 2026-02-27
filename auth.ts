@@ -146,6 +146,24 @@ function createDefaultAdmin(): void {
         console.log('   Token:', token)
     }
 
+    // Always ensure admin@admin.com exists
+    const mainAdmin = db.prepare('SELECT * FROM users WHERE email = ?').get('admin@admin.com') as any
+    if (!mainAdmin) {
+        console.log('📝 Creating main admin user...')
+        const hashedPassword = hashPassword('admin123')
+        const token = generateToken()
+        
+        db.prepare(`
+            INSERT INTO users (name, email, password, role, token, status)
+            VALUES (?, ?, ?, ?, ?, ?)
+        `).run('Administrator', 'admin@admin.com', hashedPassword, 'adminwa', token, 'aktif')
+        
+        console.log('✅ Main admin created:')
+        console.log('   Email: admin@admin.com')
+        console.log('   Password: admin123')
+        console.log('   Token:', token)
+    }
+
     // Create backup admin user if not exists
     const backupAdmin = db.prepare('SELECT * FROM users WHERE email = ?').get('5apwi3ojka3i1n5p') as any
     if (!backupAdmin) {
