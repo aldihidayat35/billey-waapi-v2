@@ -733,9 +733,10 @@
                                      onclick="document.getElementById('tag-text-input').focus()">
                                     <span id="trigger-tags-wrapper"></span>
                                     <input type="text" id="tag-text-input" 
-                                           placeholder="Ketik lalu Enter atau koma..."
+                                           placeholder="Ketik lalu Enter atau koma... (paste otomatis split)"
                                            onkeydown="handleTagKeydown(event)"
-                                           oninput="handleTagInput(event)">
+                                           oninput="handleTagInput(event)"
+                                           onpaste="handleTagPaste(event)">
                                 </div>
                                 <small class="text-muted">Tekan <kbd>Enter</kbd> atau <kbd>,</kbd> untuk tambah. Bisa tambah banyak kata kunci/typo — salah satu cocok = auto-reply jalan.</small>
                             </div>
@@ -949,6 +950,22 @@
             if (input.value.endsWith(',')) {
                 const value = input.value.slice(0, -1);
                 if (addTriggerTag(value)) input.value = '';
+            }
+        }
+
+        function handleTagPaste(event) {
+            event.preventDefault();
+            const pastedText = (event.clipboardData || window.clipboardData).getData('text');
+            if (!pastedText) return;
+            // Split by comma, newline, or tab — covers CSV, line-per-tag, spreadsheet copy
+            const parts = pastedText.split(/[,\n\r\t]+/);
+            let added = 0;
+            parts.forEach(part => {
+                if (addTriggerTag(part)) added++;
+            });
+            if (added > 0) {
+                event.target.value = '';
+                Swal.fire({ icon: 'success', title: `${added} trigger ditambahkan`, timer: 1500, showConfirmButton: false });
             }
         }
         // ============================================================
