@@ -1,18 +1,52 @@
+// Check if user is logged in
+async function checkAuth() {
+    try {
+        const res = await fetch('/api/auth/me', { credentials: 'include' })
+        if (res.ok) {
+            const data = await res.json()
+            if (data.success && data.user) return true
+        }
+    } catch (e) {}
+    return false
+}
+
 // Load components
 async function loadComponents() {
     try {
-        const headerResponse = await fetch('components/header.html')
-        const headerHTML = await headerResponse.text()
-        document.getElementById('header-container').innerHTML = headerHTML
-        
-        const sidebarResponse = await fetch('components/sidebar.html')
-        const sidebarHTML = await sidebarResponse.text()
-        document.getElementById('sidebar-container').innerHTML = sidebarHTML
-        
-        const footerResponse = await fetch('components/footer.html')
-        const footerHTML = await footerResponse.text()
-        document.getElementById('footer-container').innerHTML = footerHTML
-        
+        const isLoggedIn = await checkAuth()
+
+        if (isLoggedIn) {
+            // Logged in: load full layout with sidebar & header
+            const headerResponse = await fetch('components/header.html')
+            const headerHTML = await headerResponse.text()
+            document.getElementById('header-container').innerHTML = headerHTML
+
+            const sidebarResponse = await fetch('components/sidebar.html')
+            const sidebarHTML = await sidebarResponse.text()
+            document.getElementById('sidebar-container').innerHTML = sidebarHTML
+
+            const footerResponse = await fetch('components/footer.html')
+            const footerHTML = await footerResponse.text()
+            document.getElementById('footer-container').innerHTML = footerHTML
+        } else {
+            // Not logged in: hide sidebar & header, expand content full-width
+            const body = document.getElementById('kt_app_body')
+            if (body) {
+                body.removeAttribute('data-kt-app-sidebar-enabled')
+                body.removeAttribute('data-kt-app-sidebar-fixed')
+                body.removeAttribute('data-kt-app-sidebar-hoverable')
+                body.removeAttribute('data-kt-app-sidebar-push-header')
+                body.removeAttribute('data-kt-app-sidebar-push-toolbar')
+                body.removeAttribute('data-kt-app-sidebar-push-footer')
+            }
+            const headerEl = document.getElementById('header-container')
+            if (headerEl) headerEl.remove()
+            const sidebarEl = document.getElementById('sidebar-container')
+            if (sidebarEl) sidebarEl.remove()
+            const footerEl = document.getElementById('footer-container')
+            if (footerEl) footerEl.remove()
+        }
+
         console.log('✅ Components loaded')
         
         initializeComponents()
