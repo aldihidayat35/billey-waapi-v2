@@ -371,7 +371,11 @@ function renderSessions() {
                             </div>
                         </div>
                         
-                        <div class="d-flex flex-stack">
+                        <div class="d-flex gap-2 flex-wrap mt-2">
+                            <button class="btn btn-sm btn-light-info fw-semibold"
+                                    onclick="showSessionDetail('${session.id}')">
+                                <i class="bi bi-info-circle me-1"></i>Detail
+                            </button>
                             ${isConnected ? `
                                 <button class="btn btn-sm btn-danger" onclick="logoutSession('${session.id}')">
                                     <i class="bi bi-power"></i> Logout
@@ -454,6 +458,161 @@ window.reconnectSession = function(sessionId, type, phoneNumber) {
 document.addEventListener('DOMContentLoaded', () => {
     loadComponents()
     initializeModals()
+
+    // Toggle API key show/hide inside Detail Modal
+    document.getElementById('btnToggleApiKey').addEventListener('click', function () {
+        const input = document.getElementById('det-api-key')
+        const icon  = document.getElementById('iconApiKey')
+        if (input.type === 'password') {
+            input.type = 'text'
+            icon.className = 'bi bi-eye-slash fs-6'
+        } else {
+            input.type = 'password'
+            icon.className = 'bi bi-eye fs-6'
+        }
+    })
 })
+
+// ─── Session Detail Modal ────────────────────────────────────
+let detailModal = null
+
+window.showSessionDetail = function (sessionId) {
+    const session = allSessions.find(s => s.id === sessionId)
+    if (!session) return
+
+    const isConnected  = session.isConnected
+    const userName     = session.user?.name || session.user?.id?.split(':')[0] || 'Unknown'
+    const phoneNumber  = session.user?.id?.split(':')[0] || '-'
+    const jid          = session.user?.id || '-'
+    const typeLabel    = session.type === 'qr' ? '📱 QR Code' : '🔢 Pairing Code'
+    const createdAt    = session.createdAt ? new Date(session.createdAt).toLocaleString('id-ID') : '-'
+    const lastOn       = session.lastConnected
+        ? new Date(session.lastConnected).toLocaleString('id-ID')
+        : (isConnected ? 'Saat ini' : '-')
+
+    // — Identity
+    document.getElementById('det-session-id').textContent  = session.id
+    document.getElementById('det-name').textContent         = userName
+    document.getElementById('det-phone').textContent        = phoneNumber
+    document.getElementById('det-jid').textContent          = jid
+
+    // — Connection info
+    document.getElementById('det-type').textContent           = typeLabel
+    document.getElementById('det-created').textContent        = createdAt
+    document.getElementById('det-last-connected').textContent = lastOn
+    document.getElementById('det-paired-phone').textContent   = session.phoneNumber || '-'
+
+    // — Status banner
+    const dot  = document.getElementById('detailStatusDot')
+    const desc = document.getElementById('detailStatusDesc')
+    if (isConnected) {
+        dot.className   = 'badge badge-light-success fs-7 px-4 py-2'
+        dot.innerHTML   = '<span class="status-dot-connected me-2"></span>Terhubung'
+        desc.textContent = `Session aktif dan siap menerima / mengirim pesan`
+    } else {
+        dot.className   = 'badge badge-light-danger fs-7 px-4 py-2'
+        dot.innerHTML   = '<span class="status-dot-disconnected me-2"></span>Terputus'
+        desc.textContent = 'Session tidak aktif. Lakukan Reconnect untuk menggunakannya kembali.'
+    }
+
+    // — Header
+    document.getElementById('detailModalTitle').textContent    = `Detail — ${session.id}`
+    document.getElementById('detailModalSubtitle').textContent = isConnected
+        ? `✅ Aktif · ${userName}`
+        : `❌ Offline · ${session.id}`
+    document.getElementById('detailModalHeader').style.background = isConnected
+        ? 'linear-gradient(135deg,#50cd89 0%,#1bc5bd 100%)'
+        : 'linear-gradient(135deg,#f1416c 0%,#d9214e 100%)'
+
+    // — API Key & Endpoints
+    const baseUrl = window.location.origin
+    document.getElementById('det-base-url').value  = baseUrl
+    document.getElementById('det-endpoint').value   = `${baseUrl}/api/wa/send`
+
+    // Reset key field while loading
+    const keyInput = document.getElementById('det-api-key')
+    keyInput.value = 'Memuat...'
+    keyInput.type  = 'password'
+    document.getElementById('iconApiKey').className = 'bi bi-eye fs-6'
+
+    fetch('/api/auth/me')
+        .then(r => r.json())
+        .then(data => {
+            const token = data.user?.token || '(token tidak tersedia)'
+            keyInput.value = token
+            document.getElementById('det-curl-example').textContent = buildCurlExample(baseUrl, token, session.id)
+        })
+        .catch(() => {
+            keyInput.value = '(gagal mengambil token)'
+            document.getElementById('det-curl-example').textContent = buildCurlExample(baseUrl, '<YOUR_API_KEY>', session.id)
+        })
+
+    // — Raw JSON
+    document.getElementById('det-raw-json').textContent = JSON.stringify(session, null, 2)
+
+    // — Footer action buttons
+    const btnLogout    = document.getElementById('detailBtnLogout')
+    const btnReconnect = document.getElementById('detailBtnReconnect')
+    const btnDelete    = document.getElementById('detailBtnDelete')
+
+    btnLogout.classList.toggle('d-none', !isConnected)
+    btnReconnect.classList.toggle('d-none', isConnected)
+
+    btnLogout.onclick    = () => { detailModal.hide(); logoutSession(session.id) }
+    btnReconnect.onclick = () => { detailModal.hide(); reconnectSession(session.id, session.type, session.phoneNumber || '') }
+    btnDelete.onclick    = () => { detailModal.hide(); deleteSession(session.id) }
+
+    // — Show modal
+    if (!detailModal) {
+        detailModal = new bootstrap.Modal(document.getElementById('sessionDetailModal'))
+    }
+    detailModal.show()
+}
+
+function buildCurlExample(baseUrl, token, sessionId) {
+    return `curl -X POST ${baseUrl}/api/wa/send \\
+  -H "Content-Type: application/json" \\
+  -H "X-Api-Key: ${token}" \\
+  -d '{
+    "to": "628123456789",
+    "message": "Halo dari Billey WA API!",
+    "session_id": "${sessionId}"
+  }'`
+}
+
+window.copyDetailField = function (id, label) {
+    const el   = document.getElementById(id)
+    const text = (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')
+        ? el.value
+        : el.textContent
+
+    const doToast = () => Swal.fire({
+        icon: 'success',
+        title: `${label} disalin!`,
+        timer: 1400,
+        showConfirmButton: false,
+        toast: true,
+        position: 'top-end',
+    })
+
+    if (navigator.clipboard) {
+        navigator.clipboard.writeText(text).then(doToast).catch(() => fallbackCopy(text, doToast))
+    } else {
+        fallbackCopy(text, doToast)
+    }
+}
+
+function fallbackCopy(text, cb) {
+    const ta = document.createElement('textarea')
+    ta.value = text
+    ta.style.position = 'fixed'
+    ta.style.opacity  = '0'
+    document.body.appendChild(ta)
+    ta.focus()
+    ta.select()
+    document.execCommand('copy')
+    document.body.removeChild(ta)
+    cb()
+}
 
 console.log('✅ Manage Sessions page initialized')

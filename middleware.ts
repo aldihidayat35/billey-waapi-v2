@@ -151,6 +151,65 @@ export function sessionOwnerMiddleware(sessionIdParam: string = 'sessionId') {
 }
 
 /**
+ * API Key middleware — validates X-Api-Key header or ?api_key query param.
+ * Key is checked against the WA_API_KEY environment variable.
+ * If WA_API_KEY is not set, this middleware falls back to the user token check
+ * (x-api-token header) so existing integrations keep working.
+ */
+export function apiKeyMiddleware(req: Request, res: Response, next: NextFunction): void {
+    // Accept key from header (preferred) or query string
+    const provided = req.headers['x-api-key'] as string ||
+                     req.query.api_key as string
+
+    const envKey = process.env.WA_API_KEY
+
+    if (envKey) {
+        // Strict static-key check
+        if (!provided) {
+            res.status(401).json({
+                success: false,
+                error: 'API Key diperlukan. Sertakan header X-Api-Key.',
+            })
+            return
+        }
+        if (provided !== envKey) {
+            res.status(401).json({
+                success: false,
+                error: 'API Key tidak valid.',
+            })
+            return
+        }
+        return next()
+    }
+
+    // Fallback: validate against per-user tokens (x-api-token) when WA_API_KEY not set
+    const userToken = req.headers['x-api-token'] as string || req.query.token as string
+    if (!userToken) {
+        res.status(401).json({
+            success: false,
+            error: 'Autentikasi diperlukan. Gunakan header X-Api-Key atau X-Api-Token.',
+        })
+        return
+    }
+
+    import('./auth.js').then(({ userDb }) => {
+        const user = userDb.getByToken(userToken)
+        if (!user) {
+            res.status(401).json({ success: false, error: 'Token tidak valid.' })
+            return
+        }
+        if (user.status !== 'aktif') {
+            res.status(403).json({ success: false, error: 'Akun tidak aktif.' })
+            return
+        }
+        req.user = user
+        next()
+    }).catch(() => {
+        res.status(500).json({ success: false, error: 'Kesalahan validasi autentikasi.' })
+    })
+}
+
+/**
  * Optional auth middleware - doesn't fail if not authenticated
  * Just attaches user to request if valid session exists
  */

@@ -301,6 +301,245 @@
     
     <!-- Main App Script -->
     <script src="manage-sessions.js"></script>
-    
+
+    <!-- ============================================================ -->
+    <!-- Session Detail Modal — Metronic 8                            -->
+    <!-- ============================================================ -->
+    <div class="modal fade" id="sessionDetailModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+            <div class="modal-content shadow-lg">
+
+                <!-- Header -->
+                <div class="modal-header border-0 py-5 px-7" id="detailModalHeader"
+                     style="background: linear-gradient(135deg,#009ef7 0%,#0078d4 100%);">
+                    <div class="d-flex align-items-center gap-4">
+                        <div class="symbol symbol-50px">
+                            <div class="symbol-label rounded"
+                                 style="background:rgba(255,255,255,0.15)">
+                                <i class="bi bi-whatsapp fs-2" style="color:#fff"></i>
+                            </div>
+                        </div>
+                        <div>
+                            <h3 class="modal-title text-white fw-bold mb-0 fs-4"
+                                id="detailModalTitle">Detail Session</h3>
+                            <small class="text-white opacity-75 fs-7"
+                                   id="detailModalSubtitle">Informasi lengkap session</small>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white"
+                            data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+
+                <!-- Status Banner -->
+                <div class="px-7 py-3 d-flex align-items-center gap-3 border-bottom bg-gray-50">
+                    <span id="detailStatusDot" class="badge fs-7 px-4 py-2"></span>
+                    <span id="detailStatusDesc" class="text-muted fs-7"></span>
+                </div>
+
+                <!-- Body -->
+                <div class="modal-body px-7 py-6">
+
+                    <!-- Row 1: Identitas & Koneksi -->
+                    <div class="row g-5 mb-5">
+
+                        <!-- Identitas Session -->
+                        <div class="col-md-6">
+                            <div class="card card-flush border border-dashed border-primary h-100">
+                                <div class="card-header min-h-50px px-5 pt-4 pb-2">
+                                    <h5 class="card-title fw-bold text-primary fs-8 mb-0 text-uppercase tracking-wider">
+                                        <i class="bi bi-person-vcard me-2"></i>Identitas Session
+                                    </h5>
+                                </div>
+                                <div class="card-body py-3 px-5">
+                                    <table class="table table-borderless table-sm mb-0">
+                                        <tbody>
+                                            <tr>
+                                                <td class="text-muted fw-semibold py-1 pe-3"
+                                                    style="width:100px;white-space:nowrap">Session ID</td>
+                                                <td class="py-1">
+                                                    <span class="badge badge-light-primary fw-bold font-monospace fs-8"
+                                                          id="det-session-id">-</span>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-muted fw-semibold py-1">Nama</td>
+                                                <td class="fw-semibold py-1" id="det-name">-</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-muted fw-semibold py-1">Nomor WA</td>
+                                                <td class="fw-bold text-dark py-1" id="det-phone">-</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-muted fw-semibold py-1">JID</td>
+                                                <td class="text-muted font-monospace fs-8 py-1"
+                                                    id="det-jid">-</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Info Koneksi -->
+                        <div class="col-md-6">
+                            <div class="card card-flush border border-dashed border-success h-100">
+                                <div class="card-header min-h-50px px-5 pt-4 pb-2">
+                                    <h5 class="card-title fw-bold text-success fs-8 mb-0 text-uppercase">
+                                        <i class="bi bi-wifi me-2"></i>Info Koneksi
+                                    </h5>
+                                </div>
+                                <div class="card-body py-3 px-5">
+                                    <table class="table table-borderless table-sm mb-0">
+                                        <tbody>
+                                            <tr>
+                                                <td class="text-muted fw-semibold py-1 pe-3"
+                                                    style="width:100px;white-space:nowrap">Metode</td>
+                                                <td class="fw-semibold py-1" id="det-type">-</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-muted fw-semibold py-1">Dibuat</td>
+                                                <td class="fw-semibold py-1" id="det-created">-</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-muted fw-semibold py-1">Terakhir On</td>
+                                                <td class="fw-semibold py-1" id="det-last-connected">-</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-muted fw-semibold py-1">Nomor Paired</td>
+                                                <td class="text-muted fs-8 py-1" id="det-paired-phone">-</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Row 2: API Key & Endpoint -->
+                    <div class="card card-flush border border-dashed border-warning mb-5">
+                        <div class="card-header min-h-50px px-5 pt-4 pb-2">
+                            <h5 class="card-title fw-bold text-warning fs-8 mb-0 text-uppercase">
+                                <i class="bi bi-key me-2"></i>API Key &amp; Endpoint
+                            </h5>
+                        </div>
+                        <div class="card-body py-4 px-5">
+
+                            <!-- API Key row -->
+                            <div class="mb-4">
+                                <label class="form-label fw-semibold text-muted fs-8 mb-1">
+                                    API KEY
+                                    <span class="text-muted fw-normal ms-1">(gunakan sebagai header <code>X-Api-Key</code>)</span>
+                                </label>
+                                <div class="input-group input-group-sm">
+                                    <input type="password" id="det-api-key"
+                                           class="form-control form-control-sm font-monospace bg-light-warning border-0 fw-semibold"
+                                           readonly autocomplete="off">
+                                    <button class="btn btn-sm btn-light" type="button"
+                                            id="btnToggleApiKey" title="Tampilkan / Sembunyikan">
+                                        <i class="bi bi-eye fs-6" id="iconApiKey"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-light-warning fw-semibold" type="button"
+                                            onclick="copyDetailField('det-api-key','API Key')">
+                                        <i class="bi bi-clipboard me-1 fs-7"></i>Salin
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- URL & Endpoint row -->
+                            <div class="row g-3 mb-4">
+                                <div class="col-md-5">
+                                    <label class="form-label fw-semibold text-muted fs-8 mb-1">Base URL</label>
+                                    <div class="input-group input-group-sm">
+                                        <input type="text" id="det-base-url"
+                                               class="form-control form-control-sm font-monospace bg-light border-0"
+                                               readonly>
+                                        <button class="btn btn-sm btn-light-primary" type="button"
+                                                onclick="copyDetailField('det-base-url','Base URL')">
+                                            <i class="bi bi-clipboard fs-7"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="col-md-7">
+                                    <label class="form-label fw-semibold text-muted fs-8 mb-1">Send Message Endpoint</label>
+                                    <div class="input-group input-group-sm">
+                                        <input type="text" id="det-endpoint"
+                                               class="form-control form-control-sm font-monospace bg-light border-0"
+                                               readonly>
+                                        <button class="btn btn-sm btn-light-primary" type="button"
+                                                onclick="copyDetailField('det-endpoint','Endpoint')">
+                                            <i class="bi bi-clipboard fs-7"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- cURL example -->
+                            <div>
+                                <label class="form-label fw-semibold text-muted fs-8 mb-1">Contoh cURL</label>
+                                <div class="position-relative">
+                                    <pre id="det-curl-example"
+                                         class="bg-dark text-warning rounded p-4 fs-8 mb-0"
+                                         style="overflow-x:auto;white-space:pre;max-height:120px"></pre>
+                                    <button class="btn btn-xs btn-light position-absolute top-0 end-0 m-2 py-1 px-3"
+                                            style="font-size:0.75rem"
+                                            onclick="copyDetailField('det-curl-example','cURL')">
+                                        <i class="bi bi-clipboard fs-8 me-1"></i>Salin
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Row 3: Raw JSON -->
+                    <div class="card card-flush border border-dashed border-secondary">
+                        <div class="card-header min-h-50px px-5 pt-4 pb-2">
+                            <h5 class="card-title fw-bold text-secondary fs-8 mb-0 text-uppercase">
+                                <i class="bi bi-braces me-2"></i>Raw Session Data
+                            </h5>
+                            <div class="card-toolbar">
+                                <button class="btn btn-xs btn-light py-1 px-3"
+                                        style="font-size:0.75rem"
+                                        onclick="copyDetailField('det-raw-json','JSON')">
+                                    <i class="bi bi-clipboard fs-8 me-1"></i>Salin JSON
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body py-3 px-5">
+                            <pre id="det-raw-json"
+                                 class="bg-light rounded p-4 fs-8 mb-0 text-gray-700"
+                                 style="max-height:180px;overflow-y:auto;white-space:pre-wrap"></pre>
+                        </div>
+                    </div>
+
+                </div>
+                <!-- /Body -->
+
+                <!-- Footer -->
+                <div class="modal-footer border-top px-7 py-4 d-flex justify-content-between">
+                    <div class="d-flex gap-2 flex-wrap">
+                        <button type="button" id="detailBtnLogout"
+                                class="btn btn-sm btn-danger d-none">
+                            <i class="bi bi-power me-1"></i>Logout Session
+                        </button>
+                        <button type="button" id="detailBtnReconnect"
+                                class="btn btn-sm btn-primary d-none">
+                            <i class="bi bi-arrow-repeat me-1"></i>Reconnect
+                        </button>
+                        <button type="button" id="detailBtnDelete"
+                                class="btn btn-sm btn-light-danger">
+                            <i class="bi bi-trash me-1"></i>Hapus Session
+                        </button>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-light"
+                            data-bs-dismiss="modal">
+                        <i class="bi bi-x-lg me-1"></i>Tutup
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+    <!-- /Session Detail Modal -->
+
 </body>
 </html>

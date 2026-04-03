@@ -211,6 +211,20 @@ db.exec(`
     CREATE INDEX IF NOT EXISTS idx_auto_forward_tokens_sender ON auto_forward_tokens(session_id, sender_number);
     CREATE INDEX IF NOT EXISTS idx_auto_forward_logs_session ON auto_forward_logs(session_id);
     CREATE INDEX IF NOT EXISTS idx_auto_forward_logs_created ON auto_forward_logs(created_at);
+
+    -- Member ↔ WhatsApp Session assignment (many-to-many)
+    CREATE TABLE IF NOT EXISTS member_sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        session_id TEXT NOT NULL,
+        assigned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        assigned_by INTEGER,
+        UNIQUE(user_id, session_id),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_member_sessions_user ON member_sessions(user_id);
+    CREATE INDEX IF NOT EXISTS idx_member_sessions_session ON member_sessions(session_id);
 `)
 
 // Migration: Add media columns to chat_templates if they don't exist
@@ -1901,6 +1915,109 @@ export const autoForwardLogDb = {
             return db.prepare('DELETE FROM auto_forward_logs WHERE created_at < ?').run(cutoff.toISOString()).changes
         } catch { return 0 }
     }
+}
+
+// ============================================
+// Member ↔ Session Assignment CRUD
+// ============================================
+export interface MemberSession {
+    id: number
+    user_id: number
+    session_id: string
+    assigned_at: string
+    assigned_by: number | null
+}
+
+export const memberSessionDb = {
+    /** Assign a WA session to a member (idempotent) */
+    assign: (userId: number, sessionId: string, assignedBy?: number): { success: boolean; error?: string } => {
+        try {
+            db.prepare(
+                `INSERT OR IGNORE INTO member_sessions (user_id, session_id, assigned_by) VALUES (?, ?, ?)`
+            ).run(userId, sessionId, assignedBy ?? null)
+            return { success: true }
+        } catch (e: any) { return { success: false, error: e.message } }
+    },
+
+    /** Unassign a WA session from a member */
+    unassign: (userId: number, sessionId: string): { success: boolean } => {
+        try {
+            db.prepare('DELETE FROM member_sessions WHERE user_id = ? AND session_id = ?').run(userId, sessionId)
+            return { success: true }
+        } catch { return { success: false } }
+    },
+
+    /** Get all session IDs assigned to a user */
+    getSessionsForUser: (userId: number): string[] => {
+        try {
+            const rows = db.prepare('SELECT session_id FROM member_sessions WHERE user_id = ?').all(userId) as any[]
+            return rows.map(r => r.session_id)
+        } catch { return [] }
+    },
+
+    /** Get all user IDs assigned to a session */
+    getUsersForSession: (sessionId: string): number[] => {
+        try {
+            const rows = db.prepare('SELECT user_id FROM member_sessions WHERE session_id = ?').all(sessionId) as any[]
+            return rows.map(r => r.user_id)
+        } catch { return [] }
+    },
+
+    /** Get full assignment list for a user (with metadata) */
+    getFullForUser: (userId: number): MemberSession[] => {
+        try {
+            return db.prepare('SELECT * FROM member_sessions WHERE user_id = ? ORDER BY assigned_at DESC').all(userId) as MemberSession[]
+        } catch { return [] }
+    },
+
+    /** Replace all session assignments for a user */
+    replaceForUser: (userId: number, sessionIds: string[], assignedBy?: number): { success: boolean } => {
+        try {
+            const del = db.prepare('DELETE FROM member_sessions WHERE user_id = ?')
+            const ins = db.prepare('INSERT INTO member_sessions (user_id, session_id, assigned_by) VALUES (?, ?, ?)')
+            const tx = db.transaction(() => {
+                del.run(userId)
+                for (const sid of sessionIds) {
+                    ins.run(userId, sid, assignedBy ?? null)
+                }
+            })
+            tx()
+            return { success: true }
+        } catch { return { success: false } }
+    },
+
+    /** Delete all assignments for a session (when session is deleted) */
+    clearSession: (sessionId: string): void => {
+        try { db.prepare('DELETE FROM member_sessions WHERE session_id = ?').run(sessionId) } catch {}
+    }
+}
+
+// ============================================
+// Scheduled Media Cleanup (auto-delete media > N days)
+// ============================================
+let _mediaCleanupTimer: ReturnType<typeof setInterval> | null = null
+
+export function startMediaAutoCleanup(days: number = 3, intervalHours: number = 6): void {
+    // Run once immediately
+    const cleaned = dbMaintenance.clearOldMedia(days)
+    if (cleaned > 0) {
+        console.log(`🧹 Auto media cleanup: cleared ${cleaned} media entries older than ${days} days`)
+    }
+
+    // Schedule recurring
+    if (_mediaCleanupTimer) clearInterval(_mediaCleanupTimer)
+    _mediaCleanupTimer = setInterval(() => {
+        try {
+            const n = dbMaintenance.clearOldMedia(days)
+            if (n > 0) console.log(`🧹 Scheduled media cleanup: cleared ${n} media entries older than ${days} days`)
+        } catch (e) { console.error('⚠️ Media cleanup error:', e) }
+    }, intervalHours * 60 * 60 * 1000)
+
+    console.log(`⏰ Media auto-cleanup scheduled: every ${intervalHours}h, delete media older than ${days} days`)
+}
+
+export function stopMediaAutoCleanup(): void {
+    if (_mediaCleanupTimer) { clearInterval(_mediaCleanupTimer); _mediaCleanupTimer = null }
 }
 
 // Export database instance for direct queries if needed

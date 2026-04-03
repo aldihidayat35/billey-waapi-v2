@@ -3,7 +3,7 @@ import { createServer } from 'http'
 import { Server as SocketIO } from 'socket.io'
 import { SessionManager } from './session-manager'
 import { logger as activityLogger } from './logger'
-import { messageLogDb, sessionLogDb, chatTemplateDb, groupExportDb, autoReplyDb, autoReplyLogDb, autoReplyCooldownDb, autoForwardConfigDb, autoForwardTokenDb, autoForwardLogDb, db, dbMaintenance } from './database.js'
+import { messageLogDb, sessionLogDb, chatTemplateDb, groupExportDb, autoReplyDb, autoReplyLogDb, autoReplyCooldownDb, autoForwardConfigDb, autoForwardTokenDb, autoForwardLogDb, db, dbMaintenance, memberSessionDb, startMediaAutoCleanup } from './database.js'
 import * as fs from 'fs'
 import * as path from 'path'
 import { fileURLToPath } from 'url'
@@ -11,14 +11,15 @@ import * as XLSX from 'xlsx'
 import cookieParser from 'cookie-parser'
 import { 
 	login, logout, validateSession, userDb, sessionDb, 
-	linkWaSessionToUser, getWaSessionsForUser, userOwnsSession,
+	linkWaSessionToUser, unlinkWaSessionFromUser, getWaSessionsForUser, userOwnsSession,
 	User, UserRole, generateToken, hashPassword
 } from './auth.js'
 import { 
 	authMiddleware, adminMiddleware, optionalAuthMiddleware, 
-	sessionOwnerMiddleware, tokenMiddleware, SESSION_COOKIE_NAME,
+	sessionOwnerMiddleware, tokenMiddleware, apiKeyMiddleware, SESSION_COOKIE_NAME,
 	getUserSessionIds, getSessionFilter, getUserFilter
 } from './middleware.js'
+import multer from 'multer'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -159,11 +160,15 @@ app.post('/api/auth/login', (req, res) => {
 			return res.status(401).json(result)
 		}
 
+		// Persistent login: 30 days for member, 24h for admin
+		const isMember = result.user?.role === 'memberwa'
+		const maxAge = isMember ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000
+
 		// Set session cookie
 		res.cookie(SESSION_COOKIE_NAME, result.sessionToken, {
 			httpOnly: true,
 			secure: process.env.NODE_ENV === 'production',
-			maxAge: 24 * 60 * 60 * 1000, // 24 hours
+			maxAge,
 			sameSite: 'lax'
 		})
 
@@ -302,7 +307,7 @@ app.get('/api/users/:id', authMiddleware, adminMiddleware, (req, res) => {
 // Create user
 app.post('/api/users', authMiddleware, adminMiddleware, (req, res) => {
 	try {
-		const { name, email, password, role, status } = req.body
+		const { name, email, password, role, status, phone_visible } = req.body
 
 		if (!name || !email || !password) {
 			return res.status(400).json({ 
@@ -318,7 +323,7 @@ app.post('/api/users', authMiddleware, adminMiddleware, (req, res) => {
 			})
 		}
 
-		const result = userDb.create({ name, email, password, role, status })
+		const result = userDb.create({ name, email, password, role, status, phone_visible: phone_visible !== undefined ? Number(phone_visible) : 1 })
 		
 		if (result.success) {
 			const newUser = userDb.getById(result.id!)
@@ -339,9 +344,9 @@ app.post('/api/users', authMiddleware, adminMiddleware, (req, res) => {
 app.put('/api/users/:id', authMiddleware, adminMiddleware, (req, res) => {
 	try {
 		const id = parseInt(req.params.id)
-		const { name, email, role, status } = req.body
+		const { name, email, role, status, phone_visible } = req.body
 
-		const result = userDb.update(id, { name, email, role, status })
+		const result = userDb.update(id, { name, email, role, status, phone_visible: phone_visible !== undefined ? Number(phone_visible) : undefined })
 		
 		if (result.success) {
 			const updatedUser = userDb.getById(id)
@@ -458,6 +463,180 @@ app.get('/api/users/:id/sessions', authMiddleware, adminMiddleware, (req, res) =
 	}
 })
 
+// Unlink WhatsApp session from user
+app.post('/api/users/:id/unlink-session', authMiddleware, adminMiddleware, (req, res) => {
+	try {
+		const userId = parseInt(req.params.id)
+		const { sessionId } = req.body
+		if (!sessionId) {
+			return res.status(400).json({ success: false, error: 'Session ID wajib diisi' })
+		}
+		unlinkWaSessionFromUser(sessionId, userId)
+		res.json({ success: true, message: `Session ${sessionId} berhasil dilepas dari user` })
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Bulk set sessions for a member — replaces all existing assignments
+app.put('/api/users/:id/sessions', authMiddleware, adminMiddleware, (req, res) => {
+	try {
+		const userId = parseInt(req.params.id)
+		const { sessionIds } = req.body // string[]
+		if (!Array.isArray(sessionIds)) {
+			return res.status(400).json({ success: false, error: 'sessionIds harus berupa array' })
+		}
+		const result = memberSessionDb.replaceForUser(userId, sessionIds, req.user!.id)
+		res.json({ success: result.success, message: 'Session assignment berhasil diperbarui' })
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// ============================================
+// Member Portal API Endpoints
+// ============================================
+
+// Get member's assigned sessions with live status
+app.get('/api/member/sessions', authMiddleware, (req, res) => {
+	try {
+		const user = req.user!
+		const assignedIds = getWaSessionsForUser(user.id, user.role)
+		const allLive = sessionManager.getAllSessions()
+		const sessions = assignedIds.map(id => {
+			const live = allLive.find(s => s.id === id)
+			return {
+				id,
+				isConnected: live?.isConnected ?? false,
+				phone: live?.user?.id?.split(':')[0] || null,
+				name: live?.user?.name || id,
+				phoneVisible: user.phone_visible !== 0,
+			}
+		})
+		res.json({ success: true, sessions })
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Get conversations for member (scoped to their sessions)
+app.get('/api/member/conversations', authMiddleware, (req, res) => {
+	try {
+		const user = req.user!
+		const assignedIds = getWaSessionsForUser(user.id, user.role)
+		if (assignedIds.length === 0) {
+			return res.json({ success: true, conversations: [] })
+		}
+		const placeholders = assignedIds.map(() => '?').join(',')
+		const rows = db.prepare(`
+			SELECT session_id, 
+				CASE WHEN direction = 'incoming' THEN from_number ELSE to_number END as contact,
+				MAX(timestamp) as last_time,
+				COUNT(*) as total_messages,
+				SUM(CASE WHEN direction = 'incoming' AND status = 'received' THEN 1 ELSE 0 END) as unread
+			FROM message_logs
+			WHERE session_id IN (${placeholders})
+			  AND CASE WHEN direction = 'incoming' THEN from_number ELSE to_number END NOT LIKE '%@broadcast'
+			  AND CASE WHEN direction = 'incoming' THEN from_number ELSE to_number END NOT LIKE '%@newsletter'
+			GROUP BY session_id, contact
+			ORDER BY last_time DESC
+			LIMIT 200
+		`).all(...assignedIds) as any[]
+
+		// Get latest message per conversation
+		const conversations = rows.map(r => {
+			const lastMsg = db.prepare(`
+				SELECT content, message_type, direction, timestamp FROM message_logs
+				WHERE session_id = ? AND (from_number = ? OR to_number = ?)
+				ORDER BY timestamp DESC LIMIT 1
+			`).get(r.session_id, r.contact, r.contact) as any
+			return {
+				sessionId: r.session_id,
+				contact: r.contact,
+				lastMessage: lastMsg?.content || '',
+				lastMessageType: lastMsg?.message_type || 'text',
+				lastDirection: lastMsg?.direction || 'incoming',
+				lastTime: r.last_time,
+				totalMessages: r.total_messages,
+				unread: r.unread,
+			}
+		})
+		res.json({ success: true, conversations })
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Get chat messages for a specific contact (member-scoped)
+app.get('/api/member/messages/:sessionId/:contact', authMiddleware, (req, res) => {
+	try {
+		const user = req.user!
+		const { sessionId, contact } = req.params
+		const limit = parseInt(req.query.limit as string) || 100
+
+		// Check session access
+		if (!userOwnsSession(user.id, sessionId, user.role)) {
+			return res.status(403).json({ success: false, error: 'Anda tidak memiliki akses ke session ini' })
+		}
+
+		const messages = db.prepare(`
+			SELECT * FROM message_logs
+			WHERE session_id = ? AND (from_number = ? OR to_number = ?)
+			ORDER BY timestamp ASC
+			LIMIT ?
+		`).all(sessionId, contact, contact, limit) as any[]
+
+		res.json({ success: true, messages })
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Get unread count for member (all assigned sessions)
+app.get('/api/member/unread', authMiddleware, (req, res) => {
+	try {
+		const user = req.user!
+		const assignedIds = getWaSessionsForUser(user.id, user.role)
+		if (assignedIds.length === 0) {
+			return res.json({ success: true, total: 0, perSession: {} })
+		}
+		const placeholders = assignedIds.map(() => '?').join(',')
+		const rows = db.prepare(`
+			SELECT session_id, COUNT(*) as cnt FROM message_logs
+			WHERE session_id IN (${placeholders}) AND direction = 'incoming' AND status = 'received'
+			GROUP BY session_id
+		`).all(...assignedIds) as any[]
+
+		const perSession: Record<string, number> = {}
+		let total = 0
+		for (const r of rows) {
+			perSession[r.session_id] = r.cnt
+			total += r.cnt
+		}
+		res.json({ success: true, total, perSession })
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Mark messages as read when a conversation is opened
+app.post('/api/member/messages/:sessionId/:contact/read', authMiddleware, (req, res) => {
+	try {
+		const user = req.user!
+		const { sessionId, contact } = req.params
+		if (!userOwnsSession(user.id, sessionId, user.role)) {
+			return res.status(403).json({ success: false, error: 'Akses ditolak' })
+		}
+		const result = db.prepare(`
+			UPDATE message_logs SET status = 'read'
+			WHERE session_id = ? AND from_number = ? AND direction = 'incoming' AND status = 'received'
+		`).run(sessionId, contact)
+		res.json({ success: true, updated: result.changes })
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
 // ============================================
 // User Frontend Routes
 // ============================================
@@ -501,6 +680,15 @@ app.get('/user/export/:id', (req, res) => {
 app.use('/user/assets', express.static('public/user/assets'))
 
 // ============================================
+// Member Portal Routes
+// ============================================
+app.get('/member/dashboard.html', authMiddleware, (req, res) => {
+	res.sendFile(__dirname + '/public/member/dashboard.html')
+})
+app.get('/member/dashboard', (req, res) => res.redirect('/member/dashboard.html'))
+app.use('/member/assets', express.static('public/member/assets'))
+
+// ============================================
 // NEW Frontend Routes (public/frontend)
 // ============================================
 
@@ -528,6 +716,222 @@ app.use('/frontend/assets', express.static('public/frontend/assets'))
 // Dashboard route - Admin Dashboard
 app.get('/dashboard', (req, res) => {
 	res.sendFile(__dirname + '/public/index.html')
+})
+
+// ============================================
+// External WA API — Protected by API Key
+// ============================================
+//
+// Gunakan header: X-Api-Key: <nilai WA_API_KEY di .env>
+// Atau query:     ?api_key=<nilai>
+//
+// Jika WA_API_KEY belum di-set, gunakan X-Api-Token (user token)
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } })
+
+/**
+ * Helper: pilih session yang aktif.
+ * Jika sessionId diberikan, pakai itu.
+ * Jika tidak, pilih sesi pertama yang terkoneksi.
+ */
+function resolveSession(sessionId?: string): string | null {
+	if (sessionId) return sessionId
+	const all = sessionManager.getAllSessions()
+	const connected = all.find(s => s.isConnected)
+	return connected?.id ?? null
+}
+
+// POST /api/wa/send — kirim pesan teks
+// Body (JSON): { to, message, session_id? }
+app.post('/api/wa/send', apiKeyMiddleware, async (req, res) => {
+	try {
+		const { to, message, session_id } = req.body
+		if (!to || !message) {
+			return res.status(400).json({ success: false, error: 'Field "to" dan "message" wajib diisi.' })
+		}
+		const sid = resolveSession(session_id)
+		if (!sid) {
+			return res.status(503).json({ success: false, error: 'Tidak ada sesi WhatsApp yang terhubung.' })
+		}
+		const result = await sessionManager.sendMessage(sid, to, message)
+		res.json({ success: true, message: 'Pesan berhasil dikirim.', data: { to, session_id: sid, msg_id: result?.key?.id } })
+	} catch (error: any) {
+		console.error('[/api/wa/send]', error.message)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// POST /api/wa/send-image — kirim gambar
+// Multipart form-data: to, caption?(opsional), session_id?(opsional), file
+app.post('/api/wa/send-image', apiKeyMiddleware, upload.single('file'), async (req: any, res) => {
+	try {
+		const { to, caption, session_id } = req.body
+		const file = req.file
+		if (!to || !file) {
+			return res.status(400).json({ success: false, error: 'Field "to" dan "file" (gambar) wajib diisi.' })
+		}
+		const sid = resolveSession(session_id)
+		if (!sid) {
+			return res.status(503).json({ success: false, error: 'Tidak ada sesi WhatsApp yang terhubung.' })
+		}
+		const result = await sessionManager.sendImage(sid, to, file.buffer, caption || undefined, file.mimetype, file.originalname)
+		res.json({ success: true, message: 'Gambar berhasil dikirim.', data: { to, session_id: sid, filename: file.originalname, msg_id: result?.key?.id } })
+	} catch (error: any) {
+		console.error('[/api/wa/send-image]', error.message)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// POST /api/wa/send-document — kirim dokumen (PDF, DOC, dll)
+// Multipart form-data: to, filename?(opsional), session_id?(opsional), file
+app.post('/api/wa/send-document', apiKeyMiddleware, upload.single('file'), async (req: any, res) => {
+	try {
+		const { to, filename, session_id } = req.body
+		const file = req.file
+		if (!to || !file) {
+			return res.status(400).json({ success: false, error: 'Field "to" dan "file" wajib diisi.' })
+		}
+		const sid = resolveSession(session_id)
+		if (!sid) {
+			return res.status(503).json({ success: false, error: 'Tidak ada sesi WhatsApp yang terhubung.' })
+		}
+		const displayName = filename || file.originalname || 'dokumen'
+		const result = await sessionManager.sendDocument(sid, to, file.buffer, file.mimetype, displayName)
+		res.json({ success: true, message: 'Dokumen berhasil dikirim.', data: { to, session_id: sid, filename: displayName, msg_id: result?.key?.id } })
+	} catch (error: any) {
+		console.error('[/api/wa/send-document]', error.message)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// POST /api/wa/forward — teruskan pesan teks + opsional file ke nomor tujuan
+// Supports 3 file modes:
+//   1. Multipart form-data with 'file' field (multer upload)
+//   2. JSON body with 'file_base64', 'mimetype', 'filename'
+//   3. JSON body with 'file_url' (server downloads the file first)
+app.post('/api/wa/forward', apiKeyMiddleware, upload.single('file'), async (req: any, res) => {
+	try {
+		const { to, message, caption, session_id, file_base64, file_url, mimetype: bodyMimetype, filename: bodyFilename } = req.body
+		let file = req.file // multer file
+		if (!to) {
+			return res.status(400).json({ success: false, error: 'Field "to" wajib diisi.' })
+		}
+
+		// --- Resolve file buffer from alternative sources ---
+		let fileBuffer: Buffer | null = null
+		let fileMimetype: string = bodyMimetype || 'application/octet-stream'
+		let fileFilename: string = bodyFilename || 'file'
+
+		if (file) {
+			// Mode 1: multer file upload
+			fileBuffer = file.buffer
+			fileMimetype = file.mimetype
+			fileFilename = file.originalname
+		} else if (file_base64) {
+			// Mode 2: base64 string in JSON body
+			try {
+				// Strip data-url prefix if present, e.g. "data:image/png;base64,..."
+				const raw = file_base64.includes(',') ? file_base64.split(',')[1] : file_base64
+				fileBuffer = Buffer.from(raw, 'base64')
+				// Try to infer mimetype from data-url prefix
+				if (!bodyMimetype && file_base64.startsWith('data:')) {
+					const match = file_base64.match(/^data:([^;]+);/)
+					if (match) fileMimetype = match[1]
+				}
+			} catch (e: any) {
+				return res.status(400).json({ success: false, error: 'file_base64 tidak valid: ' + e.message })
+			}
+		} else if (file_url) {
+			// Mode 3: download from URL
+			try {
+				const response = await fetch(file_url, { signal: AbortSignal.timeout(30000) })
+				if (!response.ok) throw new Error(`HTTP ${response.status}`)
+				const arrayBuf = await response.arrayBuffer()
+				fileBuffer = Buffer.from(arrayBuf)
+				// Infer mimetype from response header
+				const ct = response.headers.get('content-type')
+				if (ct && !bodyMimetype) fileMimetype = ct.split(';')[0].trim()
+				// Infer filename from URL
+				if (!bodyFilename) {
+					const urlPath = new URL(file_url).pathname
+					fileFilename = urlPath.split('/').pop() || 'file'
+				}
+			} catch (e: any) {
+				return res.status(400).json({ success: false, error: 'Gagal mengunduh file_url: ' + e.message })
+			}
+		}
+
+		if (!message && !fileBuffer) {
+			return res.status(400).json({ success: false, error: 'Wajib menyertakan "message", "file", "file_base64", atau "file_url".' })
+		}
+		const sid = resolveSession(session_id)
+		if (!sid) {
+			return res.status(503).json({ success: false, error: 'Tidak ada sesi WhatsApp yang terhubung.' })
+		}
+		const results: any[] = []
+		if (message) {
+			const r = await sessionManager.sendMessage(sid, to, message)
+			results.push({ type: 'text', msg_id: r?.key?.id })
+		}
+		if (fileBuffer) {
+			const isImage = fileMimetype.startsWith('image/')
+			const isVideo = fileMimetype.startsWith('video/')
+			let r
+			if (isImage) {
+				r = await sessionManager.sendImage(sid, to, fileBuffer, caption || undefined, fileMimetype, fileFilename)
+			} else if (isVideo) {
+				r = await sessionManager.sendVideo(sid, to, fileBuffer, caption || undefined, fileMimetype, fileFilename)
+			} else {
+				r = await sessionManager.sendDocument(sid, to, fileBuffer, fileMimetype, fileFilename)
+			}
+			results.push({ type: isImage ? 'image' : isVideo ? 'video' : 'document', filename: fileFilename, msg_id: r?.key?.id })
+
+			// Log forwarded media to database
+			try {
+				const jid = to.includes('@') ? to : `${to.replace(/[^0-9]/g, '')}@s.whatsapp.net`
+				messageLogDb.insert({
+					message_id: r?.key?.id || `fwd_${Date.now()}`,
+					session_id: sid,
+					direction: 'outgoing',
+					from_number: sid,
+					to_number: jid,
+					message_type: isImage ? 'image' : isVideo ? 'video' : 'document',
+					content: caption || message || '',
+					mimetype: fileMimetype,
+					filename: fileFilename,
+					file_size: fileBuffer.length,
+					timestamp: new Date().toISOString(),
+					status: 'sent',
+					source: 'api-forward'
+				})
+			} catch (dbErr) {
+				console.error('⚠️ Forward db log failed:', dbErr)
+			}
+		}
+		res.json({ success: true, message: 'Pesan diteruskan.', data: { to, session_id: sid, results } })
+	} catch (error: any) {
+		console.error('[/api/wa/forward]', error.message)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// GET /api/wa/status — cek status koneksi (untuk validasi dari Jokiin)
+app.get('/api/wa/status', apiKeyMiddleware, (req, res) => {
+	try {
+		const all = sessionManager.getAllSessions()
+		const connected = all.filter(s => s.isConnected)
+		res.json({
+			success: true,
+			connected: connected.length > 0,
+			sessions: connected.map(s => ({
+				id: s.id,
+				phone: s.phoneNumber || (s.user?.id ? s.user.id.split(':')[0] : null),
+				name: s.user?.name || s.id,
+			})),
+		})
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
 })
 
 // ============================================
@@ -2812,7 +3216,7 @@ app.post('/api/group-exports', (req, res) => {
 			total_members: totalMembers || 0,
 			phone_numbers: phoneNumbers || 0,
 			lid_count: lidCount || 0,
-			groups_data: groupsData ? JSON.stringify(groupsData) : null,
+			groups_data: groupsData ? JSON.stringify(groupsData) : undefined,
 			status: 'completed'
 		})
 		
@@ -3271,7 +3675,7 @@ app.post('/api/exports', async (req, res) => {
 			total_members: totalParticipants,
 			phone_numbers: totalPhoneNumbers,
 			lid_count: totalLid,
-			groups_data: groups ? JSON.stringify(groups) : null,
+			groups_data: groups ? JSON.stringify(groups) : undefined,
 			file_size: fileSize,
 			status: 'completed'
 		})
@@ -3850,8 +4254,8 @@ const startTime = Date.now()
 
 app.get('/api/health', (req, res) => {
 	const uptime = Math.floor((Date.now() - startTime) / 1000)
-	const sessions = sessionManager.getAllSessionsStatus()
-	const connectedSessions = sessions.filter(s => s.status === 'connected').length
+	const sessions = sessionManager.getAllSessions()
+	const connectedSessions = sessions.filter(s => s.isConnected).length
 	
 	res.json({
 		status: 'ok',
@@ -3890,6 +4294,9 @@ const PORT = process.env.PORT || 8080
 server.listen(PORT, async () => {
 	console.log(`🚀 Server running on http://localhost:${PORT}`)
 	console.log(`📱 Open browser and visit http://localhost:${PORT}`)
+	
+	// Start auto-delete media older than 3 days (runs every 6 hours)
+	startMediaAutoCleanup(3, 6)
 	
 	// Auto-reconnect all saved sessions after server starts
 	console.log('⏳ Waiting 3 seconds before auto-reconnecting sessions...')

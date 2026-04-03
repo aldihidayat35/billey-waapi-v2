@@ -21,6 +21,7 @@ export interface User {
     role: UserRole
     token: string
     status: UserStatus
+    phone_visible: number  // 1 = tampilkan nomor HP, 0 = sembunyikan
     created_at: string
     updated_at: string
 }
@@ -41,6 +42,7 @@ export interface CreateUserInput {
     password: string
     role?: UserRole
     status?: UserStatus
+    phone_visible?: number
 }
 
 export interface UpdateUserInput {
@@ -48,6 +50,7 @@ export interface UpdateUserInput {
     email?: string
     role?: UserRole
     status?: UserStatus
+    phone_visible?: number
 }
 
 // ============================================
@@ -95,6 +98,15 @@ export function initAuthTables(): void {
 
     // Add user_id column to existing tables if not exists
     migrateExistingTables()
+
+    // Add phone_visible column to users if not exists
+    try {
+        const userCols = db.prepare('PRAGMA table_info(users)').all() as any[]
+        if (!userCols.some(c => c.name === 'phone_visible')) {
+            db.exec(`ALTER TABLE users ADD COLUMN phone_visible INTEGER NOT NULL DEFAULT 1`)
+            console.log('✅ phone_visible column added to users')
+        }
+    } catch (e) { /* column may already exist */ }
 
     // Create default admin if no users exist
     createDefaultAdmin()
@@ -291,15 +303,16 @@ export const userDb = {
             const token = generateToken()
 
             const result = db.prepare(`
-                INSERT INTO users (name, email, password, role, token, status)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO users (name, email, password, role, token, status, phone_visible)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
             `).run(
                 input.name,
                 input.email,
                 hashedPassword,
                 input.role || 'memberwa',
                 token,
-                input.status || 'aktif'
+                input.status || 'aktif',
+                input.phone_visible !== undefined ? input.phone_visible : 1
             )
 
             return { success: true, id: Number(result.lastInsertRowid) }
@@ -337,6 +350,11 @@ export const userDb = {
             if (input.status !== undefined) {
                 updates.push('status = ?')
                 params.push(input.status)
+            }
+
+            if (input.phone_visible !== undefined) {
+                updates.push('phone_visible = ?')
+                params.push(input.phone_visible)
             }
 
             if (updates.length === 0) {
@@ -444,6 +462,7 @@ export const sessionDb = {
             role: session.role,
             token: session.token,
             status: session.status,
+            phone_visible: session.phone_visible ?? 1,
             created_at: session.created_at,
             updated_at: session.updated_at
         }
@@ -504,8 +523,9 @@ export function login(email: string, password: string, ipAddress?: string, userA
         return { success: false, error: 'Email atau password salah' }
     }
 
-    // Create session
-    const sessionToken = sessionDb.create(user.id, ipAddress, userAgent)
+    // Create session — 30 days for member, 24h for admin
+    const sessionHours = user.role === 'memberwa' ? 30 * 24 : 24
+    const sessionToken = sessionDb.create(user.id, ipAddress, userAgent, sessionHours)
 
     return {
         success: true,
@@ -535,13 +555,24 @@ export function validateSession(sessionToken: string): User | null {
 // WhatsApp Session Ownership
 // ============================================
 
-// Link WhatsApp session to user
+// Link WhatsApp session to user (uses member_sessions table)
 export function linkWaSessionToUser(sessionId: string, userId: number): void {
-    // We'll track this in session_logs with a special action
+    // Insert into member_sessions (idempotent via UNIQUE constraint)
+    db.prepare(`
+        INSERT OR IGNORE INTO member_sessions (user_id, session_id, assigned_by)
+        VALUES (?, ?, ?)
+    `).run(userId, sessionId, userId)
+
+    // Also log to session_logs for audit trail
     db.prepare(`
         INSERT INTO session_logs (session_id, action, status, user_id, user_name, details, timestamp)
         VALUES (?, 'owner_assigned', 'success', ?, (SELECT name FROM users WHERE id = ?), ?, datetime('now'))
     `).run(sessionId, userId.toString(), userId, JSON.stringify({ userId, assignedAt: new Date().toISOString() }))
+}
+
+// Unlink WhatsApp session from user
+export function unlinkWaSessionFromUser(sessionId: string, userId: number): void {
+    db.prepare('DELETE FROM member_sessions WHERE user_id = ? AND session_id = ?').run(userId, sessionId)
 }
 
 // Get WhatsApp sessions owned by user
@@ -554,11 +585,10 @@ export function getWaSessionsForUser(userId: number, role: UserRole): string[] {
         return sessions.map(s => s.session_id)
     }
 
-    // Member can only see their own sessions
+    // Member: read from member_sessions table
     const sessions = db.prepare(`
-        SELECT DISTINCT session_id FROM session_logs 
-        WHERE user_id = ? AND action = 'owner_assigned'
-    `).all(userId.toString()) as any[]
+        SELECT session_id FROM member_sessions WHERE user_id = ?
+    `).all(userId) as any[]
     return sessions.map(s => s.session_id)
 }
 
@@ -567,10 +597,10 @@ export function userOwnsSession(userId: number, sessionId: string, role: UserRol
     if (role === 'adminwa') return true
 
     const result = db.prepare(`
-        SELECT 1 FROM session_logs 
-        WHERE session_id = ? AND user_id = ? AND action = 'owner_assigned'
+        SELECT 1 FROM member_sessions
+        WHERE user_id = ? AND session_id = ?
         LIMIT 1
-    `).get(sessionId, userId.toString())
+    `).get(userId, sessionId)
 
     return !!result
 }

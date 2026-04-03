@@ -314,6 +314,19 @@
                                 </select>
                             </div>
                         </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Privasi Nomor HP</label>
+                            <div class="d-flex align-items-center gap-3 p-3 rounded" style="background:#f8f9fa;border:1px solid #e9ecef;">
+                                <div class="form-check form-switch mb-0">
+                                    <input class="form-check-input" type="checkbox" id="user-phone-visible" checked>
+                                    <label class="form-check-label" for="user-phone-visible">
+                                        <span id="phone-visible-label">Nomor HP <strong class="text-success">Aktif / Ditampilkan</strong></span>
+                                    </label>
+                                </div>
+                            </div>
+                            <small class="text-muted">Jika dimatikan, nomor HP kontak akan disembunyikan di portal member (diganti &ldquo;***&rdquo;).</small>
+                        </div>
                     </form>
                 </div>
                 <div class="modal-footer">
@@ -423,6 +436,11 @@
             await loadComponents();
             userModal = new bootstrap.Modal(document.getElementById('userModal'));
             resetPasswordModal = new bootstrap.Modal(document.getElementById('resetPasswordModal'));
+
+            // Live label update for phone visible toggle
+            document.getElementById('user-phone-visible').addEventListener('change', function() {
+                updatePhoneVisibleLabel(this.checked);
+            });
             
             loadStats();
             loadUsers();
@@ -544,6 +562,9 @@
                         </td>
                         <td class="text-muted">${createdAt}</td>
                         <td class="text-end">
+                            ${user.role === 'memberwa' ? `<button class="action-btn token me-1" onclick="showAssignSessions(${user.id})" title="Assign Sessions" style="background:#f0f0ff;color:#7239ea;">
+                                <i class="bi bi-phone"></i>
+                            </button>` : ''}
                             <button class="action-btn edit me-1" onclick="editUser(${user.id})" title="Edit">
                                 <i class="bi bi-pencil"></i>
                             </button>
@@ -617,6 +638,8 @@
             document.getElementById('user-id').value = '';
             document.getElementById('password-group').style.display = 'block';
             document.getElementById('user-password').required = true;
+            document.getElementById('user-phone-visible').checked = true;
+            updatePhoneVisibleLabel(true);
             userModal.show();
         }
         
@@ -631,9 +654,18 @@
             document.getElementById('user-email').value = user.email;
             document.getElementById('user-role').value = user.role;
             document.getElementById('user-status').value = user.status;
+            const visible = user.phone_visible !== 0;
+            document.getElementById('user-phone-visible').checked = visible;
+            updatePhoneVisibleLabel(visible);
             document.getElementById('password-group').style.display = 'none';
             document.getElementById('user-password').required = false;
             userModal.show();
+        }
+
+        function updatePhoneVisibleLabel(checked) {
+            document.getElementById('phone-visible-label').innerHTML = checked
+                ? 'Nomor HP <strong class="text-success">Aktif / Ditampilkan</strong>'
+                : 'Nomor HP <strong class="text-danger">Nonaktif / Disembunyikan</strong>';
         }
         
         // Save user
@@ -643,7 +675,8 @@
                 name: document.getElementById('user-name').value,
                 email: document.getElementById('user-email').value,
                 role: document.getElementById('user-role').value,
-                status: document.getElementById('user-status').value
+                status: document.getElementById('user-status').value,
+                phone_visible: document.getElementById('user-phone-visible').checked ? 1 : 0,
             };
             
             if (!id) {
@@ -810,6 +843,108 @@
             div.textContent = text;
             return div.innerHTML;
         }
+
+        // ─── Session Assignment ────────────────────────────────
+        let assignModal, assignUserId = null;
+
+        // Initialize modal after load
+        document.addEventListener('DOMContentLoaded', () => {
+            setTimeout(() => {
+                const el = document.getElementById('assignSessionsModal');
+                if (el) assignModal = new bootstrap.Modal(el);
+            }, 500);
+        });
+
+        async function showAssignSessions(userId) {
+            assignUserId = userId;
+            const user = users.find(u => u.id === userId);
+            if (!user) return;
+            document.getElementById('assign-user-name').textContent = user.name;
+
+            const container = document.getElementById('assign-sessions-list');
+            container.innerHTML = '<div class="text-center py-5"><span class="spinner-border spinner-border-sm"></span> Memuat...</div>';
+            assignModal.show();
+
+            try {
+                // Load all WA sessions
+                const [sessRes, userSessRes] = await Promise.all([
+                    fetch('/api/sessions'),
+                    fetch(`/api/users/${userId}/sessions`)
+                ]);
+                const sessData = await sessRes.json();
+                const allSessions = sessData.sessions || [];
+                const userSessData = await userSessRes.json();
+                const userSessions = userSessData.sessions || [];
+
+                if (allSessions.length === 0) {
+                    container.innerHTML = '<div class="text-center text-muted py-5">Belum ada session WhatsApp yang tersedia.</div>';
+                    return;
+                }
+
+                container.innerHTML = allSessions.map(s => {
+                    const checked = userSessions.includes(s.id) ? 'checked' : '';
+                    const statusBadge = s.status === 'connected'
+                        ? '<span class="badge badge-light-success ms-2">Online</span>'
+                        : '<span class="badge badge-light-danger ms-2">Offline</span>';
+                    const phone = s.phoneNumber || '-';
+                    return `
+                        <label class="d-flex align-items-center p-3 mb-2 rounded border cursor-pointer" style="cursor:pointer;">
+                            <input type="checkbox" class="form-check-input me-3 session-checkbox" value="${s.id}" ${checked}>
+                            <div class="flex-grow-1">
+                                <div class="fw-bold">${escapeHtml(s.id)}</div>
+                                <div class="text-muted fs-7">${phone} ${statusBadge}</div>
+                            </div>
+                        </label>`;
+                }).join('');
+            } catch (err) {
+                container.innerHTML = '<div class="text-center text-danger py-5">Gagal memuat session.</div>';
+            }
+        }
+
+        async function saveAssignedSessions() {
+            const checkboxes = document.querySelectorAll('#assign-sessions-list .session-checkbox');
+            const sessionIds = [];
+            checkboxes.forEach(cb => { if (cb.checked) sessionIds.push(cb.value); });
+
+            try {
+                const res = await fetch(`/api/users/${assignUserId}/sessions`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sessionIds })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    assignModal.hide();
+                    Swal.fire('Berhasil', `${sessionIds.length} session berhasil di-assign`, 'success');
+                } else {
+                    Swal.fire('Error', data.error, 'error');
+                }
+            } catch {
+                Swal.fire('Error', 'Gagal menyimpan assignment', 'error');
+            }
+        }
     </script>
+
+    <!-- Session Assignment Modal -->
+    <div class="modal fade" id="assignSessionsModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title"><i class="bi bi-phone me-2"></i>Assign WA Session</h3>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" style="max-height: 400px; overflow-y: auto;">
+                    <p class="text-muted mb-3">Pilih session untuk <strong id="assign-user-name"></strong>:</p>
+                    <div id="assign-sessions-list"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
+                    <button type="button" class="btn btn-primary" onclick="saveAssignedSessions()">
+                        <i class="bi bi-check-lg me-1"></i>Simpan
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
