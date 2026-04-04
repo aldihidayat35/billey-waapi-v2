@@ -16,6 +16,8 @@ const S = {
     unread: {},             // sessionId → count
     selectedFile: null,
     selectedFileData: null,
+    _loadingConversations: false,  // Guard against concurrent loads
+    _conversationsLoaded: false,   // Track if initial load done
 };
 
 const COLORS = [
@@ -69,9 +71,14 @@ async function loadSessions() {
 
     renderSessionTabs();
 
-    // Auto-select first session
+    // Auto-select: restore saved session or pick first
+    const savedSession = sessionStorage.getItem('member_activeSession');
     if (!S.activeSession) {
-        selectSession(S.sessions[0].id);
+        if (savedSession && S.sessions.find(s => s.id === savedSession)) {
+            selectSession(savedSession);
+        } else {
+            selectSession(S.sessions[0].id);
+        }
     }
 }
 
@@ -96,13 +103,26 @@ function renderSessionTabs() {
 function selectSession(sid) {
     S.activeSession = sid;
     S.activeContact = null;
+    S._conversationsLoaded = false;
+    S._loadingConversations = false;
+    sessionStorage.setItem('member_activeSession', sid);
     renderSessionTabs();
     loadConversations();
     showConvPanel();
 }
 
 // ─── Conversations ────────────────────────────────────────────
-async function loadConversations() {
+async function loadConversations(silent = false) {
+    // Guard: skip if already loading
+    if (S._loadingConversations) return;
+    S._loadingConversations = true;
+    
+    // Show loading indicator only on first explicit load (not silent reconnect)
+    const list = document.getElementById('conv-list');
+    if (!silent && !S._conversationsLoaded) {
+        list.innerHTML = `<div class="conv-empty"><div class="spinner-border spinner-border-sm text-primary"></div><p>Memuat percakapan...</p></div>`;
+    }
+    
     try {
         const r = await fetch('/api/member/conversations');
         const d = await r.json();
@@ -112,11 +132,23 @@ async function loadConversations() {
             !/@newsletter$/i.test(c.contact)
         );
     } catch { S.conversations = []; }
+    
+    S._loadingConversations = false;
+    S._conversationsLoaded = true;
+    
     // Sync session unread from actual conversation unread sums
     if (S.activeSession) {
         S.unread[S.activeSession] = S.conversations.reduce((sum, c) => sum + (c.unread || 0), 0);
     }
     renderConversations();
+    
+    // Auto-restore last opened chat after refresh
+    if (!S.activeContact && !silent) {
+        const savedContact = sessionStorage.getItem('member_activeContact');
+        if (savedContact && S.conversations.find(c => c.contact === savedContact)) {
+            openChat(savedContact);
+        }
+    }
 }
 
 function renderConversations(filter = '') {
@@ -166,6 +198,7 @@ function renderConversations(filter = '') {
 async function openChat(contact) {
     S.activeContact = contact;
     S.messages.clear();
+    sessionStorage.setItem('member_activeContact', contact);
 
     // Highlight in list
     document.querySelectorAll('.conv-item').forEach(el => el.classList.toggle('active', el.dataset.contact === contact));
@@ -244,28 +277,53 @@ function renderMessages() {
         const isPending = m.status === 'pending';
         const time = formatMsgTime(m.timestamp);
         let body = '';
+        const msgId = m.message_id || m.id;
+        const mediaUrl = m.media_url || '';
+        const hasMedia = mediaUrl || m.media_data || m.has_media;
 
-        // Media
-        if (m.message_type === 'image' && m.media_data) {
-            const mime = m.mimetype || 'image/jpeg';
-            body += `<div class="msg-media"><img src="data:${mime};base64,${m.media_data}" onclick="viewImage(this.src)" alt=""></div>`;
-        } else if (m.message_type === 'image' && !m.media_data) {
-            body += `<div class="msg-media-expired"><i class="bi bi-image"></i> Media sudah dihapus otomatis</div>`;
-        } else if (m.message_type === 'document' && m.media_data) {
-            const msgId = m.message_id || m.id;
-            body += `<div class="msg-doc" onclick="downloadDoc('${escHtml(msgId)}')"><i class="bi bi-file-earmark-arrow-down"></i><span class="msg-doc-name">${escHtml(m.filename || 'Document')}</span></div>`;
-        } else if (m.message_type === 'document' && !m.media_data) {
-            body += `<div class="msg-doc msg-doc-expired"><i class="bi bi-file-earmark-x"></i><span class="msg-doc-name">${escHtml(m.filename || 'Document')} (dihapus)</span></div>`;
-        } else if (m.message_type === 'video' && m.media_data) {
-            const mime = m.mimetype || 'video/mp4';
-            body += `<div class="msg-media"><video controls><source src="data:${mime};base64,${m.media_data}"></video></div>`;
-        } else if (m.message_type === 'video' && !m.media_data) {
-            body += `<div class="msg-media-expired"><i class="bi bi-camera-video"></i> Media sudah dihapus otomatis</div>`;
+        // Resolve media source: prefer media_url (file), then API endpoint, then base64
+        function resolveMediaSrc(defaultMime) {
+            if (mediaUrl) return mediaUrl;
+            if (msgId) return `/api/member/media/${encodeURIComponent(msgId)}`;
+            if (m.media_data && m.media_data.length > 10) {
+                return `data:${m.mimetype || defaultMime};base64,${m.media_data}`;
+            }
+            return '';
         }
 
-        // Text/caption content
-        if (m.content) {
-            body += `<div class="${m.message_type !== 'text' ? 'msg-caption' : 'msg-text'}">${escHtml(m.content)}</div>`;
+        // Media rendering — uses file URL first, then API endpoint, then inline base64
+        if (m.message_type === 'image' && hasMedia) {
+            const imgSrc = resolveMediaSrc('image/jpeg');
+            body += `<div class="msg-media"><img src="${imgSrc}" onclick="viewImage(this.src)" alt="" loading="lazy" onerror="this.onerror=null;this.parentElement.innerHTML='<div class=msg-media-expired><i class=bi-image></i> Media sudah dihapus</div>'"></div>`;
+        } else if (m.message_type === 'image' && !hasMedia) {
+            body += `<div class="msg-media-expired"><i class="bi bi-image"></i> Media sudah dihapus otomatis</div>`;
+        } else if (m.message_type === 'document' && hasMedia) {
+            const fname = m.filename || 'Document';
+            const docSrc = resolveMediaSrc('application/octet-stream');
+            body += `<div class="msg-doc" onclick="window.open('${docSrc}', '_blank')"><i class="bi bi-file-earmark-arrow-down"></i><span class="msg-doc-name">${escHtml(fname)}</span></div>`;
+        } else if (m.message_type === 'document' && !hasMedia) {
+            const fname = m.filename || 'Document';
+            body += `<div class="msg-doc"><i class="bi bi-file-earmark"></i><span class="msg-doc-name">${escHtml(fname)}</span></div>`;
+        } else if (m.message_type === 'video' && hasMedia) {
+            const vidSrc = resolveMediaSrc('video/mp4');
+            body += `<div class="msg-media"><video controls preload="metadata"><source src="${vidSrc}" type="${m.mimetype || 'video/mp4'}"></video></div>`;
+        } else if (m.message_type === 'video' && !hasMedia) {
+            body += `<div class="msg-media-expired"><i class="bi bi-camera-video"></i> Media sudah dihapus otomatis</div>`;
+        } else if ((m.message_type === 'audio' || m.message_type === 'voice' || m.message_type === 'ptt') && hasMedia) {
+            const audioSrc = resolveMediaSrc('audio/ogg');
+            body += `<div class="msg-media"><audio controls preload="metadata"><source src="${audioSrc}" type="${m.mimetype || 'audio/ogg'}"></audio></div>`;
+        } else if (m.message_type === 'sticker' && hasMedia) {
+            const stickerSrc = resolveMediaSrc('image/webp');
+            body += `<div class="msg-media"><img src="${stickerSrc}" alt="Sticker" style="max-width:150px;max-height:150px;"></div>`;
+        }
+
+        // Text/caption content — use caption field for media, content for text
+        const displayText = (m.message_type !== 'text') ? (m.caption || m.content || '') : (m.content || '');
+        if (displayText) {
+            const isFilenameOnly = (m.message_type === 'document') && m.filename && displayText === m.filename;
+            if (!isFilenameOnly) {
+                body += `<div class="${m.message_type !== 'text' ? 'msg-caption' : 'msg-text'}">${escHtml(displayText)}</div>`;
+            }
         }
 
         const check = dir === 'out' ? `<i class="bi bi-check2-all msg-check"></i>` : '';
@@ -333,7 +391,7 @@ function sendMediaMessage() {
     const isVideo = file.type.startsWith('video/');
     const eventType = isImage ? 'send-image' : isVideo ? 'send-video' : 'send-document';
 
-    // Optimistic
+    // Optimistic render
     const msg = {
         message_id: tempId,
         session_id: S.activeSession,
@@ -341,7 +399,7 @@ function sendMediaMessage() {
         from_number: S.activeSession,
         to_number: S.activeContact,
         message_type: isImage ? 'image' : isVideo ? 'video' : 'document',
-        content: caption || file.name,
+        content: caption || '',
         media_data: isImage ? base64 : null,
         mimetype: file.type,
         filename: file.name,
@@ -349,6 +407,7 @@ function sendMediaMessage() {
         status: 'pending',
     };
     S.messages.set(tempId, msg);
+    S.pendingMsgs.set(tempId, msg);
     renderMessages();
     scrollToBottom();
 
@@ -359,11 +418,8 @@ function sendMediaMessage() {
         mimetype: file.type,
         filename: file.name,
         tempId,
+        base64,
     };
-
-    if (isImage) payload.base64 = base64;
-    else if (isVideo) payload.base64 = base64;
-    else payload.base64 = base64;
 
     S.socket.emit(eventType, payload);
 
@@ -378,10 +434,10 @@ function setupSocketListeners() {
     // Reconnect handler — sync missed messages after connection drop
     sock.on('connect', () => {
         console.log('🔌 Socket connected:', sock.id);
-        // If we already had sessions loaded, this is a reconnection — reload data
-        if (S.sessions.length > 0) {
-            console.log('🔄 Reconnected — syncing missed data...');
-            loadConversations();
+        // Only silently refresh on reconnect (not on first connect — selectSession handles initial load)
+        if (S.sessions.length > 0 && S._conversationsLoaded) {
+            console.log('🔄 Reconnected — silently syncing...');
+            loadConversations(true);
             loadUnread();
             // If a chat is open, reload messages to catch any missed during disconnect
             if (S.activeSession && S.activeContact) {
@@ -408,7 +464,9 @@ function setupSocketListeners() {
                 to_number: data.to?.includes('@') ? data.to : `${data.to}@s.whatsapp.net`,
                 message_type: data.mediaType || 'text',
                 content: data.messageContent || data.caption || data.message || '',
-                media_data: data.base64 || null,
+                caption: data.caption || '',
+                media_url: data.mediaUrl || null,
+                has_media: !!(data.mediaUrl),
                 mimetype: data.mimetype || null,
                 filename: data.filename || null,
                 timestamp: new Date().toISOString(),
@@ -437,19 +495,22 @@ function setupSocketListeners() {
         const msgId = data.messageId || data.message_id || `in_${Date.now()}`;
         if (S.messages.has(msgId)) return; // dedup
 
+        const resolvedType = data.type || data.messageType || 'text';
         const msg = {
             message_id: msgId,
             session_id: data.sessionId,
-            direction: 'incoming',
+            direction: data.fromMe ? 'outgoing' : 'incoming',
             from_number: data.from || data.phone || '',
             to_number: data.sessionId,
-            message_type: data.type || data.messageType || 'text',
-            content: data.message || data.content || data.body || '',
-            media_data: data.media || data.base64 || data.mediaBase64 || null,
+            message_type: resolvedType,
+            content: resolvedType === 'text' ? (data.messageText || data.message || data.content || data.body || '') : '',
+            caption: data.caption || '',
+            media_url: data.mediaUrl || null,
+            has_media: !!(data.mediaUrl),
             mimetype: data.mimetype || null,
             filename: data.filename || null,
             timestamp: data.timestamp || new Date().toISOString(),
-            status: 'received',
+            status: data.fromMe ? 'sent' : 'received',
         };
 
         // If this chat is open, add message and render
@@ -459,13 +520,13 @@ function setupSocketListeners() {
             S.messages.set(msgId, msg);
             renderMessages();
             scrollToBottom();
-            // User is actively viewing — mark read immediately
             markConversationRead(data.sessionId, contact);
         }
 
-        // Update conversation list event-driven (no HTTP fetch)
-        upsertConversation(data.sessionId, contact, msg.content, msg.message_type, 'incoming', msg.timestamp, !chatIsOpen);
-        if (!chatIsOpen) {
+        // Update conversation list
+        const previewText = msg.caption || msg.content || '';
+        upsertConversation(data.sessionId, contact, previewText, msg.message_type, msg.direction, msg.timestamp, !chatIsOpen);
+        if (!chatIsOpen && !data.fromMe) {
             S.unread[data.sessionId] = (S.unread[data.sessionId] || 0) + 1;
         }
         if (S.activeSession === data.sessionId) renderConversations();
@@ -528,6 +589,10 @@ function wireUI() {
 
     // Read All — mark every conversation as read
     document.getElementById('btn-read-all').addEventListener('click', readAllConversations);
+
+    // PWA Install
+    const pwaBtn = document.getElementById('btn-pwa-install');
+    if (pwaBtn) pwaBtn.addEventListener('click', () => PWAInstall.promptInstall());
 
     // Search conversations
     document.getElementById('conv-search-input').addEventListener('input', (e) => {
@@ -615,20 +680,33 @@ window.viewImage = function (src) {
 
 window.downloadDoc = function (messageId) {
     const msg = S.messages.get(messageId);
-    if (!msg || !msg.media_data) return;
-    const mime = msg.mimetype || 'application/octet-stream';
-    const byteChars = atob(msg.media_data);
-    const byteArr = new Uint8Array(byteChars.length);
-    for (let i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i);
-    const blob = new Blob([byteArr], { type: mime });
-    const url = URL.createObjectURL(blob);
+    const fname = (msg && msg.filename) || 'document';
+
+    // If base64 in memory (real-time message), use it directly
+    if (msg && msg.media_data) {
+        const mime = msg.mimetype || 'application/octet-stream';
+        const byteChars = atob(msg.media_data);
+        const byteArr = new Uint8Array(byteChars.length);
+        for (let i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i);
+        const blob = new Blob([byteArr], { type: mime });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fname;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        return;
+    }
+
+    // Otherwise fetch from API (DB-loaded messages)
     const a = document.createElement('a');
-    a.href = url;
-    a.download = msg.filename || 'document';
+    a.href = `/api/member/media/${encodeURIComponent(messageId)}`;
+    a.download = fname;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    URL.revokeObjectURL(url);
 };
 
 // Update or insert a conversation entry, then re-sort by recency

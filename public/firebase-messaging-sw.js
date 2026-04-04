@@ -1,10 +1,69 @@
-// Firebase Messaging Service Worker
-// This file MUST be at the root of the public folder (public/firebase-messaging-sw.js)
-// It handles background push notifications when the app is not in focus
+// ============================================
+// Unified Service Worker: PWA + Firebase Cloud Messaging
+// Handles: offline caching, app install, background push notifications
+// ============================================
+
+const CACHE_NAME = 'billey-wa-v1';
+const PRECACHE_URLS = [
+    '/member/dashboard.html',
+    '/member/chat.js',
+    '/js/notifications.js',
+    '/js/app-init.js',
+    '/assets/media/logos/favicon.ico',
+    '/assets/media/logos/pwa-192.png',
+    '/assets/media/logos/pwa-512.png',
+    '/manifest.json'
+];
 
 // ============================================
-// IMPORTANT: Replace these values with your Firebase project config
-// Get them from: Firebase Console → Project Settings → General → Your apps → Web app
+// Install: precache essential assets
+// ============================================
+self.addEventListener('install', (event) => {
+    event.waitUntil(
+        caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS))
+    );
+    self.skipWaiting();
+});
+
+// ============================================
+// Activate: clean old caches
+// ============================================
+self.addEventListener('activate', (event) => {
+    event.waitUntil(
+        caches.keys().then((names) =>
+            Promise.all(names.filter((n) => n !== CACHE_NAME).map((n) => caches.delete(n)))
+        )
+    );
+    self.clients.claim();
+});
+
+// ============================================
+// Fetch: network-first with cache fallback for navigations & assets
+// ============================================
+self.addEventListener('fetch', (event) => {
+    const url = new URL(event.request.url);
+
+    // Skip non-GET, socket.io, and API calls
+    if (event.request.method !== 'GET') return;
+    if (url.pathname.startsWith('/socket.io')) return;
+    if (url.pathname.startsWith('/api/')) return;
+
+    event.respondWith(
+        fetch(event.request)
+            .then((response) => {
+                // Cache successful responses for offline access
+                if (response.ok && url.origin === self.location.origin) {
+                    const clone = response.clone();
+                    caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+                }
+                return response;
+            })
+            .catch(() => caches.match(event.request))
+    );
+});
+
+// ============================================
+// Firebase Cloud Messaging (FCM)
 // ============================================
 const FIREBASE_CONFIG = {
     apiKey: "AIzaSyAlVxYvpR3xdvZDndYg7bbxJVUdYMU6BQ0",

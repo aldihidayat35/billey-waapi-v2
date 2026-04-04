@@ -286,7 +286,7 @@ export class NotificationService {
         }
 
         // 3. Record notification
-        const channel = socketSent && fcmSent ? 'socket+fcm' : socketSent ? 'socket' : fcmSent ? 'fcm' : 'none'
+        const channel = socketSent && fcmSent ? 'both' : socketSent ? 'socket' : fcmSent ? 'fcm' : 'none'
         const notifRecord: NotificationEntry = {
             user_id: userId,
             type: payload.type,

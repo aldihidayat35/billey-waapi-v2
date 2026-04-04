@@ -21,6 +21,7 @@ import {
 } from './middleware.js'
 import multer from 'multer'
 import { NotificationService, registerUserSocket, unregisterUserSocket, registerAdminSocket, unregisterAdminSocket, isUserOnline, getOnlineUserCount } from './notification.js'
+import { saveMediaBase64, getMediaDir, getMediaPath, cleanupOldMedia, migrateMediaFromDb } from './media-storage.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -127,6 +128,11 @@ app.use(protectStaticFiles)
 // Serve static files (now protected by middleware above)
 app.use(express.static('public'))
 app.use('/api', express.static('api')) // Serve API folder
+app.use('/media', express.static(getMediaDir(), {
+	maxAge: '1d',
+	immutable: true,
+	fallthrough: true
+}))
 
 // ============================================
 // Authentication Routes
@@ -642,14 +648,14 @@ app.get('/api/member/conversations', authMiddleware, (req, res) => {
 		// Get latest message per conversation
 		const conversations = filteredRows.map(r => {
 			const lastMsg = db.prepare(`
-				SELECT content, message_type, direction, timestamp FROM message_logs
+				SELECT content, caption, message_type, direction, timestamp FROM message_logs
 				WHERE session_id = ? AND (from_number = ? OR to_number = ?)
 				ORDER BY timestamp DESC LIMIT 1
 			`).get(r.session_id, r.contact, r.contact) as any
 			return {
 				sessionId: r.session_id,
 				contact: r.contact,
-				lastMessage: lastMsg?.content || '',
+				lastMessage: lastMsg?.caption || lastMsg?.content || '',
 				lastMessageType: lastMsg?.message_type || 'text',
 				lastDirection: lastMsg?.direction || 'incoming',
 				lastTime: r.last_time,
@@ -681,13 +687,75 @@ app.get('/api/member/messages/:sessionId/:contact', authMiddleware, (req, res) =
 		}
 
 		const messages = db.prepare(`
-			SELECT * FROM message_logs
+			SELECT id, message_id, session_id, direction, from_number, to_number,
+				message_type, content, caption, media_url, filename, file_size, mimetype,
+				timestamp, status, source, created_at, updated_at,
+				CASE WHEN (media_url IS NOT NULL AND media_url != '') 
+				     OR (media_data IS NOT NULL AND media_data != '') THEN 1 ELSE 0 END AS has_media
+			FROM message_logs
 			WHERE session_id = ? AND (from_number = ? OR to_number = ?)
 			ORDER BY timestamp ASC
 			LIMIT ?
 		`).all(sessionId, contact, contact, limit) as any[]
 
 		res.json({ success: true, messages })
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// GET /api/member/media/:messageId — serve media data on demand (binary)
+app.get('/api/member/media/:messageId', authMiddleware, (req, res) => {
+	try {
+		const user = req.user!
+		const { messageId } = req.params
+
+		const row = db.prepare(`
+			SELECT session_id, from_number, to_number, media_url, media_data, mimetype, filename
+			FROM message_logs WHERE message_id = ?
+		`).get(messageId) as any
+
+		if (!row) {
+			return res.status(404).json({ success: false, error: 'Message not found' })
+		}
+
+		// Verify user has access to this session
+		if (!userOwnsSession(user.id, row.session_id, user.role)) {
+			return res.status(403).json({ success: false, error: 'Access denied' })
+		}
+
+		// Worker: check contact-level access
+		const contact = row.from_number === row.session_id ? row.to_number : row.from_number
+		if (user.role === 'worker' && !workerAssignmentDb.hasAccess(user.id, row.session_id, contact)) {
+			return res.status(403).json({ success: false, error: 'Access denied' })
+		}
+
+		// Priority 1: serve from file system via media_url
+		if (row.media_url) {
+			const filePath = getMediaPath(row.media_url)
+			if (filePath) {
+				const mime = row.mimetype || 'application/octet-stream'
+				res.set('Content-Type', mime)
+				if (row.filename) {
+					res.set('Content-Disposition', `inline; filename="${row.filename}"`)
+				}
+				return res.sendFile(filePath)
+			}
+		}
+
+		// Priority 2: serve from database blob (legacy)
+		if (row.media_data) {
+			const buffer = Buffer.from(row.media_data, 'base64')
+			const mime = row.mimetype || 'application/octet-stream'
+			res.set('Content-Type', mime)
+			res.set('Content-Length', String(buffer.length))
+			if (row.filename) {
+				res.set('Content-Disposition', `inline; filename="${row.filename}"`)
+			}
+			return res.send(buffer)
+		}
+
+		return res.status(404).json({ success: false, error: 'Media sudah dihapus' })
 	} catch (error: any) {
 		res.status(500).json({ success: false, error: error.message })
 	}
@@ -937,10 +1005,10 @@ app.post('/api/wa/send-image', apiKeyMiddleware, upload.single('file'), async (r
 })
 
 // POST /api/wa/send-document — kirim dokumen (PDF, DOC, dll)
-// Multipart form-data: to, filename?(opsional), session_id?(opsional), file
+// Multipart form-data: to, filename?(opsional), caption?(opsional), session_id?(opsional), file
 app.post('/api/wa/send-document', apiKeyMiddleware, upload.single('file'), async (req: any, res) => {
 	try {
-		const { to, filename, session_id } = req.body
+		const { to, filename, caption, session_id } = req.body
 		const file = req.file
 		if (!to || !file) {
 			return res.status(400).json({ success: false, error: 'Field "to" dan "file" wajib diisi.' })
@@ -950,8 +1018,8 @@ app.post('/api/wa/send-document', apiKeyMiddleware, upload.single('file'), async
 			return res.status(503).json({ success: false, error: 'Tidak ada sesi WhatsApp yang terhubung.' })
 		}
 		const displayName = filename || file.originalname || 'dokumen'
-		const result = await sessionManager.sendDocument(sid, to, file.buffer, file.mimetype, displayName)
-		res.json({ success: true, message: 'Dokumen berhasil dikirim.', data: { to, session_id: sid, filename: displayName, msg_id: result?.key?.id } })
+		const result = await sessionManager.sendDocument(sid, to, file.buffer, file.mimetype, displayName, caption || undefined)
+		res.json({ success: true, message: 'Dokumen berhasil dikirim.', data: { to, session_id: sid, filename: displayName, caption: caption || '', msg_id: result?.key?.id } })
 	} catch (error: any) {
 		console.error('[/api/wa/send-document]', error.message)
 		res.status(500).json({ success: false, error: error.message })
@@ -1040,17 +1108,24 @@ app.post('/api/wa/forward', apiKeyMiddleware, upload.single('file'), async (req:
 			}
 			results.push({ type: isImage ? 'image' : isVideo ? 'video' : 'document', filename: fileFilename, msg_id: r?.key?.id })
 
-			// Log forwarded media to database
+			// Save media to file system and log to database
 			try {
+				const msgId = r?.key?.id || `fwd_${Date.now()}`
 				const jid = to.includes('@') ? to : `${to.replace(/[^0-9]/g, '')}@s.whatsapp.net`
+				let fwdMediaUrl: string | undefined
+				try {
+					fwdMediaUrl = saveMediaBase64(sid, msgId, fileBuffer.toString('base64'), fileMimetype, fileFilename)
+				} catch (_) { /* ignore file save error */ }
 				messageLogDb.insert({
-					message_id: r?.key?.id || `fwd_${Date.now()}`,
+					message_id: msgId,
 					session_id: sid,
 					direction: 'outgoing',
 					from_number: sid,
 					to_number: jid,
 					message_type: isImage ? 'image' : isVideo ? 'video' : 'document',
-					content: caption || message || '',
+					content: (!isImage && !isVideo) ? (message || '') : '',
+					caption: (isImage || isVideo) ? (caption || '') : undefined,
+					media_url: fwdMediaUrl,
 					mimetype: fileMimetype,
 					filename: fileFilename,
 					file_size: fileBuffer.length,
@@ -1632,7 +1707,8 @@ io.on('connection', (socket) => {
 										from_number: data.sessionId,
 										to_number: jid,
 										message_type: 'image',
-										content: template.content,
+										content: '',
+										caption: template.content,
 										timestamp: new Date().toISOString(),
 										status: 'sent',
 										source: 'template'
@@ -1780,8 +1856,15 @@ io.on('connection', (socket) => {
 			const result = await sessionManager.sendImage(data.sessionId, data.phone, imageBuffer, data.caption || '', data.mimetype, data.filename)
 			const messageId = result?.key?.id || `img_${Date.now()}`
 			
-			// Save media to database with base64 data
+			// Save media to file system
 			const jid = data.phone.includes('@s.whatsapp.net') ? data.phone : `${data.phone.replace(/[^0-9]/g, '')}@s.whatsapp.net`
+			let mediaUrl: string | null = null
+			try {
+				mediaUrl = saveMediaBase64(data.sessionId, messageId, base64Data, data.mimetype || 'image/jpeg', data.filename || 'image.jpg')
+			} catch (saveErr) {
+				console.error('⚠️ Failed to save media file:', saveErr)
+			}
+
 			try {
 				messageLogDb.insert({
 					message_id: messageId,
@@ -1790,8 +1873,10 @@ io.on('connection', (socket) => {
 					from_number: data.sessionId,
 					to_number: jid,
 					message_type: 'image',
-					content: data.caption || '',
-					media_data: base64Data, // Store base64 for later rendering
+					content: '',
+					caption: data.caption || '',
+					media_url: mediaUrl || undefined,
+					media_data: mediaUrl ? undefined : base64Data,
 					mimetype: data.mimetype || 'image/jpeg',
 					filename: data.filename || 'image.jpg',
 					file_size: imageBuffer.length,
@@ -1799,7 +1884,7 @@ io.on('connection', (socket) => {
 					status: 'sent',
 					source: 'ui'
 				})
-				console.log('✅ Image saved to database with messageId:', messageId)
+				console.log('✅ Image saved with messageId:', messageId)
 			} catch (dbError) {
 				console.error('⚠️ Failed to save image to database:', dbError)
 			}
@@ -1813,7 +1898,7 @@ io.on('connection', (socket) => {
 				tempId: data.tempId,
 				messageId: messageId,
 				mediaType: 'image',
-				base64: base64Data
+				mediaUrl: mediaUrl || null
 			})
 		} catch (error: any) {
 			console.error('❌ Error sending image:', error.message)
@@ -1830,7 +1915,6 @@ io.on('connection', (socket) => {
 		try {
 			console.log('🎥 Received send-video request for', data.phone)
 			
-			// Convert base64 to buffer (support both base64 and video params)
 			const base64Data = data.base64 || data.video
 			if (!base64Data) {
 				throw new Error('No video data provided')
@@ -1840,8 +1924,14 @@ io.on('connection', (socket) => {
 			const result = await sessionManager.sendVideo(data.sessionId, data.phone, videoBuffer, data.caption || '', data.mimetype, data.filename)
 			const messageId = result?.key?.id || `vid_${Date.now()}`
 			
-			// Save video to database with base64 data
 			const jid = data.phone.includes('@s.whatsapp.net') ? data.phone : `${data.phone.replace(/[^0-9]/g, '')}@s.whatsapp.net`
+			let mediaUrl: string | null = null
+			try {
+				mediaUrl = saveMediaBase64(data.sessionId, messageId, base64Data, data.mimetype || 'video/mp4', data.filename || 'video.mp4')
+			} catch (saveErr) {
+				console.error('⚠️ Failed to save video file:', saveErr)
+			}
+
 			try {
 				messageLogDb.insert({
 					message_id: messageId,
@@ -1850,8 +1940,10 @@ io.on('connection', (socket) => {
 					from_number: data.sessionId,
 					to_number: jid,
 					message_type: 'video',
-					content: data.caption || '',
-					media_data: base64Data,
+					content: '',
+					caption: data.caption || '',
+					media_url: mediaUrl || undefined,
+					media_data: mediaUrl ? undefined : base64Data,
 					mimetype: data.mimetype || 'video/mp4',
 					filename: data.filename || 'video.mp4',
 					file_size: videoBuffer.length,
@@ -1859,7 +1951,7 @@ io.on('connection', (socket) => {
 					status: 'sent',
 					source: 'ui'
 				})
-				console.log('✅ Video saved to database with messageId:', messageId)
+				console.log('✅ Video saved with messageId:', messageId)
 			} catch (dbError) {
 				console.error('⚠️ Failed to save video to database:', dbError)
 			}
@@ -1873,7 +1965,7 @@ io.on('connection', (socket) => {
 				tempId: data.tempId,
 				messageId: messageId,
 				mediaType: 'video',
-				base64: base64Data
+				mediaUrl: mediaUrl || null
 			})
 		} catch (error: any) {
 			console.error('❌ Error sending video:', error.message)
@@ -1886,22 +1978,27 @@ io.on('connection', (socket) => {
 	})
 
 	// Handle document sending
-	socket.on('send-document', async (data: { sessionId: string, phone: string, base64?: string, document?: string, mimetype?: string, filename?: string, tempId?: string }) => {
+	socket.on('send-document', async (data: { sessionId: string, phone: string, base64?: string, document?: string, caption?: string, mimetype?: string, filename?: string, tempId?: string }) => {
 		try {
 			console.log('📎 Received send-document request for', data.phone)
 			
-			// Convert base64 to buffer (support both base64 and document params)
 			const base64Data = data.base64 || data.document
 			if (!base64Data) {
 				throw new Error('No document data provided')
 			}
 			const documentBuffer = Buffer.from(base64Data, 'base64')
 			
-			const result = await sessionManager.sendDocument(data.sessionId, data.phone, documentBuffer, data.mimetype, data.filename)
+			const result = await sessionManager.sendDocument(data.sessionId, data.phone, documentBuffer, data.mimetype, data.filename, data.caption)
 			const messageId = result?.key?.id || `doc_${Date.now()}`
 			
-			// Save document to database
 			const jid = data.phone.includes('@s.whatsapp.net') ? data.phone : `${data.phone.replace(/[^0-9]/g, '')}@s.whatsapp.net`
+			let mediaUrl: string | null = null
+			try {
+				mediaUrl = saveMediaBase64(data.sessionId, messageId, base64Data, data.mimetype || 'application/octet-stream', data.filename || 'document')
+			} catch (saveErr) {
+				console.error('⚠️ Failed to save document file:', saveErr)
+			}
+
 			try {
 				messageLogDb.insert({
 					message_id: messageId,
@@ -1910,8 +2007,10 @@ io.on('connection', (socket) => {
 					from_number: data.sessionId,
 					to_number: jid,
 					message_type: 'document',
-					content: data.filename || 'Document',
-					media_data: base64Data,
+					content: '',
+					caption: data.caption || '',
+					media_url: mediaUrl || undefined,
+					media_data: mediaUrl ? undefined : base64Data,
 					mimetype: data.mimetype || 'application/octet-stream',
 					filename: data.filename || 'document',
 					file_size: documentBuffer.length,
@@ -1919,7 +2018,7 @@ io.on('connection', (socket) => {
 					status: 'sent',
 					source: 'ui'
 				})
-				console.log('✅ Document saved to database with messageId:', messageId)
+				console.log('✅ Document saved with messageId:', messageId)
 			} catch (dbError) {
 				console.error('⚠️ Failed to save document to database:', dbError)
 			}
@@ -1928,10 +2027,12 @@ io.on('connection', (socket) => {
 				success: true, 
 				sessionId: data.sessionId,
 				to: data.phone,
+				caption: data.caption || '',
 				filename: data.filename || '',
 				tempId: data.tempId,
 				messageId: messageId,
-				mediaType: 'document'
+				mediaType: 'document',
+				mediaUrl: mediaUrl || null
 			})
 		} catch (error: any) {
 			console.error('❌ Error sending document:', error.message)
@@ -4759,8 +4860,48 @@ server.listen(PORT, async () => {
 	console.log(`🚀 Server running on http://localhost:${PORT}`)
 	console.log(`📱 Open browser and visit http://localhost:${PORT}`)
 	
-	// Start auto-delete media older than 3 days (runs every 6 hours)
-	startMediaAutoCleanup(3, 6)
+	// Migrate existing base64 media from database to file system
+	try {
+		migrateMediaFromDb(db)
+	} catch (err) {
+		console.error('⚠️ Media migration error:', err)
+	}
+
+	// Start cleanup: delete media files older than 7 days (check every 6 hours)
+	startMediaAutoCleanup(3, 6) // DB blob cleanup
+	setInterval(() => {
+		try {
+			const deleted = cleanupOldMedia(7)
+			if (deleted > 0) {
+				console.log(`🗑️ Auto-deleted ${deleted} media files older than 7 days`)
+				// Mark DB rows where file was deleted
+				db.prepare(`
+					UPDATE message_logs 
+					SET media_url = NULL 
+					WHERE media_url IS NOT NULL AND media_url != ''
+					AND datetime(timestamp) < datetime('now', '-7 days')
+				`).run()
+			}
+		} catch (err) {
+			console.error('⚠️ Media cleanup error:', err)
+		}
+	}, 6 * 60 * 60 * 1000) // Every 6 hours
+	
+	// Run once at startup too
+	setTimeout(() => {
+		try {
+			const deleted = cleanupOldMedia(7)
+			if (deleted > 0) {
+				console.log(`🗑️ Startup cleanup: deleted ${deleted} media files older than 7 days`)
+				db.prepare(`
+					UPDATE message_logs 
+					SET media_url = NULL 
+					WHERE media_url IS NOT NULL AND media_url != ''
+					AND datetime(timestamp) < datetime('now', '-7 days')
+				`).run()
+			}
+		} catch (_) {}
+	}, 5000)
 	
 	// Auto-reconnect all saved sessions after server starts
 	console.log('⏳ Waiting 3 seconds before auto-reconnecting sessions...')

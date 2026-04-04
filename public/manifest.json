@@ -1,0 +1,30 @@
+{
+  "name": "Billey WA - WhatsApp Multi Session",
+  "short_name": "Billey WA",
+  "description": "WhatsApp Multi Session Manager & Chat Portal",
+  "start_url": "/member/dashboard.html",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#008069",
+  "background_color": "#ffffff",
+  "icons": [
+    {
+      "src": "/assets/media/logos/favicon.ico",
+      "sizes": "64x64",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "/assets/media/logos/pwa-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/assets/media/logos/pwa-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

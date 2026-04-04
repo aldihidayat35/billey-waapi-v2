@@ -12,6 +12,7 @@ import makeWASocket, {
 import { logger as activityLogger } from './logger'
 import { messageLogDb, chatTemplateDb, autoReplyDb, autoReplyLogDb, autoReplyCooldownDb, autoForwardConfigDb, autoForwardTokenDb, autoForwardLogDb, db } from './database.js'
 import { getAuthorizedSocketIds } from './notification.js'
+import { saveMedia } from './media-storage.js'
 import { readFileSync, existsSync, readdirSync, rmSync } from 'fs'
 import { join } from 'path'
 
@@ -558,6 +559,7 @@ export class SessionManager {
 					
 					const messageType = this.getMessageType(msg.message)
 					const messageContent = this.getMessageContent(msg.message)
+					const messageCaption = this.getMessageCaption(msg.message)
 					const mediaInfo = this.getMediaInfo(msg.message)
 					const messageId = msg.key.id || `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 					
@@ -629,7 +631,8 @@ export class SessionManager {
 												from: session.user?.id || sessionId,
 												to: remoteJid,
 												messageType: 'image',
-												content: template.content,
+												content: '',
+												caption: template.content,
 												status: 'sent',
 												messageId: result?.key?.id || `template_${Date.now()}`,
 												source: 'template'
@@ -711,11 +714,12 @@ export class SessionManager {
 						}
 					}
 					
-					// Try to download media for incoming messages
+					// Try to download media for all messages (incoming AND outgoing from mobile)
 					let mediaBase64: string | undefined = undefined
-					if (!fromMe && (messageType === 'image' || messageType === 'video' || messageType === 'document' || messageType === 'audio' || messageType === 'sticker')) {
+					let mediaUrl: string | undefined = undefined
+					if (messageType === 'image' || messageType === 'video' || messageType === 'document' || messageType === 'audio' || messageType === 'sticker') {
 						try {
-							console.log(`📥 Downloading ${messageType} from ${remoteJid}...`)
+							console.log(`📥 Downloading ${messageType} from ${remoteJid} (${fromMe ? 'outgoing' : 'incoming'})...`)
 							const buffer = await downloadMediaMessage(
 								msg,
 								'buffer',
@@ -726,8 +730,20 @@ export class SessionManager {
 								}
 							)
 							if (buffer) {
-								mediaBase64 = buffer.toString('base64')
-								console.log(`✅ Downloaded ${messageType}: ${buffer.length} bytes`)
+								// Save to file system instead of database blob
+								try {
+									mediaUrl = saveMedia(
+										sessionId,
+										messageId,
+										buffer as Buffer,
+										mediaInfo?.mimetype,
+										mediaInfo?.filename
+									)
+									console.log(`✅ Downloaded & saved ${messageType}: ${buffer.length} bytes → ${mediaUrl}`)
+								} catch (saveErr) {
+									console.error(`⚠️ Failed to save media file, falling back to base64:`, saveErr)
+									mediaBase64 = (buffer as Buffer).toString('base64')
+								}
 							}
 						} catch (downloadError) {
 							console.error(`⚠️ Failed to download ${messageType}:`, downloadError)
@@ -743,19 +759,22 @@ export class SessionManager {
 						to: fromMe ? remoteJid : (session.user?.id || sessionId),
 						messageType,
 						content: messageContent,
-						mediaInfo,
+						caption: messageCaption,
+						mediaInfo: {
+							...mediaInfo,
+							url: mediaUrl || mediaInfo?.url
+						},
 						status: fromMe ? 'sent' : 'received',
 						messageId: messageId,
 						source: source
 					})
 					
-					// Also save media data directly to database if downloaded
-					if (mediaBase64) {
+					// Fallback: save base64 to DB if file save failed
+					if (mediaBase64 && !mediaUrl) {
 						try {
-							// Update the just-inserted message with media data using imported db
 							const updateStmt = db.prepare(`UPDATE message_logs SET media_data = ? WHERE message_id = ?`)
 							updateStmt.run(mediaBase64, messageId)
-							console.log(`✅ Media data saved to database for ${messageId}`)
+							console.log(`✅ Media data saved to database (fallback) for ${messageId}`)
 						} catch (dbError) {
 							console.error('⚠️ Failed to save media data:', dbError)
 						}
@@ -906,7 +925,8 @@ export class SessionManager {
 											from: session.user?.id || sessionId,
 											to: targetJid,
 											messageType: matchedRule.response_type === 'text' ? 'text' : matchedRule.response_type,
-											content: matchedRule.response_content,
+											content: matchedRule.response_type === 'text' ? matchedRule.response_content : '',
+											caption: matchedRule.response_type !== 'text' ? matchedRule.response_content : undefined,
 											status: 'sent',
 											messageId: replyResult?.key?.id || `auto_reply_${Date.now()}`,
 											source: 'auto-reply'
@@ -1082,14 +1102,18 @@ export class SessionManager {
 						sessionId,
 						from: remoteJid,
 						to: fromMe ? remoteJid : (session.user?.id || sessionId),
-						message: messageContent,
+						message: msg.message, // Send original proto object for proper type detection
+						messageText: messageContent,
 						type: messageType,
 						timestamp: timestamp,
 						fromMe: fromMe,
 						messageId: messageId,
 						participant: msg.key.participant,
 						originalJid: msg.key.remoteJid,
-						mediaBase64: mediaBase64 // Include downloaded media
+						mediaUrl: mediaUrl || null, // File URL for media
+						caption: messageCaption || null,
+						mimetype: mediaInfo?.mimetype || null,
+						filename: mediaInfo?.filename || null
 					}
 					for (const sid of authorizedSockets) {
 						this.socketIO.to(sid).emit('message-received', messageData)
@@ -1240,7 +1264,8 @@ export class SessionManager {
 		phone: string,
 		documentBuffer: Buffer,
 		mimetype?: string,
-		filename?: string
+		filename?: string,
+		caption?: string
 	): Promise<any> {
 		const session = this.getSession(sessionId)
 		
@@ -1264,6 +1289,10 @@ export class SessionManager {
 			messageContent.fileName = filename
 		} else {
 			messageContent.fileName = 'document'
+		}
+
+		if (caption) {
+			messageContent.caption = caption
 		}
 
 		console.log('📤 Sending document to', jid, 'size:', documentBuffer.length, 'bytes')
@@ -1336,12 +1365,20 @@ export class SessionManager {
 	private getMessageContent(message: any): string {
 		if (message.conversation) return message.conversation
 		if (message.extendedTextMessage?.text) return message.extendedTextMessage.text
-		if (message.imageMessage?.caption) return message.imageMessage.caption
-		if (message.videoMessage?.caption) return message.videoMessage.caption
-		if (message.documentMessage?.fileName) return message.documentMessage.fileName
+		// For media messages, return empty string — caption is handled separately by getMessageCaption()
+		if (message.imageMessage) return ''
+		if (message.videoMessage) return ''
+		if (message.documentMessage) return ''
 		if (message.contactMessage?.displayName) return message.contactMessage.displayName
 		if (message.locationMessage?.name) return message.locationMessage.name || 'Location'
 		return ''
+	}
+
+	private getMessageCaption(message: any): string | undefined {
+		if (message.imageMessage?.caption) return message.imageMessage.caption
+		if (message.videoMessage?.caption) return message.videoMessage.caption
+		if (message.documentMessage?.caption) return message.documentMessage.caption
+		return undefined
 	}
 
 	private getMediaInfo(message: any): any {
@@ -1350,22 +1387,22 @@ export class SessionManager {
 		if (message.imageMessage) {
 			mediaInfo.mimetype = message.imageMessage.mimetype
 			mediaInfo.size = message.imageMessage.fileLength
-			mediaInfo.filename = 'image'
+			mediaInfo.filename = message.imageMessage.fileName || `image_${Date.now()}.${(message.imageMessage.mimetype || 'image/jpeg').split('/')[1] || 'jpg'}`
 		}
 		if (message.videoMessage) {
 			mediaInfo.mimetype = message.videoMessage.mimetype
 			mediaInfo.size = message.videoMessage.fileLength
-			mediaInfo.filename = 'video'
+			mediaInfo.filename = message.videoMessage.fileName || `video_${Date.now()}.${(message.videoMessage.mimetype || 'video/mp4').split('/')[1] || 'mp4'}`
 		}
 		if (message.documentMessage) {
 			mediaInfo.mimetype = message.documentMessage.mimetype
 			mediaInfo.size = message.documentMessage.fileLength
-			mediaInfo.filename = message.documentMessage.fileName
+			mediaInfo.filename = message.documentMessage.fileName || 'document'
 		}
 		if (message.audioMessage) {
 			mediaInfo.mimetype = message.audioMessage.mimetype
 			mediaInfo.size = message.audioMessage.fileLength
-			mediaInfo.filename = 'audio'
+			mediaInfo.filename = message.audioMessage.fileName || `audio_${Date.now()}.${message.audioMessage.ptt ? 'ogg' : 'mp3'}`
 		}
 		
 		return Object.keys(mediaInfo).length > 0 ? mediaInfo : undefined

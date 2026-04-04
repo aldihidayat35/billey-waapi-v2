@@ -20,7 +20,9 @@ const State = {
     mediaType: null,
     selectedFile: null,
     selectedFileData: null,
-    lastMessageFrom: null
+    lastMessageFrom: null,
+    _loadingConversations: false,  // Guard against concurrent loads
+    _conversationsLoaded: false    // Track if initial load done
 };
 
 // Avatar colors
@@ -192,8 +194,9 @@ function setupSocketListeners() {
     socket.on('connect', () => {
         console.log('🔌 Socket connected');
         setConnectionStatus('connected');
-        if (State.sessionId) {
-            loadConversations(State.sessionId);
+        // Only silently refresh on reconnect (not on first connect — selectSession handles that)
+        if (State.sessionId && State._conversationsLoaded) {
+            loadConversations(State.sessionId, true);
         }
     });
     
@@ -210,7 +213,7 @@ function setupSocketListeners() {
     // INCOMING MESSAGE - REALTIME UPDATE
     // ========================================
     socket.on('message-received', (data) => {
-        console.log('📨 Message received via socket:', data);
+        console.log('📨 Message received via socket:', data?.messageId, data?.type);
         
         // Only process for current session
         if (data.sessionId !== State.sessionId) return;
@@ -219,9 +222,14 @@ function setupSocketListeners() {
         const phone = cleanPhoneNumber(data.from);
         const isFromMe = data.fromMe === true;
         
-        // Parse message content
+        // Parse message content — use server-provided type/caption first, then fallback to proto parse
         const msgContent = parseMessageContent(data.message);
         const messageId = data.messageId || `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        
+        // Use server-provided type (reliable) over parseMessageContent (may get plain string)
+        const resolvedType = data.type || msgContent.type || 'text';
+        const resolvedCaption = data.caption || msgContent.caption || '';
+        const resolvedText = data.messageText || msgContent.text || '';
         
         // Check for duplicate
         if (State.messages.has(messageId)) {
@@ -229,19 +237,23 @@ function setupSocketListeners() {
             return;
         }
         
-        // Create message object with media data from server
+        // Create message object — use media_url from server (file-based storage)
         const msg = {
             id: messageId,
-            content: msgContent.text,
-            messageType: msgContent.type,
+            message_id: messageId,
+            content: resolvedType === 'text' ? resolvedText : '',
+            message_type: resolvedType,
+            messageType: resolvedType,
             isFromMe: isFromMe,
+            direction: isFromMe ? 'outgoing' : 'incoming',
             timestamp: data.timestamp || Date.now(),
             status: isFromMe ? 'sent' : 'received',
-            mediaUrl: msgContent.mediaUrl,
-            mediaData: data.mediaBase64 || '', // Media downloaded by server
-            caption: msgContent.caption,
-            filename: msgContent.filename,
-            mimetype: msgContent.mimetype
+            media_url: data.mediaUrl || msgContent.mediaUrl || '',
+            mediaUrl: data.mediaUrl || msgContent.mediaUrl || '',
+            has_media: !!(data.mediaUrl),
+            caption: resolvedCaption,
+            filename: data.filename || msgContent.filename || '',
+            mimetype: data.mimetype || msgContent.mimetype || ''
         };
         
         // Store in messages map
@@ -409,14 +421,27 @@ function loadSessions() {
             if (data.success && DOM.sessionSelect) {
                 DOM.sessionSelect.innerHTML = '<option value="">Pilih Session...</option>';
                 
+                const connectedSessions = [];
                 (data.sessions || []).forEach(s => {
                     if (s.status === 'connected') {
                         const opt = document.createElement('option');
                         opt.value = s.id;
                         opt.textContent = `${s.id} ${s.phoneNumber ? '- ' + s.phoneNumber : ''}`;
                         DOM.sessionSelect.appendChild(opt);
+                        connectedSessions.push(s.id);
                     }
                 });
+                
+                // Restore last selected session from localStorage
+                const savedSession = localStorage.getItem('inbox_sessionId');
+                if (savedSession && connectedSessions.includes(savedSession)) {
+                    DOM.sessionSelect.value = savedSession;
+                    selectSession(savedSession);
+                } else if (connectedSessions.length === 1) {
+                    // Auto-select if only one session
+                    DOM.sessionSelect.value = connectedSessions[0];
+                    selectSession(connectedSessions[0]);
+                }
             }
         })
         .catch(console.error);
@@ -427,6 +452,13 @@ function selectSession(sessionId) {
     State.currentChat = null;
     State.messages.clear();
     State.pendingMessages.clear();
+    State._conversationsLoaded = false;
+    State._loadingConversations = false;
+    
+    // Persist selection
+    if (sessionId) {
+        localStorage.setItem('inbox_sessionId', sessionId);
+    }
     
     if (!sessionId) {
         DOM.sessionBadge?.classList.add('d-none');
@@ -454,23 +486,42 @@ function selectSession(sessionId) {
 // ============================================
 // CONVERSATIONS
 // ============================================
-function loadConversations(sessionId) {
-    DOM.conversationsList.innerHTML = `
-        <div class="d-flex justify-content-center py-5">
-            <div class="spinner-border spinner-border-sm text-primary"></div>
-        </div>
-    `;
+function loadConversations(sessionId, silent = false) {
+    // Guard: skip if already loading
+    if (State._loadingConversations) return;
+    State._loadingConversations = true;
+    
+    // Only show spinner on explicit load (not silent reconnect refresh)
+    if (!silent) {
+        DOM.conversationsList.innerHTML = `
+            <div class="d-flex justify-content-center py-5">
+                <div class="spinner-border spinner-border-sm text-primary"></div>
+            </div>
+        `;
+    }
     
     fetch(`/api/messages/conversations/${sessionId}`)
         .then(r => r.json())
         .then(data => {
+            State._loadingConversations = false;
+            State._conversationsLoaded = true;
             if (data.success && data.conversations?.length > 0) {
                 renderConversations(data.conversations);
-            } else {
+                // Auto-restore last opened chat after refresh
+                if (!State.currentChat) {
+                    const savedChat = localStorage.getItem('inbox_currentChat');
+                    if (savedChat && data.conversations.some(c => cleanPhoneNumber(c.phone) === savedChat)) {
+                        openChat(savedChat);
+                    }
+                }
+            } else if (!silent) {
                 showEmptyConversations();
             }
         })
-        .catch(() => showEmptyConversations());
+        .catch(() => {
+            State._loadingConversations = false;
+            if (!silent) showEmptyConversations();
+        });
 }
 
 function renderConversations(list) {
@@ -523,14 +574,16 @@ function updateConversationItem(phone, msg) {
     if (item) {
         const timeEl = item.querySelector('.conv-time');
         const previewEl = item.querySelector('.conv-preview-text');
+        const msgType = msg.messageType || msg.message_type || 'text';
+        const previewText = msg.caption || msg.content || '';
         if (timeEl) timeEl.textContent = formatTime(msg.timestamp);
-        if (previewEl) previewEl.innerHTML = getPreview(msg.content, msg.messageType);
+        if (previewEl) previewEl.innerHTML = getPreview(previewText, msgType);
         
         // Move to top
         DOM.conversationsList.prepend(item);
     } else {
-        // New conversation, reload list
-        loadConversations(State.sessionId);
+        // New conversation, reload list silently (don't flash spinner)
+        loadConversations(State.sessionId, true);
     }
 }
 
@@ -558,7 +611,14 @@ function getPreview(content, type) {
         location: '<i class="bi bi-geo-alt me-1"></i>Lokasi'
     };
     
-    if (type && icons[type]) return icons[type];
+    if (type && type !== 'text' && icons[type]) {
+        // For media types, show icon + caption if available
+        if (content && content.trim()) {
+            const text = content.length > 25 ? content.substring(0, 25) + '...' : content;
+            return `${icons[type]} ${escapeHtml(text)}`;
+        }
+        return icons[type];
+    }
     if (content) {
         const text = content.length > 30 ? content.substring(0, 30) + '...' : content;
         return escapeHtml(text);
@@ -573,6 +633,9 @@ function openChat(phone) {
     State.currentChat = phone;
     State.messages.clear();
     State.lastMessageFrom = null;
+    
+    // Persist current chat
+    localStorage.setItem('inbox_currentChat', phone);
     
     // Update sidebar
     document.querySelectorAll('.conversation-item').forEach(item => {
@@ -628,25 +691,17 @@ function loadMessages(phone) {
     console.log('📥 Loading messages from:', apiUrl);
     
     fetch(apiUrl)
-        .then(r => r.json())
+        .then(r => {
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            return r.json();
+        })
         .then(data => {
             console.log('📥 API Response:', {
                 success: data.success,
-                messageCount: data.messages?.length || 0,
-                messages: data.messages
+                messageCount: data.messages?.length || 0
             });
             
             if (data.success && data.messages?.length > 0) {
-                // Log image messages specifically
-                const imageMessages = data.messages.filter(m => 
-                    (m.message_type === 'image' || m.messageType === 'image')
-                );
-                console.log('🖼️ Image messages found:', imageMessages.length);
-                imageMessages.forEach(m => {
-                    console.log('  - ID:', m.message_id || m.id, 
-                        'media_data:', m.media_data ? m.media_data.length + ' chars' : 'EMPTY');
-                });
-                
                 renderMessages(data.messages);
             } else {
                 DOM.messagesContainer.innerHTML = `
@@ -674,6 +729,7 @@ function renderMessages(messages) {
     
     let html = '';
     let lastDate = null;
+    let errorCount = 0;
     
     messages.forEach((msg, idx) => {
         try {
@@ -689,9 +745,28 @@ function renderMessages(messages) {
             
             html += renderMessageBubble(msg, msgId);
         } catch (err) {
-            console.error('❌ Error rendering message:', msg, err);
+            errorCount++;
+            console.error(`❌ Error rendering message [${idx}]:`, err, msg);
+            // Render a fallback bubble so other messages are not affected
+            const isOut = msg?.direction === 'outgoing';
+            html += `
+                <div class="message-row ${isOut ? 'out' : 'in'}" data-id="err_${idx}">
+                    <div class="message-bubble">
+                        <div class="message-text" style="color: #999; font-style: italic;">
+                            <i class="bi bi-exclamation-triangle me-1"></i>Pesan tidak dapat ditampilkan
+                        </div>
+                        <span class="message-footer">
+                            <span class="message-time">${msg?.timestamp ? formatTimeFull(msg.timestamp) : ''}</span>
+                        </span>
+                    </div>
+                </div>
+            `;
         }
     });
+    
+    if (errorCount > 0) {
+        console.warn(`⚠️ ${errorCount} message(s) failed to render`);
+    }
     
     DOM.messagesContainer.innerHTML = html;
     scrollToBottom();
@@ -708,7 +783,14 @@ function renderMessageBubble(msg, msgId) {
     
     const timestamp = formatTimeFull(msg.timestamp);
     const status = isOut ? renderStatus(msg.status) : '';
-    const content = renderContent(msg);
+    
+    let content;
+    try {
+        content = renderContent(msg);
+    } catch (e) {
+        console.error('❌ renderContent error:', e, msg);
+        content = `<div class="message-text" style="color: #999; font-style: italic;">Pesan tidak dapat ditampilkan</div>`;
+    }
     
     return `
         <div class="message-row ${rowClass} ${isConsecutive ? 'consecutive' : ''}" data-id="${msgId}">
@@ -726,135 +808,96 @@ function renderMessageBubble(msg, msgId) {
 function renderContent(msg) {
     const type = (msg.messageType || msg.message_type || 'text').toLowerCase();
     const text = msg.content || msg.text || '';
-    const caption = msg.caption || text || '';
+    // Caption: prefer dedicated caption field
+    const caption = msg.caption || msg.media_caption || '';
+    const displayCaption = caption || (type !== 'text' ? text : '');
     const mediaUrl = msg.mediaUrl || msg.media_url || '';
     const mediaData = msg.mediaData || msg.media_data || '';
     const mimetype = msg.mimetype || msg.mimeType || '';
+    const hasMedia = msg.has_media || msg.hasMedia || !!mediaUrl;
+    const messageId = msg.message_id || msg.id || '';
     
-    // Debug log for image messages
-    if (type === 'image') {
-        console.log('🖼️ Rendering image:', {
-            id: msg.id || msg.message_id,
-            hasMediaUrl: !!mediaUrl,
-            hasMediaData: !!mediaData,
-            mediaDataLength: mediaData ? mediaData.length : 0,
-            mimetype: mimetype
-        });
+    // Resolve media source: prefer media_url (file), then API endpoint, then base64
+    function resolveMediaSrc(defaultMime) {
+        if (mediaUrl) return mediaUrl;
+        if (hasMedia && messageId) return '/api/member/media/' + encodeURIComponent(messageId);
+        if (mediaData && mediaData.length > 10) {
+            const m = mimetype || defaultMime;
+            return 'data:' + m + ';base64,' + mediaData;
+        }
+        return '';
     }
     
     switch (type) {
-        case 'image':
-            // Determine image source: prefer direct data, then base64
-            let imgSrc = '';
-            if (mediaUrl) {
-                imgSrc = mediaUrl;
-            } else if (mediaData) {
-                // Use mimetype if available, otherwise default to jpeg
-                const imgMime = mimetype.startsWith('image/') ? mimetype : 'image/jpeg';
-                imgSrc = `data:${imgMime};base64,${mediaData}`;
-            }
+        case 'image': {
+            const imgSrc = resolveMediaSrc('image/jpeg');
             
             if (imgSrc) {
-                // Use data-src attribute to store base64 for preview, avoid putting in onclick
-                const previewId = `img_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
-                // Store in a global map for preview
+                const previewId = 'img_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
                 if (!window._imagePreviewMap) window._imagePreviewMap = {};
                 window._imagePreviewMap[previewId] = imgSrc;
                 
-                return `
-                    <div class="media-container" onclick="previewImageById('${previewId}')">
-                        <img src="${imgSrc}" alt="Image" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\\'media-placeholder\\'><i class=\\'bi bi-image\\'></i><span>📷 Foto</span></div>'">
-                    </div>
-                    ${caption ? `<div class="media-caption">${formatText(caption)}</div>` : ''}
-                `;
+                return '<div class="media-container" onclick="previewImageById(\'' + previewId + '\')">' +
+                    '<img src="' + imgSrc + '" alt="Image" loading="lazy" onerror="this.onerror=null;this.parentElement.innerHTML=\'<div class=media-placeholder><i class=bi-image></i><span>Media telah dihapus</span></div>\'">' +
+                    '</div>' +
+                    (displayCaption ? '<div class="media-caption">' + formatText(displayCaption) + '</div>' : '');
             }
-            // Fallback placeholder when no data available
-            return `
-                <div class="media-container">
-                    <div class="media-placeholder">
-                        <i class="bi bi-image"></i>
-                        <span>📷 Foto</span>
-                    </div>
-                </div>
-                ${caption ? `<div class="media-caption">${formatText(caption)}</div>` : ''}
-            `;
+            return '<div class="media-container"><div class="media-placeholder"><i class="bi bi-image"></i><span>Media telah dihapus</span></div></div>' +
+                (displayCaption ? '<div class="media-caption">' + formatText(displayCaption) + '</div>' : '');
+        }
             
         case 'video':
-        case 'gif':
-            let videoSrc = '';
-            if (mediaUrl) {
-                videoSrc = mediaUrl;
-            } else if (mediaData) {
-                const vidMime = mimetype.startsWith('video/') ? mimetype : 'video/mp4';
-                videoSrc = `data:${vidMime};base64,${mediaData}`;
-            }
+        case 'gif': {
+            const videoSrc = resolveMediaSrc('video/mp4');
             
             if (videoSrc) {
-                return `
-                    <div class="media-container">
-                        <video controls ${type === 'gif' ? 'autoplay loop muted' : ''}>
-                            <source src="${videoSrc}" type="${mimetype || 'video/mp4'}">
-                        </video>
-                    </div>
-                    ${caption ? `<div class="media-caption">${formatText(caption)}</div>` : ''}
-                `;
+                return '<div class="media-container">' +
+                    '<video controls ' + (type === 'gif' ? 'autoplay loop muted' : '') + '>' +
+                    '<source src="' + videoSrc + '" type="' + (mimetype || 'video/mp4') + '">' +
+                    '</video></div>' +
+                    (displayCaption ? '<div class="media-caption">' + formatText(displayCaption) + '</div>' : '');
             }
-            return `
-                <div class="media-container">
-                    <div class="media-placeholder">
-                        <i class="bi bi-camera-video"></i>
-                        <span>🎬 ${type === 'gif' ? 'GIF' : 'Video'}</span>
-                    </div>
-                </div>
-                ${caption ? `<div class="media-caption">${formatText(caption)}</div>` : ''}
-            `;
+            return '<div class="media-container"><div class="media-placeholder"><i class="bi bi-camera-video"></i><span>Media telah dihapus</span></div></div>' +
+                (displayCaption ? '<div class="media-caption">' + formatText(displayCaption) + '</div>' : '');
+        }
             
         case 'audio':
         case 'voice':
-        case 'ptt':
-            return `
-                <div class="voice-bubble">
-                    <div class="voice-play-btn"><i class="bi bi-play-fill"></i></div>
-                    <div class="voice-waveform"></div>
-                    <span class="voice-duration">${msg.duration || '0:00'}</span>
-                </div>
-            `;
+        case 'ptt': {
+            const audioSrc = resolveMediaSrc('audio/ogg');
+            if (audioSrc) {
+                return '<div class="voice-bubble"><audio controls preload="metadata"><source src="' + audioSrc + '" type="' + (mimetype || 'audio/ogg') + '"></audio></div>';
+            }
+            return '<div class="voice-bubble"><div class="voice-play-btn"><i class="bi bi-play-fill"></i></div><div class="voice-waveform"></div><span class="voice-duration">' + (msg.duration || '0:00') + '</span></div>';
+        }
             
-        case 'document':
+        case 'document': {
             const filename = msg.filename || msg.fileName || 'Document';
             const size = msg.filesize || msg.file_size || '';
-            return `
-                <div class="document-bubble">
-                    <div class="document-icon"><i class="bi bi-file-earmark-text"></i></div>
-                    <div class="document-info">
-                        <div class="document-name">${escapeHtml(filename)}</div>
-                        <div class="document-meta">${size ? formatFileSize(size) : 'Dokumen'}</div>
-                    </div>
-                </div>
-            `;
+            const docSrc = resolveMediaSrc('application/octet-stream');
+            const docCaption = displayCaption;
+            return '<div class="document-bubble" ' + (docSrc ? 'onclick="window.open(\'' + docSrc + '\', \'_blank\')" style="cursor:pointer"' : '') + '>' +
+                '<div class="document-icon"><i class="bi bi-file-earmark-text"></i></div>' +
+                '<div class="document-info">' +
+                '<div class="document-name">' + escapeHtml(filename) + '</div>' +
+                '<div class="document-meta">' + (size ? formatFileSize(size) : 'Dokumen') + '</div>' +
+                '</div></div>' +
+                (docCaption ? '<div class="media-caption">' + formatText(docCaption) + '</div>' : '');
+        }
             
-        case 'sticker':
-            if (mediaUrl || mediaData) {
-                const stickerSrc = mediaUrl || `data:image/webp;base64,${mediaData}`;
-                return `<div class="sticker-container"><img src="${stickerSrc}" alt="Sticker"></div>`;
+        case 'sticker': {
+            const stickerSrc = resolveMediaSrc('image/webp');
+            if (stickerSrc) {
+                return '<div class="sticker-container"><img src="' + stickerSrc + '" alt="Sticker" onerror="this.onerror=null;this.parentElement.innerHTML=\'<i class=bi-emoji-smile></i> Sticker\'"></div>';
             }
-            return `
-                <div class="media-placeholder" style="padding: 20px;">
-                    <i class="bi bi-emoji-smile"></i>
-                    <span>Sticker</span>
-                </div>
-            `;
+            return '<div class="media-placeholder" style="padding: 20px;"><i class="bi bi-emoji-smile"></i><span>Sticker</span></div>';
+        }
             
         case 'location':
-            return `
-                <div class="media-placeholder">
-                    <i class="bi bi-geo-alt-fill"></i>
-                    <span>Lokasi</span>
-                </div>
-            `;
+            return '<div class="media-placeholder"><i class="bi bi-geo-alt-fill"></i><span>Lokasi</span></div>';
             
         default:
-            return `<div class="message-text">${formatText(text)}</div>`;
+            return '<div class="message-text">' + formatText(text || displayCaption || '...') + '</div>';
     }
 }
 
@@ -1206,19 +1249,17 @@ function handleMediaSentSuccess(data, type) {
                 statusEl.innerHTML = '<i class="bi bi-check2"></i>';
             }
             
-            // Replace placeholder with actual media if base64 is available
+            // Replace placeholder with actual media from server URL
             const placeholder = el.querySelector('.media-placeholder');
-            if (placeholder && data.base64) {
+            const mediaUrl = data.mediaUrl;
+            if (placeholder && mediaUrl) {
                 const container = placeholder.parentElement;
                 if (type === 'image') {
-                    const imgSrc = `data:image/jpeg;base64,${data.base64}`;
-                    container.innerHTML = `<img src="${imgSrc}" alt="Image" loading="lazy" onclick="previewImage('${imgSrc}')">`;
+                    container.innerHTML = `<img src="${mediaUrl}" alt="Image" loading="lazy">`;
                 } else if (type === 'video') {
-                    const vidSrc = `data:video/mp4;base64,${data.base64}`;
-                    container.innerHTML = `<video controls><source src="${vidSrc}" type="video/mp4"></video>`;
+                    container.innerHTML = `<video controls><source src="${mediaUrl}" type="video/mp4"></video>`;
                 }
             } else if (placeholder) {
-                // Just update text if no base64
                 const span = placeholder.querySelector('span');
                 if (span) {
                     span.textContent = type === 'image' ? '📷 Foto' : type === 'video' ? '🎬 Video' : '📄 Dokumen';
@@ -1281,7 +1322,8 @@ function parseMessageContent(message) {
     if (message.documentMessage) {
         return { 
             type: 'document', 
-            text: message.documentMessage.fileName || '',
+            text: '',
+            caption: message.documentMessage.caption || '',
             filename: message.documentMessage.fileName || 'Document',
             mimetype: message.documentMessage.mimetype || 'application/octet-stream'
         };

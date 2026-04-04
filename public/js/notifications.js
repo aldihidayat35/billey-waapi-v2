@@ -138,9 +138,8 @@ const NotificationManager = {
             }
             this.messaging = firebase.messaging();
 
-            // Register service worker
-            const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-            console.log('📋 Service Worker registered:', registration.scope);
+            // Reuse the service worker already registered by PWAInstall
+            const registration = await navigator.serviceWorker.ready;
 
             // Handle foreground messages from FCM
             // Socket.IO already handles in-app UI (toast/sound), so FCM foreground
@@ -459,6 +458,64 @@ const NotificationManager = {
         }
     }
 };
+
+// ============================================
+// PWA Install Prompt Manager
+// ============================================
+const PWAInstall = {
+    deferredPrompt: null,
+
+    init() {
+        // Register unified service worker (handles both PWA caching + FCM)
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' })
+                .then((reg) => console.log('📋 PWA Service Worker registered:', reg.scope))
+                .catch((err) => console.warn('⚠️ SW registration failed:', err));
+        }
+
+        // Capture the beforeinstallprompt event
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            this.deferredPrompt = e;
+            this._showInstallButton();
+            console.log('📲 PWA install prompt ready');
+        });
+
+        // Detect if already installed
+        window.addEventListener('appinstalled', () => {
+            this.deferredPrompt = null;
+            this._hideInstallButton();
+            console.log('✅ PWA installed');
+        });
+
+        // Check if running in standalone (already installed)
+        if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) {
+            console.log('📱 Running as installed PWA');
+        }
+    },
+
+    async promptInstall() {
+        if (!this.deferredPrompt) return false;
+        this.deferredPrompt.prompt();
+        const { outcome } = await this.deferredPrompt.userChoice;
+        this.deferredPrompt = null;
+        if (outcome === 'accepted') this._hideInstallButton();
+        return outcome === 'accepted';
+    },
+
+    _showInstallButton() {
+        const btn = document.getElementById('btn-pwa-install');
+        if (btn) btn.style.display = '';
+    },
+
+    _hideInstallButton() {
+        const btn = document.getElementById('btn-pwa-install');
+        if (btn) btn.style.display = 'none';
+    }
+};
+
+// Auto-init PWA on load
+document.addEventListener('DOMContentLoaded', () => PWAInstall.init());
 
 // Export for module usage if needed
 if (typeof module !== 'undefined' && module.exports) {

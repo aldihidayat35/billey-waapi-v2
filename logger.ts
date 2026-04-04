@@ -27,6 +27,7 @@ export interface MessageLog {
 	to: string
 	messageType: string
 	content: string
+	caption?: string
 	mediaInfo?: {
 		mimetype?: string
 		size?: number
@@ -198,6 +199,7 @@ export class Logger {
 				to_number: log.to,
 				message_type: log.messageType,
 				content: log.content,
+				caption: log.caption,
 				media_url: log.mediaInfo?.url,
 				filename: log.mediaInfo?.filename,
 				file_size: fileSize,

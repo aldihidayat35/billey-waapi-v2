@@ -35,6 +35,7 @@ db.exec(`
         to_number TEXT NOT NULL,
         message_type TEXT NOT NULL DEFAULT 'text',
         content TEXT,
+        caption TEXT,
         media_url TEXT,
         media_data TEXT,
         filename TEXT,
@@ -309,7 +310,7 @@ try {
             title TEXT NOT NULL,
             body TEXT,
             data TEXT,
-            channel TEXT CHECK(channel IN ('socket', 'fcm', 'both')),
+            channel TEXT CHECK(channel IN ('socket', 'fcm', 'both', 'none')),
             status TEXT DEFAULT 'sent' CHECK(status IN ('sent', 'delivered', 'read', 'failed')),
             read_at DATETIME,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -321,6 +322,38 @@ try {
         CREATE INDEX IF NOT EXISTS idx_notifications_type ON notifications(type);
     `)
     console.log('✅ Notification tables migration complete')
+
+    // Migration: fix channel CHECK constraint to allow 'both' and 'none'
+    // SQLite doesn't support ALTER CHECK, so recreate the table if constraint is wrong
+    try {
+        db.prepare(`INSERT INTO notifications (user_id, type, title, channel, status) VALUES (0, 'system', '_migration_test_', 'both', 'sent')`).run()
+        db.prepare(`DELETE FROM notifications WHERE user_id = 0 AND title = '_migration_test_'`).run()
+    } catch {
+        // Old constraint rejects 'both' → recreate table
+        db.exec(`
+            ALTER TABLE notifications RENAME TO notifications_old;
+            CREATE TABLE notifications (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                type TEXT NOT NULL DEFAULT 'incoming_message',
+                title TEXT NOT NULL,
+                body TEXT,
+                data TEXT,
+                channel TEXT CHECK(channel IN ('socket', 'fcm', 'both', 'none')),
+                status TEXT DEFAULT 'sent' CHECK(status IN ('sent', 'delivered', 'read', 'failed')),
+                read_at DATETIME,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+            INSERT INTO notifications SELECT * FROM notifications_old;
+            DROP TABLE notifications_old;
+            CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
+            CREATE INDEX IF NOT EXISTS idx_notifications_status ON notifications(status);
+            CREATE INDEX IF NOT EXISTS idx_notifications_created ON notifications(created_at);
+            CREATE INDEX IF NOT EXISTS idx_notifications_type ON notifications(type);
+        `)
+        console.log('✅ Notifications table constraint migrated (added both/none)')
+    }
 } catch (migrationError) {
     console.error('⚠️ Notification tables migration error:', migrationError)
 }
@@ -335,6 +368,7 @@ export interface MessageLogEntry {
     to_number: string
     message_type: string
     content?: string
+    caption?: string
     media_url?: string
     media_data?: string
     filename?: string
@@ -374,14 +408,23 @@ export interface ChatTemplateEntry {
 
 // Message Log Functions
 export const messageLogDb = {
-    // Insert new message log
+    // Insert new message log (uses REPLACE to update on duplicate message_id)
     insert: (log: MessageLogEntry): number | bigint => {
         const stmt = db.prepare(`
-            INSERT OR IGNORE INTO message_logs (
+            INSERT INTO message_logs (
                 message_id, session_id, direction, from_number, to_number,
-                message_type, content, media_url, media_data, filename,
+                message_type, content, caption, media_url, media_data, filename,
                 file_size, mimetype, timestamp, status, source
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(message_id) DO UPDATE SET
+                media_url = COALESCE(excluded.media_url, media_url),
+                media_data = COALESCE(excluded.media_data, media_data),
+                caption = COALESCE(NULLIF(excluded.caption, ''), caption),
+                filename = COALESCE(excluded.filename, filename),
+                file_size = COALESCE(excluded.file_size, file_size),
+                mimetype = COALESCE(excluded.mimetype, mimetype),
+                status = COALESCE(excluded.status, status),
+                updated_at = CURRENT_TIMESTAMP
         `)
         
         const result = stmt.run(
@@ -392,6 +435,7 @@ export const messageLogDb = {
             log.to_number,
             log.message_type || 'text',
             log.content || '',
+            log.caption || null,
             log.media_url || null,
             log.media_data || null,
             log.filename || null,
@@ -460,16 +504,51 @@ export const messageLogDb = {
     },
 
     // Get chat history between session and contact
-    getChatHistory: (sessionId: string, contactNumber: string, limit: number = 100): MessageLogEntry[] => {
-        const stmt = db.prepare(`
-            SELECT * FROM message_logs 
-            WHERE session_id = ? 
-            AND (from_number LIKE ? OR to_number LIKE ?)
-            ORDER BY timestamp ASC
-            LIMIT ?
-        `)
-        const pattern = `%${contactNumber.replace(/[^0-9]/g, '')}%`
-        return stmt.all(sessionId, pattern, pattern, limit) as MessageLogEntry[]
+    getChatHistory: (sessionId: string, contactNumber: string, limit: number = 100): any[] => {
+        // Try exact match first (JID format), then digit-based LIKE
+        const exactJid = contactNumber.includes('@') ? contactNumber : null
+        const digits = contactNumber.replace(/[^0-9]/g, '')
+
+        let stmt
+        let result
+
+        // Priority 1: exact JID match
+        if (exactJid) {
+            stmt = db.prepare(`
+                SELECT id, message_id, session_id, direction, from_number, to_number,
+                    message_type, content, caption, media_url, filename, file_size, mimetype,
+                    timestamp, status, source, created_at, updated_at,
+                    CASE WHEN (media_url IS NOT NULL AND media_url != '') 
+                         OR (media_data IS NOT NULL AND media_data != '') THEN 1 ELSE 0 END AS has_media
+                FROM message_logs 
+                WHERE session_id = ? 
+                AND (from_number = ? OR to_number = ?)
+                ORDER BY timestamp ASC
+                LIMIT ?
+            `)
+            result = stmt.all(sessionId, exactJid, exactJid, limit) as any[]
+            if (result.length > 0) return result
+        }
+        
+        // Priority 2: LIKE with digit pattern
+        if (digits.length >= 8) {
+            const pattern = `%${digits}%`
+            stmt = db.prepare(`
+                SELECT id, message_id, session_id, direction, from_number, to_number,
+                    message_type, content, caption, media_url, filename, file_size, mimetype,
+                    timestamp, status, source, created_at, updated_at,
+                    CASE WHEN (media_url IS NOT NULL AND media_url != '') 
+                         OR (media_data IS NOT NULL AND media_data != '') THEN 1 ELSE 0 END AS has_media
+                FROM message_logs 
+                WHERE session_id = ? 
+                AND (from_number LIKE ? OR to_number LIKE ?)
+                ORDER BY timestamp ASC
+                LIMIT ?
+            `)
+            return stmt.all(sessionId, pattern, pattern, limit) as any[]
+        }
+
+        return []
     },
 
     // Get statistics
@@ -538,7 +617,7 @@ export const messageLogDb = {
                     ELSE to_number 
                 END as phone,
                 MAX(timestamp) as lastMessageTime,
-                (SELECT content FROM message_logs m2 
+                (SELECT COALESCE(NULLIF(m2.caption, ''), m2.content) FROM message_logs m2 
                  WHERE m2.session_id = ? 
                  AND (m2.from_number = CASE WHEN message_logs.direction = 'incoming' THEN message_logs.from_number ELSE message_logs.to_number END
                       OR m2.to_number = CASE WHEN message_logs.direction = 'incoming' THEN message_logs.from_number ELSE message_logs.to_number END)
@@ -2245,6 +2324,34 @@ export const appSettingDb = {
               .run(data.app_name ?? 'Billey WA', data.app_tagline ?? '', data.logo ?? null, data.logo_small ?? null, data.favicon ?? null)
         }
     }
+}
+
+// Migration: Add caption column to message_logs for proper media caption handling
+try {
+    const msgTableInfo = db.prepare("PRAGMA table_info(message_logs)").all() as any[]
+    const msgColumnNames = msgTableInfo.map((col: any) => col.name)
+    if (!msgColumnNames.includes('caption')) {
+        console.log('🔄 Migrating message_logs: Adding caption column...')
+        db.exec('ALTER TABLE message_logs ADD COLUMN caption TEXT')
+        // Migrate existing data: for media messages, move caption from content to caption field
+        db.exec(`
+            UPDATE message_logs 
+            SET caption = content, content = '' 
+            WHERE message_type IN ('image', 'video', 'gif') 
+            AND content IS NOT NULL AND content != ''
+        `)
+        // For documents: if content equals filename, it was stored as fallback — clear content, keep filename
+        db.exec(`
+            UPDATE message_logs 
+            SET caption = CASE WHEN content != filename THEN content ELSE '' END,
+                content = ''
+            WHERE message_type = 'document'
+            AND content IS NOT NULL AND content != ''
+        `)
+        console.log('✅ message_logs caption migration complete')
+    }
+} catch (migrationError) {
+    console.error('⚠️ Caption migration error:', migrationError)
 }
 
 // Export database instance for direct queries if needed
