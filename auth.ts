@@ -10,7 +10,7 @@ import * as crypto from 'crypto'
 // Types & Interfaces
 // ============================================
 
-export type UserRole = 'adminwa' | 'memberwa'
+export type UserRole = 'adminwa' | 'memberwa' | 'worker'
 export type UserStatus = 'aktif' | 'non-aktif'
 
 export interface User {
@@ -107,6 +107,57 @@ export function initAuthTables(): void {
             console.log('✅ phone_visible column added to users')
         }
     } catch (e) { /* column may already exist */ }
+
+    // Migrate role CHECK constraint to include 'worker'
+    try {
+        const roleCheck = db.prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='users'`).get() as any
+        if (roleCheck?.sql && !roleCheck.sql.includes('worker')) {
+            console.log('🔄 Migrating users table to support worker role...')
+            // Must use pragma() separately — PRAGMA inside exec() is unreliable in better-sqlite3
+            db.pragma('foreign_keys = OFF')
+            db.exec(`
+                CREATE TABLE IF NOT EXISTS users_new (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    email TEXT NOT NULL UNIQUE COLLATE NOCASE,
+                    password TEXT NOT NULL,
+                    role TEXT NOT NULL DEFAULT 'memberwa' CHECK(role IN ('adminwa', 'memberwa', 'worker')),
+                    token TEXT NOT NULL UNIQUE,
+                    status TEXT NOT NULL DEFAULT 'aktif' CHECK(status IN ('aktif', 'non-aktif')),
+                    phone_visible INTEGER NOT NULL DEFAULT 1,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                );
+                INSERT INTO users_new SELECT id, name, email, password, role, token, status,
+                    COALESCE(phone_visible, 1), created_at, updated_at FROM users;
+                DROP TABLE users;
+                ALTER TABLE users_new RENAME TO users;
+                CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+                CREATE INDEX IF NOT EXISTS idx_users_token ON users(token);
+                CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+                CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
+            `)
+            db.pragma('foreign_keys = ON')
+            console.log('✅ Users table migrated to support worker role')
+        }
+    } catch (e) { console.error('❌ Role migration failed:', (e as Error).message) }
+
+    // Create worker_assignments table
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS worker_assignments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            worker_id INTEGER NOT NULL,
+            session_id TEXT NOT NULL,
+            contact TEXT NOT NULL,
+            assigned_by INTEGER NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (worker_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (assigned_by) REFERENCES users(id),
+            UNIQUE(worker_id, session_id, contact)
+        );
+        CREATE INDEX IF NOT EXISTS idx_worker_assignments_worker ON worker_assignments(worker_id);
+        CREATE INDEX IF NOT EXISTS idx_worker_assignments_session ON worker_assignments(session_id);
+    `)
 
     // Create default admin if no users exist
     createDefaultAdmin()
@@ -412,14 +463,15 @@ export const userDb = {
     },
 
     // Get user count by role
-    getCountByRole: (): { total: number; adminwa: number; memberwa: number; aktif: number; nonaktif: number } => {
+    getCountByRole: (): { total: number; adminwa: number; memberwa: number; worker: number; aktif: number; nonaktif: number } => {
         const total = (db.prepare('SELECT COUNT(*) as count FROM users').get() as any)?.count || 0
         const adminwa = (db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'adminwa'").get() as any)?.count || 0
         const memberwa = (db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'memberwa'").get() as any)?.count || 0
+        const worker = (db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'worker'").get() as any)?.count || 0
         const aktif = (db.prepare("SELECT COUNT(*) as count FROM users WHERE status = 'aktif'").get() as any)?.count || 0
         const nonaktif = (db.prepare("SELECT COUNT(*) as count FROM users WHERE status = 'non-aktif'").get() as any)?.count || 0
 
-        return { total, adminwa, memberwa, aktif, nonaktif }
+        return { total, adminwa, memberwa, worker, aktif, nonaktif }
     }
 }
 
@@ -523,8 +575,8 @@ export function login(email: string, password: string, ipAddress?: string, userA
         return { success: false, error: 'Email atau password salah' }
     }
 
-    // Create session — 30 days for member, 24h for admin
-    const sessionHours = user.role === 'memberwa' ? 30 * 24 : 24
+    // Create session — 30 days for member/worker, 24h for admin
+    const sessionHours = (user.role === 'memberwa' || user.role === 'worker') ? 30 * 24 : 24
     const sessionToken = sessionDb.create(user.id, ipAddress, userAgent, sessionHours)
 
     return {
@@ -585,6 +637,14 @@ export function getWaSessionsForUser(userId: number, role: UserRole): string[] {
         return sessions.map(s => s.session_id)
     }
 
+    if (role === 'worker') {
+        // Worker: get sessions from worker_assignments
+        const sessions = db.prepare(`
+            SELECT DISTINCT session_id FROM worker_assignments WHERE worker_id = ?
+        `).all(userId) as any[]
+        return sessions.map(s => s.session_id)
+    }
+
     // Member: read from member_sessions table
     const sessions = db.prepare(`
         SELECT session_id FROM member_sessions WHERE user_id = ?
@@ -596,6 +656,15 @@ export function getWaSessionsForUser(userId: number, role: UserRole): string[] {
 export function userOwnsSession(userId: number, sessionId: string, role: UserRole): boolean {
     if (role === 'adminwa') return true
 
+    if (role === 'worker') {
+        const result = db.prepare(`
+            SELECT 1 FROM worker_assignments
+            WHERE worker_id = ? AND session_id = ?
+            LIMIT 1
+        `).get(userId, sessionId)
+        return !!result
+    }
+
     const result = db.prepare(`
         SELECT 1 FROM member_sessions
         WHERE user_id = ? AND session_id = ?
@@ -603,6 +672,54 @@ export function userOwnsSession(userId: number, sessionId: string, role: UserRol
     `).get(userId, sessionId)
 
     return !!result
+}
+
+// ============================================
+// Worker Assignment Management
+// ============================================
+export const workerAssignmentDb = {
+    // Get all assignments for a worker
+    getForWorker: (workerId: number): { session_id: string; contact: string }[] => {
+        return db.prepare(`
+            SELECT session_id, contact FROM worker_assignments WHERE worker_id = ?
+        `).all(workerId) as any[]
+    },
+
+    // Get assigned contacts for a worker in a specific session
+    getContactsForWorkerSession: (workerId: number, sessionId: string): string[] => {
+        const rows = db.prepare(`
+            SELECT contact FROM worker_assignments WHERE worker_id = ? AND session_id = ?
+        `).all(workerId, sessionId) as any[]
+        return rows.map(r => r.contact)
+    },
+
+    // Replace all assignments for a worker (bulk set)
+    replaceForWorker: (workerId: number, assignments: { session_id: string; contact: string }[], assignedBy: number): { success: boolean; error?: string } => {
+        try {
+            const del = db.prepare('DELETE FROM worker_assignments WHERE worker_id = ?')
+            const ins = db.prepare('INSERT OR IGNORE INTO worker_assignments (worker_id, session_id, contact, assigned_by) VALUES (?, ?, ?, ?)')
+            
+            db.transaction(() => {
+                del.run(workerId)
+                for (const a of assignments) {
+                    ins.run(workerId, a.session_id, a.contact, assignedBy)
+                }
+            })()
+            return { success: true }
+        } catch (error: any) {
+            return { success: false, error: error.message }
+        }
+    },
+
+    // Check if worker has access to a specific contact
+    hasAccess: (workerId: number, sessionId: string, contact: string): boolean => {
+        const result = db.prepare(`
+            SELECT 1 FROM worker_assignments
+            WHERE worker_id = ? AND session_id = ? AND contact = ?
+            LIMIT 1
+        `).get(workerId, sessionId, contact)
+        return !!result
+    }
 }
 
 // Initialize on import

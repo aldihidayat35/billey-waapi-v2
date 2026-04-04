@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Penugasan Worker | WhatsApp Gateway</title>
+    <link rel="shortcut icon" href="assets/media/logos/favicon.ico" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,400,500,600,700" />
+    <link href="assets/plugins/global/plugins.bundle.css" rel="stylesheet" type="text/css" />
+    <link href="assets/css/style.bundle.css" rel="stylesheet" type="text/css" />
+    <style>
+        .worker-card { transition: all .2s; }
+        .worker-card:hover { transform: translateY(-3px); box-shadow: 0 8px 25px rgba(0,0,0,.1); }
+        .worker-avatar {
+            width: 50px; height: 50px;
+            background: linear-gradient(135deg, #f6b100, #ff9800);
+            border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-weight: 700; font-size: 18px; flex-shrink: 0;
+        }
+        .session-btn {
+            padding: 6px 16px; border-radius: 20px;
+            border: 2px solid #e4e6ef; background: #fff;
+            font-size: 13px; font-weight: 500; cursor: pointer; transition: all .15s; white-space: nowrap;
+        }
+        .session-btn:hover { border-color: #7239ea; color: #7239ea; }
+        .session-btn.active { border-color: #7239ea; background: #7239ea; color: #fff; }
+        .contact-item {
+            display: flex; align-items: center; padding: 10px 14px;
+            border-radius: 8px; cursor: pointer; transition: background .12s; border: 2px solid transparent;
+        }
+        .contact-item:hover { background: #f5f8fa; }
+        .contact-item.selected { background: #e8fff3; border-color: #50cd89; }
+        .contact-avatar {
+            width: 36px; height: 36px; border-radius: 50%; background: #e4e6ef;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 12px; font-weight: 600; color: #7e8299; flex-shrink: 0;
+        }
+        .contact-item.selected .contact-avatar { background: #50cd89; color: #fff; }
+        .contact-list-wrap { max-height: 380px; overflow-y: auto; }
+        .chip {
+            display: inline-flex; align-items: center;
+            background: #7239ea; color: #fff;
+            padding: 3px 10px; border-radius: 14px; font-size: 12px; margin: 2px 4px 2px 0;
+        }
+        .chip .remove { margin-left: 6px; cursor: pointer; opacity: .75; }
+        .chip .remove:hover { opacity: 1; }
+    </style>
+</head>
+<body id="kt_app_body" data-kt-app-layout="dark-sidebar" data-kt-app-header-fixed="true" data-kt-app-sidebar-enabled="true" data-kt-app-sidebar-fixed="true" data-kt-app-sidebar-hoverable="true" data-kt-app-sidebar-push-header="true" data-kt-app-sidebar-push-toolbar="true" data-kt-app-sidebar-push-footer="true" data-kt-app-toolbar-enabled="true" class="app-default">
+
+    <div class="d-flex flex-column flex-root app-root" id="kt_app_root">
+        <div class="app-page flex-column flex-column-fluid" id="kt_app_page">
+
+            <div id="header-container"></div>
+
+            <div class="app-wrapper flex-column flex-row-fluid" id="kt_app_wrapper">
+                <div id="sidebar-container"></div>
+
+                <div class="app-main flex-column flex-row-fluid" id="kt_app_main">
+                    <div class="d-flex flex-column flex-column-fluid">
+
+                        <div id="kt_app_toolbar" class="app-toolbar py-3 py-lg-6">
+                            <div id="kt_app_toolbar_container" class="app-container container-xxl d-flex flex-stack">
+                                <div class="page-title d-flex flex-column justify-content-center flex-wrap me-3">
+                                    <h1 class="page-heading d-flex text-dark fw-bold fs-3 flex-column justify-content-center my-0">
+                                        Penugasan Worker
+                                    </h1>
+                                    <ul class="breadcrumb breadcrumb-separatorless fw-semibold fs-7 my-0 pt-1">
+                                        <li class="breadcrumb-item text-muted"><a href="index.html" class="text-muted text-hover-primary">Home</a></li>
+                                        <li class="breadcrumb-item"><span class="bullet bg-gray-400 w-5px h-2px"></span></li>
+                                        <li class="breadcrumb-item text-muted">Penugasan Worker</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="kt_app_content" class="app-content flex-column-fluid">
+                            <div id="kt_app_content_container" class="app-container container-xxl">
+
+                                <div class="row g-5 g-xl-8" id="workers-list"></div>
+
+                                <div id="loading-state" class="text-center py-20">
+                                    <div class="spinner-border text-primary mb-4" style="width:3rem;height:3rem;"></div>
+                                    <div class="text-muted fs-5">Memuat data worker...</div>
+                                </div>
+
+                                <div id="empty-state" class="text-center py-20" style="display:none;">
+                                    <i class="bi bi-person-x fs-5x text-muted d-block mb-4"></i>
+                                    <h3 class="text-muted">Belum ada Worker</h3>
+                                    <p class="text-gray-600">Tambahkan user dengan role "Worker" di halaman <a href="/users.html" class="text-primary">Manajemen User</a></p>
+                                </div>
+
+                            </div>
+                        </div>
+
+                    </div>
+                    <div id="footer-container"></div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Assignment Modal -->
+    <div class="modal fade" id="assignModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header border-0 pb-0">
+                    <div>
+                        <h3 class="modal-title fw-bold" id="assign-modal-title">Penugasan</h3>
+                        <p class="text-muted fs-7 mb-0" id="assign-modal-subtitle">Pilih session dan nomor chat</p>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body pt-4">
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold text-dark fs-6">Session WhatsApp</label>
+                        <div class="d-flex flex-wrap gap-2" id="session-selector">
+                            <span class="text-muted fs-7">Memuat session...</span>
+                        </div>
+                    </div>
+                    <div class="position-relative mb-3">
+                        <i class="bi bi-search position-absolute top-50 translate-middle-y ms-4 text-muted"></i>
+                        <input type="text" class="form-control form-control-solid ps-12" id="contact-search" placeholder="Cari nomor...">
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-muted fs-7" id="contact-count-label">Pilih session terlebih dahulu</span>
+                        <div id="select-all-row" style="display:none;">
+                            <button class="btn btn-sm btn-light-primary me-1" onclick="selectAllContacts()">Pilih Semua</button>
+                            <button class="btn btn-sm btn-light-danger" onclick="deselectAllContacts()">Hapus Semua</button>
+                        </div>
+                    </div>
+                    <div class="contact-list-wrap border rounded" id="contact-list">
+                        <div class="text-center text-muted py-8">Pilih session terlebih dahulu</div>
+                    </div>
+                    <div id="selection-summary" class="mt-3 p-3 rounded bg-light-primary" style="display:none;">
+                        <span class="fw-bold fs-7 text-primary">Dipilih: <span id="selected-count">0</span> nomor</span>
+                        <div id="selected-chips" class="mt-2"></div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
+                    <button type="button" class="btn btn-primary" id="btn-save-assignment" onclick="saveAssignment()">
+                        <i class="bi bi-check2 me-1"></i>Simpan Penugasan
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="assets/plugins/global/plugins.bundle.js"></script>
+    <script src="assets/js/scripts.bundle.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="js/header.js"></script>
+
+    <script>
+        let assignModal = null, currentWorkerId = null;
+        let sessions = [], activeSession = null, contacts = [];
+        let selectedContacts = {};
+
+        function loadHTMLWithScripts(containerId, html) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            const tmp = document.createElement('div');
+            tmp.innerHTML = html;
+            const scripts = Array.from(tmp.querySelectorAll('script'));
+            scripts.forEach(s => s.remove());
+            container.innerHTML = tmp.innerHTML;
+            scripts.forEach(old => {
+                const s = document.createElement('script');
+                if (old.src) s.src = old.src; else s.textContent = old.textContent;
+                document.body.appendChild(s);
+            });
+        }
+
+        async function loadComponents() {
+            try {
+                const [hRes, sRes, fRes] = await Promise.all([
+                    fetch('/components/header.html'),
+                    fetch('/components/sidebar.html'),
+                    fetch('/components/footer.html')
+                ]);
+                loadHTMLWithScripts('header-container', await hRes.text());
+                loadHTMLWithScripts('sidebar-container', await sRes.text());
+                loadHTMLWithScripts('footer-container', await fRes.text());
+                if (typeof KTMenu !== 'undefined') KTMenu.createInstances();
+                if (typeof KTDrawer !== 'undefined') KTDrawer.createInstances();
+            } catch (e) { console.error('Error loading components:', e); }
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadComponents();
+            assignModal = new bootstrap.Modal(document.getElementById('assignModal'));
+            document.getElementById('contact-search').addEventListener('input', e => renderContacts(e.target.value));
+            await Promise.all([loadSessions(), loadWorkers()]);
+        });
+
+        async function loadSessions() {
+            try {
+                const r = await fetch('/api/sessions');
+                const d = await r.json();
+                sessions = d.sessions || [];
+            } catch { sessions = []; }
+        }
+
+        async function loadWorkers() {
+            try {
+                const r = await fetch('/api/workers');
+                let d;
+                try {
+                    d = await r.json();
+                } catch {
+                    const text = await r.text().catch(() => '(no body)');
+                    throw new Error('HTTP ' + r.status + ': server returned non-JSON — ' + text.substring(0, 200));
+                }
+                document.getElementById('loading-state').style.display = 'none';
+                if (!d.success) {
+                    document.getElementById('workers-list').innerHTML =
+                        '<div class="col-12"><div class="alert alert-danger d-flex align-items-center">' +
+                        '<i class="bi bi-exclamation-circle me-3 fs-3"></i>' +
+                        '<div><strong>Gagal memuat worker</strong><br><small>' + esc(d.error || 'Unknown error') + '</small></div></div></div>';
+                    return;
+                }
+                if (!d.workers || d.workers.length === 0) {
+                    document.getElementById('empty-state').style.display = 'block';
+                    return;
+                }
+                document.getElementById('workers-list').innerHTML = d.workers.map(w => {
+                    const initials = w.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+                    const statusBadge = w.status === 'aktif'
+                        ? '<span class="badge badge-light-success">Aktif</span>'
+                        : '<span class="badge badge-light-danger">Non-Aktif</span>';
+                    return '<div class="col-md-6 col-xl-4">' +
+                        '<div class="card card-flush worker-card h-100">' +
+                        '<div class="card-body d-flex flex-column pt-6 pb-5 px-6">' +
+                        '<div class="d-flex align-items-center mb-4">' +
+                        '<div class="worker-avatar me-4">' + esc(initials) + '</div>' +
+                        '<div class="flex-grow-1 min-w-0">' +
+                        '<div class="fw-bold fs-5 text-dark text-truncate">' + esc(w.name) + '</div>' +
+                        '<div class="text-muted fs-7 text-truncate">' + esc(w.email) + '</div></div>' +
+                        statusBadge + '</div>' +
+                        '<div class="d-flex justify-content-between align-items-center mt-auto pt-3 border-top">' +
+                        '<span class="badge badge-light-primary fs-7"><i class="bi bi-chat-dots me-1"></i>' + w.assignment_count + ' penugasan</span>' +
+                        '<button class="btn btn-sm btn-primary" onclick="openAssign(' + w.id + ', \'' + esc(w.name) + '\')">' +
+                        '<i class="bi bi-person-check me-1"></i>Penugasan</button></div>' +
+                        '</div></div></div>';
+                }).join('');
+            } catch (e) {
+                document.getElementById('loading-state').style.display = 'none';
+                document.getElementById('workers-list').innerHTML =
+                    '<div class="col-12"><div class="alert alert-danger d-flex align-items-center">' +
+                    '<i class="bi bi-exclamation-circle me-3 fs-3"></i>' +
+                    '<div><strong>Gagal memuat data worker</strong><br>' +
+                    '<small class="text-danger">' + esc(e.message) + '</small><br>' +
+                    '<small class="text-muted mt-1 d-block">Pastikan server sudah di-restart setelah perubahan kode terbaru.</small></div></div></div>';
+            }
+        }
+
+        async function openAssign(workerId, workerName) {
+            currentWorkerId = workerId;
+            selectedContacts = {}; contacts = []; activeSession = null;
+            document.getElementById('assign-modal-title').textContent = 'Penugasan: ' + workerName;
+            document.getElementById('assign-modal-subtitle').textContent = 'Pilih session dan nomor chat yang ditugaskan';
+            document.getElementById('contact-search').value = '';
+            document.getElementById('contact-list').innerHTML = '<div class="text-center text-muted py-8">Pilih session terlebih dahulu</div>';
+            document.getElementById('contact-count-label').textContent = 'Pilih session terlebih dahulu';
+            document.getElementById('select-all-row').style.display = 'none';
+            try {
+                const r = await fetch('/api/workers/' + workerId + '/assignments');
+                const d = await r.json();
+                for (const a of (d.assignments || [])) {
+                    if (!selectedContacts[a.session_id]) selectedContacts[a.session_id] = new Set();
+                    selectedContacts[a.session_id].add(a.contact);
+                }
+            } catch {}
+            renderSessionButtons();
+            updateSummary();
+            assignModal.show();
+        }
+
+        function renderSessionButtons() {
+            const c = document.getElementById('session-selector');
+            if (!sessions.length) { c.innerHTML = '<span class="text-muted fs-7">Tidak ada session tersedia</span>'; return; }
+            c.innerHTML = sessions.map(s =>
+                '<button class="session-btn ' + (activeSession === s.id ? 'active' : '') + '" onclick="selectSession(\'' + esc(s.id) + '\')">' + esc(s.name || s.id) + '</button>'
+            ).join('');
+        }
+
+        async function selectSession(sessionId) {
+            activeSession = sessionId;
+            renderSessionButtons();
+            document.getElementById('contact-list').innerHTML = '<div class="text-center py-6"><div class="spinner-border spinner-border-sm text-primary me-2"></div> Memuat kontak...</div>';
+            document.getElementById('select-all-row').style.display = 'none';
+            try {
+                const r = await fetch('/api/sessions/' + encodeURIComponent(sessionId) + '/contacts');
+                const d = await r.json();
+                contacts = d.contacts || [];
+                document.getElementById('contact-count-label').textContent = contacts.length + ' kontak tersedia';
+                document.getElementById('select-all-row').style.display = contacts.length ? 'block' : 'none';
+                renderContacts();
+            } catch {
+                contacts = [];
+                document.getElementById('contact-list').innerHTML = '<div class="text-center text-danger py-6">Gagal memuat kontak</div>';
+            }
+        }
+
+        function renderContacts(filter) {
+            filter = filter || '';
+            const list = document.getElementById('contact-list');
+            let items = contacts;
+            if (filter) { const f = filter.toLowerCase(); items = items.filter(c => c.contact.toLowerCase().includes(f)); }
+            if (!items.length) { list.innerHTML = '<div class="text-center text-muted py-6">Tidak ada kontak ditemukan</div>'; return; }
+            const sel = selectedContacts[activeSession] || new Set();
+            list.innerHTML = items.map(c => {
+                const phone = cleanPhone(c.contact);
+                const isSel = sel.has(c.contact);
+                return '<div class="contact-item ' + (isSel ? 'selected' : '') + '" onclick="toggleContact(\'' + esc(c.contact) + '\')">' +
+                    '<div class="contact-avatar me-3">' + phone.slice(-2) + '</div>' +
+                    '<div class="flex-grow-1"><div class="fw-semibold fs-7">' + esc(phone) + '</div>' +
+                    '<div class="text-muted" style="font-size:11px">' + (c.message_count || 0) + ' pesan</div></div>' +
+                    '<i class="bi ' + (isSel ? 'bi-check-circle-fill text-success' : 'bi-circle text-muted') + ' fs-5"></i></div>';
+            }).join('');
+        }
+
+        function toggleContact(contact) {
+            if (!activeSession) return;
+            if (!selectedContacts[activeSession]) selectedContacts[activeSession] = new Set();
+            if (selectedContacts[activeSession].has(contact)) selectedContacts[activeSession].delete(contact);
+            else selectedContacts[activeSession].add(contact);
+            renderContacts(document.getElementById('contact-search').value);
+            updateSummary();
+        }
+
+        function selectAllContacts() {
+            if (!activeSession) return;
+            if (!selectedContacts[activeSession]) selectedContacts[activeSession] = new Set();
+            contacts.forEach(c => selectedContacts[activeSession].add(c.contact));
+            renderContacts(document.getElementById('contact-search').value);
+            updateSummary();
+        }
+
+        function deselectAllContacts() {
+            if (!activeSession) return;
+            selectedContacts[activeSession] = new Set();
+            renderContacts(document.getElementById('contact-search').value);
+            updateSummary();
+        }
+
+        function updateSummary() {
+            let total = 0, chips = '';
+            for (const [sid, set] of Object.entries(selectedContacts)) {
+                for (const contact of set) {
+                    total++;
+                    const phone = cleanPhone(contact);
+                    const sName = (sessions.find(s => s.id === sid) || {}).name || sid;
+                    chips += '<span class="chip">' + esc(sName) + ': ' + esc(phone) + ' <span class="remove" onclick="removeChip(\'' + esc(sid) + '\',\'' + esc(contact) + '\')">&times;</span></span>';
+                }
+            }
+            document.getElementById('selected-count').textContent = total;
+            document.getElementById('selected-chips').innerHTML = chips;
+            document.getElementById('selection-summary').style.display = total > 0 ? 'block' : 'none';
+        }
+
+        function removeChip(sid, contact) {
+            if (selectedContacts[sid]) { selectedContacts[sid].delete(contact); if (!selectedContacts[sid].size) delete selectedContacts[sid]; }
+            if (activeSession === sid) renderContacts(document.getElementById('contact-search').value);
+            updateSummary();
+        }
+
+        async function saveAssignment() {
+            if (!currentWorkerId) return;
+            const assignments = [];
+            for (const [sid, set] of Object.entries(selectedContacts)) for (const contact of set) assignments.push({ session_id: sid, contact });
+            const btn = document.getElementById('btn-save-assignment');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Menyimpan...';
+            try {
+                const r = await fetch('/api/workers/' + currentWorkerId + '/assignments', {
+                    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ assignments })
+                });
+                const d = await r.json();
+                if (d.success) {
+                    assignModal.hide(); loadWorkers();
+                    Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Penugasan berhasil disimpan', timer: 2000, showConfirmButton: false });
+                } else { Swal.fire('Error', d.error || 'Gagal menyimpan', 'error'); }
+            } catch (e) { Swal.fire('Error', e.message, 'error'); }
+            finally { btn.disabled = false; btn.innerHTML = '<i class="bi bi-check2 me-1"></i>Simpan Penugasan'; }
+        }
+
+        function cleanPhone(jid) { return (jid || '').replace(/@s\.whatsapp\.net$/i, '').replace(/@.*$/, '').replace(/[^0-9]/g, ''); }
+        function esc(str) { if (str == null) return ''; const d = document.createElement('div'); d.textContent = String(str); return d.innerHTML; }
+    </script>
+</body>
+</html>

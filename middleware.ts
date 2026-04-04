@@ -70,7 +70,7 @@ export function adminMiddleware(req: Request, res: Response, next: NextFunction)
 }
 
 /**
- * Middleware to check if user is member
+ * Middleware to check if user is member or worker
  * Must be used after authMiddleware
  */
 export function memberMiddleware(req: Request, res: Response, next: NextFunction): void {
@@ -78,8 +78,8 @@ export function memberMiddleware(req: Request, res: Response, next: NextFunction
         return handleUnauthorized(req, res, 'Silakan login terlebih dahulu')
     }
 
-    if (req.user.role !== 'memberwa') {
-        return handleForbidden(req, res, 'Akses ditolak. Halaman ini khusus untuk member')
+    if (req.user.role !== 'memberwa' && req.user.role !== 'worker') {
+        return handleForbidden(req, res, 'Akses ditolak. Halaman ini khusus untuk member/worker')
     }
 
     next()

@@ -12,7 +12,7 @@ import cookieParser from 'cookie-parser'
 import { 
 	login, logout, validateSession, userDb, sessionDb, 
 	linkWaSessionToUser, unlinkWaSessionFromUser, getWaSessionsForUser, userOwnsSession,
-	User, UserRole, generateToken, hashPassword
+	User, UserRole, generateToken, hashPassword, workerAssignmentDb
 } from './auth.js'
 import { 
 	authMiddleware, adminMiddleware, optionalAuthMiddleware, 
@@ -160,8 +160,8 @@ app.post('/api/auth/login', (req, res) => {
 			return res.status(401).json(result)
 		}
 
-		// Persistent login: 30 days for member, 24h for admin
-		const isMember = result.user?.role === 'memberwa'
+		// Persistent login: 30 days for member/worker, 24h for admin
+		const isMember = result.user?.role === 'memberwa' || result.user?.role === 'worker'
 		const maxAge = isMember ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000
 
 		// Set session cookie
@@ -494,6 +494,85 @@ app.put('/api/users/:id/sessions', authMiddleware, adminMiddleware, (req, res) =
 })
 
 // ============================================
+// Worker Assignment API Endpoints (Admin Only)
+// ============================================
+
+// Get all workers with their assignment counts
+app.get('/api/workers', authMiddleware, adminMiddleware, (req, res) => {
+	try {
+		const workers = db.prepare(`
+			SELECT u.id, u.name, u.email, u.status, u.created_at,
+				(SELECT COUNT(*) FROM worker_assignments wa WHERE wa.worker_id = u.id) as assignment_count
+			FROM users u WHERE u.role = 'worker'
+			ORDER BY u.name ASC
+		`).all() as any[]
+		res.json({ success: true, workers })
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Get assignments for a specific worker
+app.get('/api/workers/:id/assignments', authMiddleware, adminMiddleware, (req, res) => {
+	try {
+		const workerId = parseInt(req.params.id)
+		const worker = userDb.getById(workerId)
+		if (!worker || worker.role !== 'worker') {
+			return res.status(404).json({ success: false, error: 'Worker tidak ditemukan' })
+		}
+		const assignments = workerAssignmentDb.getForWorker(workerId)
+		res.json({ success: true, assignments, worker: { id: worker.id, name: worker.name, email: worker.email } })
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Save assignments for a worker (replace all)
+app.put('/api/workers/:id/assignments', authMiddleware, adminMiddleware, (req, res) => {
+	try {
+		const workerId = parseInt(req.params.id)
+		const worker = userDb.getById(workerId)
+		if (!worker || worker.role !== 'worker') {
+			return res.status(404).json({ success: false, error: 'Worker tidak ditemukan' })
+		}
+		const { assignments } = req.body // [{session_id, contact}]
+		if (!Array.isArray(assignments)) {
+			return res.status(400).json({ success: false, error: 'Format assignments tidak valid' })
+		}
+		const result = workerAssignmentDb.replaceForWorker(workerId, assignments, req.user!.id)
+		if (result.success) {
+			res.json({ success: true, message: 'Penugasan berhasil disimpan' })
+		} else {
+			res.status(400).json(result)
+		}
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Get all contacts for a session (for assignment picker)
+app.get('/api/sessions/:sessionId/contacts', authMiddleware, adminMiddleware, (req, res) => {
+	try {
+		const { sessionId } = req.params
+		const rows = db.prepare(`
+			SELECT DISTINCT 
+				CASE WHEN direction = 'incoming' THEN from_number ELSE to_number END as contact,
+				MAX(timestamp) as last_time,
+				COUNT(*) as message_count
+			FROM message_logs
+			WHERE session_id = ?
+			  AND CASE WHEN direction = 'incoming' THEN from_number ELSE to_number END NOT LIKE '%@broadcast'
+			  AND CASE WHEN direction = 'incoming' THEN from_number ELSE to_number END NOT LIKE '%@newsletter'
+			GROUP BY contact
+			ORDER BY last_time DESC
+		`).all(sessionId) as any[]
+		res.json({ success: true, contacts: rows })
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// ============================================
 // Member Portal API Endpoints
 // ============================================
 
@@ -519,7 +598,7 @@ app.get('/api/member/sessions', authMiddleware, (req, res) => {
 	}
 })
 
-// Get conversations for member (scoped to their sessions)
+// Get conversations for member/worker (scoped to their sessions)
 app.get('/api/member/conversations', authMiddleware, (req, res) => {
 	try {
 		const user = req.user!
@@ -543,8 +622,16 @@ app.get('/api/member/conversations', authMiddleware, (req, res) => {
 			LIMIT 200
 		`).all(...assignedIds) as any[]
 
+		// Worker: filter to only assigned contacts
+		let filteredRows = rows
+		if (user.role === 'worker') {
+			const assignments = workerAssignmentDb.getForWorker(user.id)
+			const assignedContacts = new Set(assignments.map(a => `${a.session_id}:${a.contact}`))
+			filteredRows = rows.filter(r => assignedContacts.has(`${r.session_id}:${r.contact}`))
+		}
+
 		// Get latest message per conversation
-		const conversations = rows.map(r => {
+		const conversations = filteredRows.map(r => {
 			const lastMsg = db.prepare(`
 				SELECT content, message_type, direction, timestamp FROM message_logs
 				WHERE session_id = ? AND (from_number = ? OR to_number = ?)
@@ -567,7 +654,7 @@ app.get('/api/member/conversations', authMiddleware, (req, res) => {
 	}
 })
 
-// Get chat messages for a specific contact (member-scoped)
+// Get chat messages for a specific contact (member/worker-scoped)
 app.get('/api/member/messages/:sessionId/:contact', authMiddleware, (req, res) => {
 	try {
 		const user = req.user!
@@ -577,6 +664,11 @@ app.get('/api/member/messages/:sessionId/:contact', authMiddleware, (req, res) =
 		// Check session access
 		if (!userOwnsSession(user.id, sessionId, user.role)) {
 			return res.status(403).json({ success: false, error: 'Anda tidak memiliki akses ke session ini' })
+		}
+
+		// Worker: check contact-level access
+		if (user.role === 'worker' && !workerAssignmentDb.hasAccess(user.id, sessionId, contact)) {
+			return res.status(403).json({ success: false, error: 'Anda tidak memiliki akses ke kontak ini' })
 		}
 
 		const messages = db.prepare(`
@@ -592,7 +684,7 @@ app.get('/api/member/messages/:sessionId/:contact', authMiddleware, (req, res) =
 	}
 })
 
-// Get unread count for member (all assigned sessions)
+// Get unread count for member/worker (all assigned sessions)
 app.get('/api/member/unread', authMiddleware, (req, res) => {
 	try {
 		const user = req.user!
@@ -601,11 +693,29 @@ app.get('/api/member/unread', authMiddleware, (req, res) => {
 			return res.json({ success: true, total: 0, perSession: {} })
 		}
 		const placeholders = assignedIds.map(() => '?').join(',')
-		const rows = db.prepare(`
-			SELECT session_id, COUNT(*) as cnt FROM message_logs
-			WHERE session_id IN (${placeholders}) AND direction = 'incoming' AND status = 'received'
-			GROUP BY session_id
-		`).all(...assignedIds) as any[]
+
+		let rows: any[]
+		if (user.role === 'worker') {
+			// Worker: only count unread for assigned contacts
+			const assignments = workerAssignmentDb.getForWorker(user.id)
+			if (assignments.length === 0) {
+				return res.json({ success: true, total: 0, perSession: {} })
+			}
+			// Build query with contact filter per session
+			const contactConditions = assignments.map(() => '(session_id = ? AND from_number = ?)').join(' OR ')
+			const contactParams = assignments.flatMap(a => [a.session_id, a.contact])
+			rows = db.prepare(`
+				SELECT session_id, COUNT(*) as cnt FROM message_logs
+				WHERE (${contactConditions}) AND direction = 'incoming' AND status = 'received'
+				GROUP BY session_id
+			`).all(...contactParams) as any[]
+		} else {
+			rows = db.prepare(`
+				SELECT session_id, COUNT(*) as cnt FROM message_logs
+				WHERE session_id IN (${placeholders}) AND direction = 'incoming' AND status = 'received'
+				GROUP BY session_id
+			`).all(...assignedIds) as any[]
+		}
 
 		const perSession: Record<string, number> = {}
 		let total = 0
@@ -625,6 +735,10 @@ app.post('/api/member/messages/:sessionId/:contact/read', authMiddleware, (req, 
 		const user = req.user!
 		const { sessionId, contact } = req.params
 		if (!userOwnsSession(user.id, sessionId, user.role)) {
+			return res.status(403).json({ success: false, error: 'Akses ditolak' })
+		}
+		// Worker: check contact-level access
+		if (user.role === 'worker' && !workerAssignmentDb.hasAccess(user.id, sessionId, contact)) {
 			return res.status(403).json({ success: false, error: 'Akses ditolak' })
 		}
 		const result = db.prepare(`

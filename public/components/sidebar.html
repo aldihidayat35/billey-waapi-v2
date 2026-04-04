@@ -65,6 +65,13 @@
                             <span class="menu-title">Manajemen User</span>
                         </a>
                     </div>
+                    
+                    <div class="menu-item">
+                        <a class="menu-link" href="/penugasan.html" data-page="penugasan">
+                            <span class="menu-icon"><span class="svg-icon svg-icon-2"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M6.28548 15.0861C7.34369 13.1814 9.35142 12 11.5304 12H12.4696C14.6486 12 16.6563 13.1814 17.7145 15.0861L19.3493 18.0287C20.0899 19.3618 19.1259 21 17.601 21H6.39903C4.87406 21 3.91012 19.3618 4.65071 18.0287L6.28548 15.0861Z" fill="currentColor"/><rect opacity="0.3" x="8" y="3" width="8" height="8" rx="4" fill="currentColor"/><path opacity="0.3" d="M18 7.5C18 8.32843 17.3284 9 16.5 9C15.6716 9 15 8.32843 15 7.5C15 6.67157 15.6716 6 16.5 6C17.3284 6 18 6.67157 18 7.5Z" fill="currentColor"/><path d="M18.5 10.5H14.5C13.9477 10.5 13.5 10.9477 13.5 11.5V14.5C13.5 15.0523 13.9477 15.5 14.5 15.5H18.5C19.0523 15.5 19.5 15.0523 19.5 14.5V11.5C19.5 10.9477 19.0523 10.5 18.5 10.5Z" fill="currentColor"/></svg></span></span>
+                            <span class="menu-title">Penugasan Worker</span>
+                        </a>
+                    </div>
                 </div>
                 
                 <div class="menu-item pt-5">
@@ -252,7 +259,7 @@
         
         if (avatarEl) avatarEl.textContent = initials;
         if (nameEl) nameEl.textContent = currentUser.name || 'User';
-        if (roleEl) roleEl.textContent = currentUser.role === 'adminwa' ? '👑 Admin' : '👤 Member';
+        if (roleEl) roleEl.textContent = currentUser.role === 'adminwa' ? '👑 Admin' : currentUser.role === 'worker' ? '🔧 Worker' : '👤 Member';
         
         // Show/hide admin menu in sidebar
         const adminMenus = document.querySelectorAll('.admin-only-menu');

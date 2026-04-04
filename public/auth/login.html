@@ -4,499 +4,206 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - WhatsApp Gateway</title>
-    
-    <!-- Metronic CSS -->
-    <link href="/assets/plugins/global/plugins.bundle.css" rel="stylesheet" type="text/css"/>
-    <link href="/assets/css/style.bundle.css" rel="stylesheet" type="text/css"/>
-    
-    <!-- Bootstrap Icons -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
-    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
     <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         :root {
-            --wa-green: #25D366;
-            --wa-dark-green: #128C7E;
-            --wa-light-green: #dcf8c6;
+            --green: #25D366;
+            --green-dark: #128C7E;
+            --green-glow: rgba(37, 211, 102, .18);
+            --bg: #f0f4f8;
+            --card: #ffffff;
+            --border: #e2e8f0;
+            --text: #1a202c;
+            --muted: #718096;
+            --danger: #e53e3e;
+            --radius: 14px;
+            --shadow: 0 20px 60px rgba(0, 0, 0, .10);
         }
-        
         body {
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-            min-height: 100vh;
-        }
-        
-        .login-container {
-            min-height: 100vh;
+            font-family: 'Inter', system-ui, sans-serif;
+            background: var(--bg);
+            min-height: 100dvh;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 20px;
+            padding: 16px;
         }
-        
-        .login-card {
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
-            overflow: hidden;
-            max-width: 1000px;
+        .card {
+            background: var(--card);
+            border-radius: 24px;
+            box-shadow: var(--shadow);
             width: 100%;
-            display: flex;
+            max-width: 420px;
+            padding: 40px 36px 36px;
+            animation: slideUp .35s cubic-bezier(.16, 1, .3, 1) both;
         }
-        
-        .login-brand {
-            background: linear-gradient(135deg, var(--wa-green) 0%, var(--wa-dark-green) 100%);
-            padding: 60px 50px;
-            color: white;
-            width: 45%;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            position: relative;
-            overflow: hidden;
+        @keyframes slideUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+        .logo-wrap { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 28px; }
+        .logo-icon {
+            width: 44px; height: 44px; background: linear-gradient(135deg, var(--green), var(--green-dark));
+            border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 22px;
+            box-shadow: 0 4px 14px var(--green-glow);
         }
-        
-        .login-brand::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            right: -50%;
-            width: 100%;
-            height: 100%;
-            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
-        }
-        
-        .login-brand h1 {
-            font-size: 2.5rem;
-            font-weight: 700;
-            margin-bottom: 20px;
-            position: relative;
-        }
-        
-        .login-brand p {
-            font-size: 1.1rem;
-            opacity: 0.9;
-            line-height: 1.7;
-            position: relative;
-        }
-        
-        .login-brand .features {
-            margin-top: 40px;
-            position: relative;
-        }
-        
-        .login-brand .feature-item {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-        
-        .login-brand .feature-icon {
-            width: 45px;
-            height: 45px;
-            background: rgba(255,255,255,0.2);
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.3rem;
-        }
-        
-        .login-form-container {
-            padding: 60px 50px;
-            width: 55%;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-        }
-        
-        .login-form-header {
-            margin-bottom: 40px;
-        }
-        
-        .login-form-header h2 {
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: #181c32;
-            margin-bottom: 10px;
-        }
-        
-        .login-form-header p {
-            color: #7e8299;
-            font-size: 1rem;
-        }
-        
-        .form-group {
-            margin-bottom: 25px;
-        }
-        
-        .form-label {
-            font-weight: 600;
-            color: #3f4254;
-            margin-bottom: 8px;
-            display: block;
-        }
-        
-        .form-control {
-            height: 50px;
-            border-radius: 10px;
-            border: 1.5px solid #e4e6ef;
-            padding: 0 20px;
-            font-size: 1rem;
-            transition: all 0.3s ease;
-        }
-        
-        .form-control:focus {
-            border-color: var(--wa-green);
-            box-shadow: 0 0 0 3px rgba(37, 211, 102, 0.1);
-        }
-        
-        .input-group {
-            position: relative;
-        }
-        
-        .input-group .form-control {
-            padding-left: 50px;
-        }
-        
-        .input-icon {
-            position: absolute;
-            left: 18px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #b5b5c3;
-            font-size: 1.2rem;
-            z-index: 5;
-        }
-        
-        .toggle-password {
-            position: absolute;
-            right: 15px;
-            top: 50%;
-            transform: translateY(-50%);
-            cursor: pointer;
-            color: #b5b5c3;
-            font-size: 1.2rem;
-            z-index: 5;
-        }
-        
-        .toggle-password:hover {
-            color: var(--wa-green);
-        }
-        
-        .btn-login {
-            height: 50px;
-            background: linear-gradient(135deg, var(--wa-green) 0%, var(--wa-dark-green) 100%);
-            border: none;
-            border-radius: 10px;
-            color: white;
-            font-weight: 600;
-            font-size: 1rem;
-            width: 100%;
-            transition: all 0.3s ease;
-        }
-        
-        .btn-login:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(37, 211, 102, 0.3);
-            background: linear-gradient(135deg, var(--wa-dark-green) 0%, var(--wa-green) 100%);
-        }
-        
-        .btn-login:disabled {
-            opacity: 0.7;
-            cursor: not-allowed;
-            transform: none;
-        }
-        
+        .logo-text { font-size: 18px; font-weight: 700; color: var(--text); letter-spacing: -.3px; }
+        .logo-text span { color: var(--green); }
+        .heading { text-align: center; margin-bottom: 28px; }
+        .heading h1 { font-size: 22px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+        .heading p { font-size: 14px; color: var(--muted); }
         .alert {
-            border-radius: 10px;
-            padding: 15px 20px;
-            margin-bottom: 25px;
-            display: none;
+            display: none; align-items: flex-start; gap: 10px; padding: 12px 14px; border-radius: var(--radius);
+            font-size: 13.5px; font-weight: 500; margin-bottom: 20px; animation: fadeIn .2s ease;
         }
-        
-        .alert.show {
-            display: flex;
-            align-items: center;
-            gap: 10px;
+        .alert.show { display: flex; }
+        .alert-danger { background: #fff5f5; color: var(--danger); border: 1px solid #fed7d7; }
+        .alert-success { background: #f0fff4; color: #276749; border: 1px solid #9ae6b4; }
+        .alert i { flex-shrink: 0; font-size: 16px; margin-top: 1px; }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(.97); } to { opacity: 1; transform: scale(1); } }
+        .field { margin-bottom: 18px; }
+        .field label { display: block; font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 7px; }
+        .input-wrap { position: relative; }
+        .input-wrap .ico {
+            position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #a0aec0; font-size: 16px;
+            pointer-events: none; transition: color .2s;
         }
-        
-        .remember-forgot {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 30px;
+        .input-wrap input {
+            width: 100%; height: 48px; border: 1.5px solid var(--border); border-radius: var(--radius);
+            padding: 0 44px 0 42px; font-size: 14.5px; font-family: inherit; color: var(--text);
+            background: #fafafa; outline: none; transition: border-color .2s, box-shadow .2s, background .2s;
         }
-        
-        .form-check-input:checked {
-            background-color: var(--wa-green);
-            border-color: var(--wa-green);
+        .input-wrap input:focus { border-color: var(--green); background: #fff; box-shadow: 0 0 0 3px var(--green-glow); }
+        .input-wrap input:focus + .ico { color: var(--green); }
+        .toggle-pw {
+            position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: #a0aec0; font-size: 16px;
+            cursor: pointer; border: none; background: none; padding: 0; transition: color .2s;
         }
-        
-        @media (max-width: 768px) {
-            .login-card {
-                flex-direction: column;
-            }
-            
-            .login-brand {
-                width: 100%;
-                padding: 40px 30px;
-            }
-            
-            .login-form-container {
-                width: 100%;
-                padding: 40px 30px;
-            }
-            
-            .login-brand h1 {
-                font-size: 1.8rem;
-            }
-            
-            .login-brand .features {
-                display: none;
-            }
+        .toggle-pw:hover { color: var(--green); }
+        .row-check { display: flex; justify-content: space-between; align-items: center; margin: 6px 0 22px; font-size: 13px; }
+        .check-label { display: flex; align-items: center; gap: 7px; color: var(--muted); cursor: pointer; }
+        .check-label input[type=checkbox] { accent-color: var(--green); width: 15px; height: 15px; cursor: pointer; }
+        .btn-login {
+            width: 100%; height: 50px; background: linear-gradient(135deg, var(--green) 0%, var(--green-dark) 100%);
+            color: #fff; border: none; border-radius: var(--radius); font-size: 15px; font-weight: 600;
+            font-family: inherit; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+            transition: transform .18s, box-shadow .18s, opacity .18s; box-shadow: 0 4px 14px var(--green-glow);
         }
-        
-        /* Loading spinner */
-        .spinner-border-sm {
-            width: 1.2rem;
-            height: 1.2rem;
+        .btn-login:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 22px var(--green-glow); }
+        .btn-login:active:not(:disabled) { transform: translateY(0); }
+        .btn-login:disabled { opacity: .65; cursor: not-allowed; }
+        .spinner {
+            width: 18px; height: 18px; border: 2.5px solid rgba(255, 255, 255, .4); border-top-color: #fff;
+            border-radius: 50%; animation: spin .7s linear infinite;
         }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .footer-note { text-align: center; margin-top: 22px; font-size: 12.5px; color: var(--muted); display: flex; align-items: center; justify-content: center; gap: 5px; }
+        @media (max-width: 440px) { .card { padding: 32px 22px 26px; border-radius: 20px; } .heading h1 { font-size: 20px; } }
     </style>
 </head>
 <body>
-    <div class="login-container">
-        <div class="login-card">
-            <!-- Brand Side -->
-            <div class="login-brand">
-                <div>
-                    <h1>
-                        <i class="bi bi-whatsapp me-2"></i>
-                        WhatsApp Gateway
-                    </h1>
-                    <p>
-                        Platform manajemen WhatsApp Business yang powerful untuk mengelola 
-                        pesan, auto-reply, dan export data grup dengan mudah.
-                    </p>
-                    
-                    <div class="features">
-                        <div class="feature-item">
-                            <div class="feature-icon">
-                                <i class="bi bi-chat-dots"></i>
-                            </div>
-                            <div>
-                                <strong>Multi Session</strong>
-                                <p class="mb-0 small opacity-75">Kelola banyak nomor WA</p>
-                            </div>
-                        </div>
-                        <div class="feature-item">
-                            <div class="feature-icon">
-                                <i class="bi bi-robot"></i>
-                            </div>
-                            <div>
-                                <strong>Auto Reply</strong>
-                                <p class="mb-0 small opacity-75">Balas pesan otomatis 24/7</p>
-                            </div>
-                        </div>
-                        <div class="feature-item">
-                            <div class="feature-icon">
-                                <i class="bi bi-people"></i>
-                            </div>
-                            <div>
-                                <strong>Export Grup</strong>
-                                <p class="mb-0 small opacity-75">Export data member grup</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Login Form Side -->
-            <div class="login-form-container">
-                <div class="login-form-header">
-                    <h2>Selamat Datang! 👋</h2>
-                    <p>Silakan login untuk melanjutkan</p>
-                </div>
-                
-                <!-- Alert -->
-                <div id="alert-container" class="alert alert-danger">
-                    <i class="bi bi-exclamation-circle"></i>
-                    <span id="alert-message"></span>
-                </div>
-                
-                <form id="login-form">
-                    <div class="form-group">
-                        <label class="form-label">Email</label>
-                        <div class="input-group">
-                            <i class="bi bi-envelope input-icon"></i>
-                            <input type="email" class="form-control" id="email" 
-                                   placeholder="Masukkan email Anda" required autocomplete="email">
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label class="form-label">Password</label>
-                        <div class="input-group">
-                            <i class="bi bi-lock input-icon"></i>
-                            <input type="password" class="form-control" id="password" 
-                                   placeholder="Masukkan password" required autocomplete="current-password">
-                            <i class="bi bi-eye toggle-password" onclick="togglePassword()"></i>
-                        </div>
-                    </div>
-                    
-                    <div class="remember-forgot">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="remember" checked>
-                            <label class="form-check-label" for="remember">
-                                Ingat saya
-                            </label>
-                        </div>
-                    </div>
-                    
-                    <button type="submit" class="btn btn-login" id="btn-login">
-                        <span class="btn-text">Masuk</span>
-                        <span class="btn-loading d-none">
-                            <span class="spinner-border spinner-border-sm me-2"></span>
-                            Memproses...
-                        </span>
-                    </button>
-                </form>
-                
-                <div class="text-center mt-4">
-                    <small class="text-muted">
-                        <i class="bi bi-shield-check me-1"></i>
-                        Koneksi aman dan terenkripsi 
-                    </small>
-                </div>
+<div class="card">
+    <div class="logo-wrap">
+        <div class="logo-icon"><i class="bi bi-whatsapp"></i></div>
+        <div class="logo-text">Billey <span>WA</span></div>
+    </div>
+    <div class="heading">
+        <h1>Selamat Datang 👋</h1>
+        <p>Masuk ke akun Anda untuk melanjutkan</p>
+    </div>
+    <div id="alert-container" class="alert alert-danger" role="alert">
+        <i class="bi bi-exclamation-circle-fill"></i>
+        <span id="alert-message"></span>
+    </div>
+    <form id="login-form" novalidate>
+        <div class="field">
+            <label for="email">Email</label>
+            <div class="input-wrap">
+                <input type="email" id="email" placeholder="nama@email.com" autocomplete="email" required>
+                <i class="bi bi-envelope ico"></i>
             </div>
         </div>
-    </div>
-
-    <!-- Scripts -->
-    <script src="/assets/plugins/global/plugins.bundle.js"></script>
-    <script src="/assets/js/scripts.bundle.js"></script>
-    
-    <script>
-        // Toggle password visibility
-        function togglePassword() {
-            const passwordInput = document.getElementById('password');
-            const toggleIcon = document.querySelector('.toggle-password');
-            
-            if (passwordInput.type === 'password') {
-                passwordInput.type = 'text';
-                toggleIcon.classList.remove('bi-eye');
-                toggleIcon.classList.add('bi-eye-slash');
+        <div class="field">
+            <label for="password">Password</label>
+            <div class="input-wrap">
+                <input type="password" id="password" placeholder="Masukkan password" autocomplete="current-password" required>
+                <i class="bi bi-lock ico"></i>
+                <button type="button" class="toggle-pw" id="toggle-pw" aria-label="Tampilkan password"><i class="bi bi-eye" id="toggle-pw-icon"></i></button>
+            </div>
+        </div>
+        <div class="row-check">
+            <label class="check-label" for="remember"><input type="checkbox" id="remember" checked>Ingat saya</label>
+        </div>
+        <button type="submit" class="btn-login" id="btn-login"><span id="btn-text">Masuk</span></button>
+    </form>
+    <div class="footer-note"><i class="bi bi-shield-lock"></i>Koneksi aman &amp; terenkripsi</div>
+</div>
+<script>
+    document.getElementById('toggle-pw').addEventListener('click', function() {
+        const input = document.getElementById('password');
+        const icon = document.getElementById('toggle-pw-icon');
+        const isHidden = input.type === 'password';
+        input.type = isHidden ? 'text' : 'password';
+        icon.className = isHidden ? 'bi bi-eye-slash' : 'bi bi-eye';
+    });
+    function showAlert(msg, type = 'danger') {
+        const box = document.getElementById('alert-container');
+        const txt = document.getElementById('alert-message');
+        box.className = 'alert alert-' + type + ' show';
+        box.querySelector('i').className = type === 'success' ? 'bi bi-check-circle-fill' : 'bi bi-exclamation-circle-fill';
+        txt.textContent = msg;
+    }
+    function hideAlert() { document.getElementById('alert-container').classList.remove('show'); }
+    function setLoading(on) {
+        const btn = document.getElementById('btn-login');
+        btn.disabled = on;
+        if (on) btn.innerHTML = '<span class="spinner"></span><span>Memproses...</span>';
+        else btn.innerHTML = '<span id="btn-text">Masuk</span>';
+    }
+    (async function() {
+        try {
+            const r = await fetch('/api/auth/me');
+            if (r.ok) {
+                const d = await r.json();
+                if (d.success && d.user) window.location.href = d.user.role === 'adminwa' ? '/index.html' : '/member/dashboard.html';
+            }
+        } catch {}
+    })();
+    const err = new URLSearchParams(window.location.search).get('error');
+    if (err) showAlert(decodeURIComponent(err));
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        hideAlert();
+        const email = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value;
+        if (!email || !password) {
+            showAlert('Email dan password wajib diisi');
+            return;
+        }
+        setLoading(true);
+        try {
+            const r = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+            const d = await r.json();
+            if (d.success) {
+                showAlert('Login berhasil! Mengalihkan...', 'success');
+                localStorage.setItem('wa_user', JSON.stringify(d.user));
+                setTimeout(() => {
+                    window.location.href = d.user.role === 'adminwa' ? '/index.html' : '/member/dashboard.html';
+                }, 700);
             } else {
-                passwordInput.type = 'password';
-                toggleIcon.classList.remove('bi-eye-slash');
-                toggleIcon.classList.add('bi-eye');
+                showAlert(d.error || 'Email atau password salah');
             }
+        } catch {
+            showAlert('Terjadi kesalahan. Silakan coba lagi.');
+        } finally {
+            setLoading(false);
         }
-        
-        // Show alert
-        function showAlert(message, type = 'danger') {
-            const alertContainer = document.getElementById('alert-container');
-            const alertMessage = document.getElementById('alert-message');
-            
-            alertContainer.className = `alert alert-${type} show`;
-            alertMessage.textContent = message;
-            
-            if (type === 'success') {
-                alertContainer.querySelector('i').className = 'bi bi-check-circle';
-            } else {
-                alertContainer.querySelector('i').className = 'bi bi-exclamation-circle';
-            }
-        }
-        
-        // Hide alert
-        function hideAlert() {
-            document.getElementById('alert-container').classList.remove('show');
-        }
-        
-        // Set loading state
-        function setLoading(loading) {
-            const btn = document.getElementById('btn-login');
-            const btnText = btn.querySelector('.btn-text');
-            const btnLoading = btn.querySelector('.btn-loading');
-            
-            btn.disabled = loading;
-            btnText.classList.toggle('d-none', loading);
-            btnLoading.classList.toggle('d-none', !loading);
-        }
-        
-        // Check if already logged in
-        (async function checkExistingSession() {
-            try {
-                const response = await fetch('/api/auth/me');
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.success && data.user) {
-                        // Already logged in, redirect
-                        window.location.href = data.user.role === 'adminwa' ? '/index.html' : '/member/dashboard.html';
-                        return;
-                    }
-                }
-            } catch (error) {
-                // Not logged in, continue to login form
-            }
-        })();
-        
-        // Check for URL error parameter
-        const urlParams = new URLSearchParams(window.location.search);
-        const errorMsg = urlParams.get('error');
-        if (errorMsg) {
-            showAlert(decodeURIComponent(errorMsg));
-        }
-        
-        // Handle form submission
-        document.getElementById('login-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            hideAlert();
-            
-            const email = document.getElementById('email').value.trim();
-            const password = document.getElementById('password').value;
-            
-            if (!email || !password) {
-                showAlert('Email dan password wajib diisi');
-                return;
-            }
-            
-            setLoading(true);
-            
-            try {
-                const response = await fetch('/api/auth/login', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ email, password })
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    showAlert('Login berhasil! Mengalihkan...', 'success');
-                    
-                    // Store user info in localStorage for quick access
-                    localStorage.setItem('wa_user', JSON.stringify(data.user));
-                    
-                    // Redirect based on role
-                    setTimeout(() => {
-                        const redirectUrl = data.user.role === 'adminwa' ? '/index.html' : '/member/dashboard.html';
-                        window.location.href = redirectUrl;
-                    }, 800);
-                } else {
-                    showAlert(data.error || 'Login gagal');
-                }
-            } catch (error) {
-                console.error('Login error:', error);
-                showAlert('Terjadi kesalahan. Silakan coba lagi.');
-            } finally {
-                setLoading(false);
-            }
-        });
-        
-        // Auto-focus email input
-        document.getElementById('email').focus();
-    </script>
+    });
+    document.getElementById('email').focus();
+</script>
 </body>
 </html>

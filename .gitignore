@@ -44,3 +44,4 @@ temp/
 # SQLite WAL files
 data/*.db-wal
 data/*.db-shm
+NUL
