@@ -22,6 +22,11 @@ wa-logs.txt
 .env.local
 .env.*.local
 
+# Firebase service account (SENSITIVE - contains private key)
+firebase-service-account.json
+wa-api-massage-*.json
+*-service-account*.json
+
 # IDE
 .vscode/
 .idea/

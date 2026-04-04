@@ -284,6 +284,47 @@ try {
     console.error('⚠️ User isolation migration error:', migrationError)
 }
 
+// Migration: Create notification tables
+try {
+    db.exec(`
+        -- FCM Device Tokens (for push notifications when user is offline)
+        CREATE TABLE IF NOT EXISTS fcm_tokens (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            token TEXT NOT NULL UNIQUE,
+            platform TEXT DEFAULT 'web',
+            browser TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_fcm_tokens_user ON fcm_tokens(user_id);
+        CREATE INDEX IF NOT EXISTS idx_fcm_tokens_token ON fcm_tokens(token);
+
+        -- Notification history / inbox
+        CREATE TABLE IF NOT EXISTS notifications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            type TEXT NOT NULL DEFAULT 'incoming_message',
+            title TEXT NOT NULL,
+            body TEXT,
+            data TEXT,
+            channel TEXT CHECK(channel IN ('socket', 'fcm', 'both')),
+            status TEXT DEFAULT 'sent' CHECK(status IN ('sent', 'delivered', 'read', 'failed')),
+            read_at DATETIME,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
+        CREATE INDEX IF NOT EXISTS idx_notifications_status ON notifications(status);
+        CREATE INDEX IF NOT EXISTS idx_notifications_created ON notifications(created_at);
+        CREATE INDEX IF NOT EXISTS idx_notifications_type ON notifications(type);
+    `)
+    console.log('✅ Notification tables migration complete')
+} catch (migrationError) {
+    console.error('⚠️ Notification tables migration error:', migrationError)
+}
+
 // Message Log Interface
 export interface MessageLogEntry {
     id?: number
@@ -2018,6 +2059,128 @@ export function startMediaAutoCleanup(days: number = 3, intervalHours: number = 
 
 export function stopMediaAutoCleanup(): void {
     if (_mediaCleanupTimer) { clearInterval(_mediaCleanupTimer); _mediaCleanupTimer = null }
+}
+
+// ============================================
+// FCM Token Functions
+// ============================================
+export interface FcmTokenEntry {
+    id?: number
+    user_id: number
+    token: string
+    platform?: string
+    browser?: string
+    created_at?: string
+    updated_at?: string
+}
+
+export const fcmTokenDb = {
+    // Save or update FCM token for a user
+    upsert: (userId: number, token: string, platform?: string, browser?: string): void => {
+        db.prepare(`
+            INSERT INTO fcm_tokens (user_id, token, platform, browser, updated_at)
+            VALUES (?, ?, ?, ?, datetime('now'))
+            ON CONFLICT(token) DO UPDATE SET
+                user_id = excluded.user_id,
+                platform = excluded.platform,
+                browser = excluded.browser,
+                updated_at = datetime('now')
+        `).run(userId, token, platform || 'web', browser || null)
+    },
+
+    // Remove a specific token
+    remove: (token: string): void => {
+        db.prepare('DELETE FROM fcm_tokens WHERE token = ?').run(token)
+    },
+
+    // Remove all tokens for a user
+    removeAllForUser: (userId: number): void => {
+        db.prepare('DELETE FROM fcm_tokens WHERE user_id = ?').run(userId)
+    },
+
+    // Get all tokens for a user
+    getForUser: (userId: number): FcmTokenEntry[] => {
+        return db.prepare('SELECT * FROM fcm_tokens WHERE user_id = ?').all(userId) as FcmTokenEntry[]
+    },
+
+    // Get all tokens for multiple users
+    getForUsers: (userIds: number[]): FcmTokenEntry[] => {
+        if (userIds.length === 0) return []
+        const placeholders = userIds.map(() => '?').join(',')
+        return db.prepare(`SELECT * FROM fcm_tokens WHERE user_id IN (${placeholders})`).all(...userIds) as FcmTokenEntry[]
+    }
+}
+
+// ============================================
+// Notification History Functions
+// ============================================
+export interface NotificationEntry {
+    id?: number
+    user_id: number
+    type: string
+    title: string
+    body?: string
+    data?: string
+    channel?: string
+    status?: string
+    read_at?: string
+    created_at?: string
+}
+
+export const notificationDb = {
+    // Insert a notification record
+    insert: (entry: NotificationEntry): number | bigint => {
+        const result = db.prepare(`
+            INSERT INTO notifications (user_id, type, title, body, data, channel, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        `).run(
+            entry.user_id,
+            entry.type || 'incoming_message',
+            entry.title,
+            entry.body || null,
+            entry.data || null,
+            entry.channel || 'socket',
+            entry.status || 'sent'
+        )
+        return result.lastInsertRowid
+    },
+
+    // Get notifications for a user (inbox)
+    getForUser: (userId: number, limit: number = 50, offset: number = 0): NotificationEntry[] => {
+        return db.prepare(`
+            SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?
+        `).all(userId, limit, offset) as NotificationEntry[]
+    },
+
+    // Get unread count
+    getUnreadCount: (userId: number): number => {
+        const row = db.prepare(`
+            SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND read_at IS NULL
+        `).get(userId) as any
+        return row?.count || 0
+    },
+
+    // Mark as read
+    markAsRead: (notificationId: number, userId: number): void => {
+        db.prepare(`
+            UPDATE notifications SET read_at = datetime('now'), status = 'read' WHERE id = ? AND user_id = ?
+        `).run(notificationId, userId)
+    },
+
+    // Mark all as read for user
+    markAllAsRead: (userId: number): void => {
+        db.prepare(`
+            UPDATE notifications SET read_at = datetime('now'), status = 'read' WHERE user_id = ? AND read_at IS NULL
+        `).run(userId)
+    },
+
+    // Delete old notifications (cleanup)
+    deleteOlderThan: (days: number): number => {
+        const result = db.prepare(`
+            DELETE FROM notifications WHERE created_at < datetime('now', '-' || ? || ' days')
+        `).run(days)
+        return result.changes
+    }
 }
 
 // Export database instance for direct queries if needed

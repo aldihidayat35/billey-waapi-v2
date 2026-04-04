@@ -3,7 +3,7 @@ import { createServer } from 'http'
 import { Server as SocketIO } from 'socket.io'
 import { SessionManager } from './session-manager'
 import { logger as activityLogger } from './logger'
-import { messageLogDb, sessionLogDb, chatTemplateDb, groupExportDb, autoReplyDb, autoReplyLogDb, autoReplyCooldownDb, autoForwardConfigDb, autoForwardTokenDb, autoForwardLogDb, db, dbMaintenance, memberSessionDb, startMediaAutoCleanup } from './database.js'
+import { messageLogDb, sessionLogDb, chatTemplateDb, groupExportDb, autoReplyDb, autoReplyLogDb, autoReplyCooldownDb, autoForwardConfigDb, autoForwardTokenDb, autoForwardLogDb, db, dbMaintenance, memberSessionDb, startMediaAutoCleanup, fcmTokenDb, notificationDb } from './database.js'
 import * as fs from 'fs'
 import * as path from 'path'
 import { fileURLToPath } from 'url'
@@ -20,6 +20,7 @@ import {
 	getUserSessionIds, getSessionFilter, getUserFilter
 } from './middleware.js'
 import multer from 'multer'
+import { NotificationService, registerUserSocket, unregisterUserSocket, registerAdminSocket, unregisterAdminSocket, isUserOnline, getOnlineUserCount } from './notification.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -40,6 +41,8 @@ const io = new SocketIO(server, {
 })
 
 const sessionManager = new SessionManager(io)
+const notificationService = new NotificationService(io)
+sessionManager.setNotificationService(notificationService)
 
 // Parse cookies and JSON body FIRST
 app.use(cookieParser()) // Parse cookies for session management
@@ -1185,8 +1188,8 @@ app.get('/api/session/:sessionId', (req, res) => {
 	}
 })
 
-// Get conversations for a session (for inbox page)
-app.get('/api/messages/conversations/:sessionId', (req, res) => {
+// Get conversations for a session (for inbox page — admin only)
+app.get('/api/messages/conversations/:sessionId', authMiddleware, adminMiddleware, (req, res) => {
 	try {
 		const { sessionId } = req.params
 		const conversations = activityLogger.getConversations(sessionId)
@@ -1197,8 +1200,8 @@ app.get('/api/messages/conversations/:sessionId', (req, res) => {
 	}
 })
 
-// Get messages for a specific chat (for inbox page)
-app.get('/api/messages/chat/:sessionId/:phone', (req, res) => {
+// Get messages for a specific chat (for inbox page — admin only)
+app.get('/api/messages/chat/:sessionId/:phone', authMiddleware, adminMiddleware, (req, res) => {
 	try {
 		const { sessionId, phone } = req.params
 		const messages = activityLogger.getChatMessages(sessionId, phone)
@@ -1209,8 +1212,8 @@ app.get('/api/messages/chat/:sessionId/:phone', (req, res) => {
 	}
 })
 
-// Get contacts for a session
-app.get('/api/contacts/:sessionId', (req, res) => {
+// Get contacts for a session (admin only)
+app.get('/api/contacts/:sessionId', authMiddleware, adminMiddleware, (req, res) => {
 	try {
 		const { sessionId } = req.params
 		const contacts = activityLogger.getContacts(sessionId)
@@ -1221,8 +1224,8 @@ app.get('/api/contacts/:sessionId', (req, res) => {
 	}
 })
 
-// Get logs by date
-app.get('/api/logs/date/:date', (req, res) => {
+// Get logs by date (admin only)
+app.get('/api/logs/date/:date', authMiddleware, adminMiddleware, (req, res) => {
 	try {
 		const date = req.params.date
 		const type = (req.query.type as 'session' | 'message') || 'message'
@@ -1234,8 +1237,8 @@ app.get('/api/logs/date/:date', (req, res) => {
 	}
 })
 
-// Clear old logs
-app.delete('/api/logs/clear', (req, res) => {
+// Clear old logs (admin only)
+app.delete('/api/logs/clear', authMiddleware, adminMiddleware, (req, res) => {
 	try {
 		const days = parseInt(req.query.days as string) || 30
 		const deletedCount = activityLogger.clearOldLogs(days)
@@ -1246,9 +1249,183 @@ app.delete('/api/logs/clear', (req, res) => {
 	}
 })
 
+// ============================================
+// Notification API Endpoints
+// ============================================
+
+// Register FCM token (member/worker)
+app.post('/api/notifications/fcm-token', authMiddleware, (req, res) => {
+	try {
+		const user = (req as any).user as User
+		if (user.role !== 'memberwa' && user.role !== 'worker') {
+			return res.status(403).json({ success: false, error: 'Hanya member dan worker yang bisa menerima notifikasi' })
+		}
+
+		const { token, platform, browser } = req.body
+		if (!token || typeof token !== 'string') {
+			return res.status(400).json({ success: false, error: 'Token FCM diperlukan' })
+		}
+
+		fcmTokenDb.upsert(user.id, token, platform, browser)
+		res.json({ success: true, message: 'FCM token registered' })
+	} catch (error: any) {
+		console.error('Error registering FCM token:', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Remove FCM token
+app.delete('/api/notifications/fcm-token', authMiddleware, (req, res) => {
+	try {
+		const { token } = req.body
+		if (!token) {
+			return res.status(400).json({ success: false, error: 'Token diperlukan' })
+		}
+		fcmTokenDb.remove(token)
+		res.json({ success: true, message: 'FCM token removed' })
+	} catch (error: any) {
+		console.error('Error removing FCM token:', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Get notifications inbox (member/worker)
+app.get('/api/notifications', authMiddleware, (req, res) => {
+	try {
+		const user = (req as any).user as User
+		const limit = parseInt(req.query.limit as string) || 50
+		const offset = parseInt(req.query.offset as string) || 0
+
+		const notifications = notificationDb.getForUser(user.id, limit, offset)
+		const unreadCount = notificationDb.getUnreadCount(user.id)
+
+		res.json({ success: true, notifications, unreadCount })
+	} catch (error: any) {
+		console.error('Error fetching notifications:', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Get unread count
+app.get('/api/notifications/unread-count', authMiddleware, (req, res) => {
+	try {
+		const user = (req as any).user as User
+		const count = notificationDb.getUnreadCount(user.id)
+		res.json({ success: true, count })
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Mark notification as read
+app.put('/api/notifications/:id/read', authMiddleware, (req, res) => {
+	try {
+		const user = (req as any).user as User
+		const notifId = parseInt(req.params.id)
+		notificationDb.markAsRead(notifId, user.id)
+		res.json({ success: true })
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Mark all notifications as read
+app.put('/api/notifications/read-all', authMiddleware, (req, res) => {
+	try {
+		const user = (req as any).user as User
+		notificationDb.markAllAsRead(user.id)
+		res.json({ success: true })
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Admin: send notification to specific user (testing/manual)
+app.post('/api/notifications/send', authMiddleware, adminMiddleware, async (req, res) => {
+	try {
+		const { userId, title, body, type } = req.body
+		if (!userId || !title) {
+			return res.status(400).json({ success: false, error: 'userId dan title diperlukan' })
+		}
+		const result = await notificationService.sendToUser(userId, {
+			type: type || 'system',
+			title,
+			body: body || '',
+			data: { url: '/member/dashboard.html' }
+		})
+		res.json({ success: true, result })
+	} catch (error: any) {
+		console.error('Error sending notification:', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Admin: get notification stats
+app.get('/api/notifications/stats', authMiddleware, adminMiddleware, (req, res) => {
+	try {
+		const onlineCount = getOnlineUserCount()
+		const totalTokens = (db.prepare('SELECT COUNT(*) as count FROM fcm_tokens').get() as any)?.count || 0
+		const totalNotifs = (db.prepare('SELECT COUNT(*) as count FROM notifications').get() as any)?.count || 0
+		const unreadNotifs = (db.prepare('SELECT COUNT(*) as count FROM notifications WHERE read_at IS NULL').get() as any)?.count || 0
+		res.json({
+			success: true,
+			stats: {
+				onlineUsers: onlineCount,
+				registeredDevices: totalTokens,
+				totalNotifications: totalNotifs,
+				unreadNotifications: unreadNotifs
+			}
+		})
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
 // Socket.IO connection
 io.on('connection', (socket) => {
 	console.log('Client connected:', socket.id)
+
+	// ============================================
+	// Auto-register user from httpOnly cookie
+	// ============================================
+	const cookieHeader = socket.handshake.headers.cookie || ''
+	const cookieMatch = cookieHeader.match(new RegExp(`(?:^|;\\s*)${SESSION_COOKIE_NAME}=([^;]+)`))
+	const autoToken = cookieMatch ? cookieMatch[1] : null
+	if (autoToken) {
+		const user = validateSession(autoToken)
+		if (user) {
+			if (user.role === 'adminwa') {
+				registerAdminSocket(socket.id)
+			} else {
+				registerUserSocket(user.id, user.role, socket.id)
+				socket.emit('user-registered', { userId: user.id, role: user.role })
+				const unreadCount = notificationDb.getUnreadCount(user.id)
+				socket.emit('unread-count', { count: unreadCount })
+			}
+		}
+	}
+
+	// ============================================
+	// User Presence Tracking for Notifications (fallback manual registration)
+	// ============================================
+	socket.on('register-user', (data: { sessionToken: string }) => {
+		if (!data?.sessionToken) return
+		const user = validateSession(data.sessionToken)
+		if (user && (user.role === 'memberwa' || user.role === 'worker')) {
+			registerUserSocket(user.id, user.role, socket.id)
+			socket.emit('user-registered', { userId: user.id, role: user.role })
+
+			// Send unread notification count
+			const unreadCount = notificationDb.getUnreadCount(user.id)
+			socket.emit('unread-count', { count: unreadCount })
+		}
+	})
+
+	socket.on('disconnect', () => {
+		unregisterUserSocket(socket.id)
+		unregisterAdminSocket(socket.id)
+		console.log('Client disconnected:', socket.id)
+	})
 
 	// Send all sessions status
 	const sessions = sessionManager.getAllSessions()

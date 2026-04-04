@@ -475,6 +475,26 @@
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="/socket.io/socket.io.js"></script>
+<!-- Firebase SDK for push notifications -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js"></script>
+<script src="/js/notifications.js"></script>
 <script src="/member/chat.js"></script>
+<script>
+// Initialize notifications after chat.js has set up the socket
+document.addEventListener('DOMContentLoaded', () => {
+    // Wait for socket to be ready (chat.js creates S.socket)
+    const checkSocket = setInterval(() => {
+        if (typeof S !== 'undefined' && S.socket) {
+            clearInterval(checkSocket);
+            NotificationManager.init(S.socket, {
+                // TODO: Replace with your VAPID key from Firebase Console
+                // Firebase Console → Project Settings → Cloud Messaging → Web Push certificates
+                vapidKey: 'BAPL5bqGjrmHDEaz2cIuRWkGLkABy3r45uf7dm29s79n9TmQLcm2JNgqROVW4dumPlqK-yaM6Rufnwz6LkqCR58'
+            });
+        }
+    }, 500);
+});
+</script>
 </body>
 </html>

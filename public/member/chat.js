@@ -202,6 +202,25 @@ async function openChat(contact) {
     markConversationRead(S.activeSession, contact);
 }
 
+// Reload active chat messages (used after reconnect to catch missed messages)
+async function reloadActiveChat() {
+    if (!S.activeSession || !S.activeContact) return;
+    try {
+        const r = await fetch(`/api/member/messages/${encodeURIComponent(S.activeSession)}/${encodeURIComponent(S.activeContact)}?limit=200`);
+        const d = await r.json();
+        let hasNew = false;
+        (d.messages || []).forEach(m => {
+            const id = m.message_id || m.id;
+            if (!S.messages.has(id)) hasNew = true;
+            S.messages.set(id, m);
+        });
+        if (hasNew) {
+            renderMessages();
+            scrollToBottom();
+        }
+    } catch (e) { console.error('Reload chat error:', e); }
+}
+
 function renderMessages() {
     const container = document.getElementById('chat-messages');
     const msgs = Array.from(S.messages.values()).sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
@@ -355,6 +374,25 @@ function sendMediaMessage() {
 // ─── Socket Listeners ─────────────────────────────────────────
 function setupSocketListeners() {
     const sock = S.socket;
+
+    // Reconnect handler — sync missed messages after connection drop
+    sock.on('connect', () => {
+        console.log('🔌 Socket connected:', sock.id);
+        // If we already had sessions loaded, this is a reconnection — reload data
+        if (S.sessions.length > 0) {
+            console.log('🔄 Reconnected — syncing missed data...');
+            loadConversations();
+            loadUnread();
+            // If a chat is open, reload messages to catch any missed during disconnect
+            if (S.activeSession && S.activeContact) {
+                reloadActiveChat();
+            }
+        }
+    });
+
+    sock.on('disconnect', (reason) => {
+        console.log('🔴 Socket disconnected:', reason);
+    });
 
     sock.on('message-sent', data => {
         if (data.tempId && S.pendingMsgs.has(data.tempId)) {

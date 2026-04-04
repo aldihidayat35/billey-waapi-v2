@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notification Tester | WhatsApp Gateway</title>
+    <link rel="shortcut icon" href="assets/media/logos/favicon.ico" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,400,500,600,700" />
+    <link href="assets/plugins/global/plugins.bundle.css" rel="stylesheet" type="text/css" />
+    <link href="assets/css/style.bundle.css" rel="stylesheet" type="text/css" />
+    <style>
+        .stat-card {
+            border-radius: 12px; padding: 20px;
+            background: #fff; border: 1px solid #e4e6ef;
+            transition: all .2s;
+        }
+        .stat-card:hover { box-shadow: 0 6px 20px rgba(0,0,0,.08); }
+        .stat-icon {
+            width: 48px; height: 48px; border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 22px; flex-shrink: 0;
+        }
+        .log-entry {
+            padding: 10px 14px; border-radius: 8px; margin-bottom: 6px;
+            font-size: 13px; font-family: 'Fira Code', monospace, inherit;
+            border-left: 4px solid #e4e6ef;
+        }
+        .log-entry.success { background: #e8fff3; border-left-color: #50cd89; }
+        .log-entry.error   { background: #fff5f8; border-left-color: #f1416c; }
+        .log-entry.info    { background: #f1faff; border-left-color: #009ef7; }
+        .log-entry .log-time { color: #a1a5b7; font-size: 11px; }
+        #notif-log { max-height: 400px; overflow-y: auto; }
+        .fcm-status { font-size: 13px; }
+        .fcm-status .badge { font-size: 12px; }
+    </style>
+</head>
+<body id="kt_app_body" data-kt-app-layout="dark-sidebar" data-kt-app-header-fixed="true" data-kt-app-sidebar-enabled="true" data-kt-app-sidebar-fixed="true" data-kt-app-sidebar-hoverable="true" data-kt-app-sidebar-push-header="true" data-kt-app-sidebar-push-toolbar="true" data-kt-app-sidebar-push-footer="true" data-kt-app-toolbar-enabled="true" class="app-default">
+    <div class="d-flex flex-column flex-root app-root" id="kt_app_root">
+        <div class="app-page flex-column flex-column-fluid" id="kt_app_page">
+            <div id="header-container"></div>
+            <div class="app-wrapper flex-column flex-row-fluid" id="kt_app_wrapper">
+                <div id="sidebar-container"></div>
+                <div class="app-main flex-column flex-row-fluid" id="kt_app_main">
+                    <div class="d-flex flex-column flex-column-fluid">
+                        <!-- Toolbar -->
+                        <div id="kt_app_toolbar" class="app-toolbar py-3 py-lg-6">
+                            <div id="kt_app_toolbar_container" class="app-container container-xxl d-flex flex-stack">
+                                <div class="page-title d-flex flex-column justify-content-center flex-wrap me-3">
+                                    <h1 class="page-heading d-flex text-gray-900 fw-bold fs-3 flex-column justify-content-center my-0">
+                                        <i class="bi bi-bell-fill text-warning me-2"></i> Notification Tester
+                                    </h1>
+                                    <ul class="breadcrumb breadcrumb-separatorless fw-semibold fs-7 my-0 pt-1">
+                                        <li class="breadcrumb-item text-muted"><a href="/" class="text-muted text-hover-primary">Dashboard</a></li>
+                                        <li class="breadcrumb-item"><span class="bullet bg-gray-500 w-5px h-2px"></span></li>
+                                        <li class="breadcrumb-item text-muted">Notification Tester</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Content -->
+                        <div id="kt_app_content" class="app-content flex-column-fluid">
+                            <div id="kt_app_content_container" class="app-container container-xxl">
+
+                                <!-- Stats Row -->
+                                <div class="row g-5 mb-8" id="stats-row">
+                                    <div class="col-6 col-md-3">
+                                        <div class="stat-card d-flex align-items-center gap-3">
+                                            <div class="stat-icon bg-light-success text-success"><i class="bi bi-person-check-fill"></i></div>
+                                            <div>
+                                                <div class="fs-2 fw-bold" id="stat-online">-</div>
+                                                <div class="text-gray-500 fs-7">User Online</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <div class="stat-card d-flex align-items-center gap-3">
+                                            <div class="stat-icon bg-light-primary text-primary"><i class="bi bi-phone-fill"></i></div>
+                                            <div>
+                                                <div class="fs-2 fw-bold" id="stat-devices">-</div>
+                                                <div class="text-gray-500 fs-7">FCM Devices</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <div class="stat-card d-flex align-items-center gap-3">
+                                            <div class="stat-icon bg-light-info text-info"><i class="bi bi-bell-fill"></i></div>
+                                            <div>
+                                                <div class="fs-2 fw-bold" id="stat-total">-</div>
+                                                <div class="text-gray-500 fs-7">Total Notifikasi</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <div class="stat-card d-flex align-items-center gap-3">
+                                            <div class="stat-icon bg-light-danger text-danger"><i class="bi bi-envelope-fill"></i></div>
+                                            <div>
+                                                <div class="fs-2 fw-bold" id="stat-unread">-</div>
+                                                <div class="text-gray-500 fs-7">Belum Dibaca</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="row g-5">
+                                    <!-- Left: Send Notification -->
+                                    <div class="col-lg-6">
+                                        <div class="card shadow-sm">
+                                            <div class="card-header">
+                                                <h3 class="card-title fw-bold"><i class="bi bi-send text-primary me-2"></i>Kirim Notifikasi</h3>
+                                            </div>
+                                            <div class="card-body">
+                                                <!-- User Selection -->
+                                                <div class="mb-5">
+                                                    <label class="form-label fw-semibold">Target User</label>
+                                                    <select class="form-select" id="target-user">
+                                                        <option value="">-- Pilih User --</option>
+                                                    </select>
+                                                </div>
+
+                                                <!-- Notification Type -->
+                                                <div class="mb-5">
+                                                    <label class="form-label fw-semibold">Tipe Notifikasi</label>
+                                                    <select class="form-select" id="notif-type">
+                                                        <option value="incoming_message">Pesan Masuk</option>
+                                                        <option value="session_status">Status Session</option>
+                                                        <option value="assignment_update">Update Penugasan</option>
+                                                        <option value="system">Sistem</option>
+                                                    </select>
+                                                </div>
+
+                                                <!-- Title -->
+                                                <div class="mb-5">
+                                                    <label class="form-label fw-semibold">Judul</label>
+                                                    <input type="text" class="form-control" id="notif-title" placeholder="Judul notifikasi" value="Test Notifikasi">
+                                                </div>
+
+                                                <!-- Body -->
+                                                <div class="mb-5">
+                                                    <label class="form-label fw-semibold">Isi Pesan</label>
+                                                    <textarea class="form-control" id="notif-body" rows="3" placeholder="Isi pesan notifikasi...">Ini adalah pesan test dari admin panel.</textarea>
+                                                </div>
+
+                                                <!-- Send Button -->
+                                                <button class="btn btn-primary w-100" id="btn-send" onclick="sendNotification()">
+                                                    <i class="bi bi-send-fill me-2"></i> Kirim Notifikasi
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <!-- FCM Status Card -->
+                                        <div class="card shadow-sm mt-5">
+                                            <div class="card-header">
+                                                <h3 class="card-title fw-bold"><i class="bi bi-cloud text-info me-2"></i>Status FCM (Browser Ini)</h3>
+                                            </div>
+                                            <div class="card-body fcm-status">
+                                                <div class="d-flex align-items-center justify-content-between mb-3">
+                                                    <span class="text-gray-700">Service Worker</span>
+                                                    <span class="badge badge-light-secondary" id="sw-status">Checking...</span>
+                                                </div>
+                                                <div class="d-flex align-items-center justify-content-between mb-3">
+                                                    <span class="text-gray-700">Notification Permission</span>
+                                                    <span class="badge badge-light-secondary" id="perm-status">Checking...</span>
+                                                </div>
+                                                <div class="d-flex align-items-center justify-content-between mb-3">
+                                                    <span class="text-gray-700">FCM Token</span>
+                                                    <span class="badge badge-light-secondary" id="fcm-token-status">Checking...</span>
+                                                </div>
+                                                <div class="d-flex align-items-center justify-content-between mb-3">
+                                                    <span class="text-gray-700">Socket.IO</span>
+                                                    <span class="badge badge-light-secondary" id="socket-status">Checking...</span>
+                                                </div>
+                                                <button class="btn btn-sm btn-light-primary mt-2" onclick="requestFCMPermission()">
+                                                    <i class="bi bi-shield-check me-1"></i> Request Permission & Token
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Right: Log -->
+                                    <div class="col-lg-6">
+                                        <div class="card shadow-sm">
+                                            <div class="card-header d-flex align-items-center justify-content-between">
+                                                <h3 class="card-title fw-bold"><i class="bi bi-journal-text text-success me-2"></i>Log Realtime</h3>
+                                                <button class="btn btn-sm btn-light" onclick="clearLog()">
+                                                    <i class="bi bi-trash me-1"></i> Clear
+                                                </button>
+                                            </div>
+                                            <div class="card-body p-4" id="notif-log">
+                                                <div class="log-entry info">
+                                                    <span class="log-time">[System]</span> Menunggu koneksi...
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Notification History -->
+                                        <div class="card shadow-sm mt-5">
+                                            <div class="card-header d-flex align-items-center justify-content-between">
+                                                <h3 class="card-title fw-bold"><i class="bi bi-inbox text-warning me-2"></i>Riwayat Notifikasi</h3>
+                                                <button class="btn btn-sm btn-light-success" onclick="markAllRead()">
+                                                    <i class="bi bi-check-all me-1"></i> Tandai Semua Dibaca
+                                                </button>
+                                            </div>
+                                            <div class="card-body p-0">
+                                                <div id="notif-history" style="max-height: 400px; overflow-y: auto;">
+                                                    <div class="text-center text-gray-500 py-8">Memuat...</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="footer-container"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="assets/plugins/global/plugins.bundle.js"></script>
+    <script src="assets/js/scripts.bundle.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js"></script>
+    <script src="/js/notifications.js"></script>
+    <script>
+    // ============================================
+    // State
+    // ============================================
+    let socket = null;
+    let currentUser = null;
+
+    // ============================================
+    // Init
+    // ============================================
+    document.addEventListener('DOMContentLoaded', async () => {
+        await loadComponents();
+        await checkAuth();
+        initSocket();
+        loadStats();
+        loadUsers();
+        loadHistory();
+        checkFCMStatus();
+    });
+
+    // ============================================
+    // Layout Components
+    // ============================================
+    function loadHTMLWithScripts(id, html) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.innerHTML = html;
+        const scripts = el.querySelectorAll('script');
+        scripts.forEach(old => {
+            const s = document.createElement('script');
+            if (old.src) s.src = old.src; else s.textContent = old.textContent;
+            document.body.appendChild(s);
+        });
+    }
+
+    async function loadComponents() {
+        try {
+            const [hRes, sRes, fRes] = await Promise.all([
+                fetch('/components/header.html'),
+                fetch('/components/sidebar.html'),
+                fetch('/components/footer.html')
+            ]);
+            loadHTMLWithScripts('header-container', await hRes.text());
+            loadHTMLWithScripts('sidebar-container', await sRes.text());
+            loadHTMLWithScripts('footer-container', await fRes.text());
+            if (typeof KTMenu !== 'undefined') KTMenu.createInstances();
+            if (typeof KTDrawer !== 'undefined') KTDrawer.createInstances();
+        } catch (e) { console.error('Error loading components:', e); }
+    }
+
+    // ============================================
+    // Auth Check
+    // ============================================
+    async function checkAuth() {
+        try {
+            const res = await fetch('/api/auth/me');
+            const data = await res.json();
+            if (!data.success || data.user.role !== 'adminwa') {
+                window.location.href = '/auth/login.html';
+                return;
+            }
+            currentUser = data.user;
+            addLog('info', `Login sebagai: ${currentUser.name} (${currentUser.role})`);
+        } catch {
+            window.location.href = '/auth/login.html';
+        }
+    }
+
+    // ============================================
+    // Socket.IO
+    // ============================================
+    function initSocket() {
+        socket = io();
+
+        socket.on('connect', () => {
+            addLog('success', `Socket.IO terhubung (${socket.id})`);
+            document.getElementById('socket-status').className = 'badge badge-light-success';
+            document.getElementById('socket-status').textContent = 'Connected';
+
+            // Register as user for presence tracking
+            const sessionToken = getCookie('wa_session');
+            if (sessionToken) {
+                socket.emit('register-user', { sessionToken });
+            }
+        });
+
+        socket.on('disconnect', () => {
+            addLog('error', 'Socket.IO terputus');
+            document.getElementById('socket-status').className = 'badge badge-light-danger';
+            document.getElementById('socket-status').textContent = 'Disconnected';
+        });
+
+        // Listen for notifications (realtime)
+        socket.on('notification', (data) => {
+            addLog('success', `🔔 NOTIF VIA SOCKET: ${data.title} — ${data.body}`);
+            loadStats();
+            loadHistory();
+        });
+
+        socket.on('user-registered', (data) => {
+            addLog('info', `User registered for notifications (userId: ${data.userId})`);
+        });
+
+        socket.on('unread-count', (data) => {
+            addLog('info', `Unread count: ${data.count}`);
+        });
+
+        // Also init NotificationManager for full experience
+        NotificationManager.init(socket, {
+            vapidKey: 'BAPL5bqGjrmHDEaz2cIuRWkGLkABy3r45uf7dm29s79n9TmQLcm2JNgqROVW4dumPlqK-yaM6Rufnwz6LkqCR58'
+        });
+    }
+
+    // ============================================
+    // Stats
+    // ============================================
+    async function loadStats() {
+        try {
+            const res = await fetch('/api/notifications/stats');
+            const data = await res.json();
+            if (data.success) {
+                document.getElementById('stat-online').textContent = data.stats.onlineUsers;
+                document.getElementById('stat-devices').textContent = data.stats.registeredDevices;
+                document.getElementById('stat-total').textContent = data.stats.totalNotifications;
+                document.getElementById('stat-unread').textContent = data.stats.unreadNotifications;
+            }
+        } catch (err) {
+            addLog('error', 'Gagal memuat stats: ' + err.message);
+        }
+    }
+
+    // ============================================
+    // Load Users (member + worker)
+    // ============================================
+    async function loadUsers() {
+        try {
+            const res = await fetch('/api/users');
+            const data = await res.json();
+            const select = document.getElementById('target-user');
+            const users = (data.users || []).filter(u => u.role === 'memberwa' || u.role === 'worker');
+            users.forEach(u => {
+                const opt = document.createElement('option');
+                opt.value = u.id;
+                opt.textContent = `${u.name} (${u.role}) — ${u.email}`;
+                select.appendChild(opt);
+            });
+            addLog('info', `Loaded ${users.length} target users (member + worker)`);
+        } catch (err) {
+            addLog('error', 'Gagal memuat users: ' + err.message);
+        }
+    }
+
+    // ============================================
+    // Send Notification
+    // ============================================
+    async function sendNotification() {
+        const userId = parseInt(document.getElementById('target-user').value);
+        const type = document.getElementById('notif-type').value;
+        const title = document.getElementById('notif-title').value.trim();
+        const body = document.getElementById('notif-body').value.trim();
+
+        if (!userId) {
+            Swal.fire('Error', 'Pilih target user terlebih dahulu', 'warning');
+            return;
+        }
+        if (!title) {
+            Swal.fire('Error', 'Judul tidak boleh kosong', 'warning');
+            return;
+        }
+
+        const btn = document.getElementById('btn-send');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Mengirim...';
+
+        try {
+            const res = await fetch('/api/notifications/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId, type, title, body })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                const r = data.result;
+                addLog('success', `✅ Terkirim via ${r.channel} — success: ${r.success}${r.error ? ' — ' + r.error : ''}`);
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Terkirim!',
+                    html: `Channel: <b>${r.channel}</b><br>Status: ${r.success ? '✅ Success' : '❌ Failed'}${r.error ? '<br>Error: ' + r.error : ''}`,
+                    timer: 3000,
+                    showConfirmButton: false
+                });
+            } else {
+                addLog('error', `❌ Gagal: ${data.error}`);
+                Swal.fire('Error', data.error, 'error');
+            }
+        } catch (err) {
+            addLog('error', `❌ Request error: ${err.message}`);
+            Swal.fire('Error', err.message, 'error');
+        }
+
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-send-fill me-2"></i> Kirim Notifikasi';
+        loadStats();
+        loadHistory();
+    }
+
+    // ============================================
+    // Notification History
+    // ============================================
+    async function loadHistory() {
+        try {
+            const res = await fetch('/api/notifications?limit=30');
+            const data = await res.json();
+            const container = document.getElementById('notif-history');
+
+            if (!data.success || !data.notifications?.length) {
+                container.innerHTML = '<div class="text-center text-gray-500 py-8">Belum ada notifikasi</div>';
+                return;
+            }
+
+            container.innerHTML = data.notifications.map(n => {
+                const icon = n.type === 'incoming_message' ? 'bi-chat-dots-fill text-primary' :
+                             n.type === 'session_status' ? 'bi-wifi text-success' :
+                             n.type === 'assignment_update' ? 'bi-clipboard-check text-warning' :
+                             'bi-bell-fill text-info';
+                const channelBadge = n.channel === 'socket'
+                    ? '<span class="badge badge-light-success badge-sm">Socket</span>'
+                    : '<span class="badge badge-light-primary badge-sm">FCM</span>';
+                const readBadge = n.read_at
+                    ? ''
+                    : '<span class="badge badge-light-danger badge-sm">Unread</span>';
+                const time = new Date(n.created_at).toLocaleString('id-ID');
+
+                return `
+                    <div class="d-flex align-items-start gap-3 p-4 border-bottom ${!n.read_at ? 'bg-light-warning' : ''}" 
+                         onclick="markRead(${n.id}, this)" style="cursor:pointer">
+                        <div class="d-flex align-items-center justify-content-center flex-shrink-0"
+                             style="width:36px;height:36px;border-radius:8px;background:#f5f8fa">
+                            <i class="bi ${icon}"></i>
+                        </div>
+                        <div class="flex-grow-1 min-w-0">
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                                <span class="fw-bold fs-7">${escapeHtml(n.title)}</span>
+                                ${channelBadge} ${readBadge}
+                            </div>
+                            <div class="text-gray-600 fs-8">${escapeHtml(n.body || '')}</div>
+                            <div class="text-gray-400 fs-9 mt-1">${time}</div>
+                        </div>
+                    </div>`;
+            }).join('');
+        } catch (err) {
+            document.getElementById('notif-history').innerHTML =
+                `<div class="text-center text-danger py-8">Error: ${err.message}</div>`;
+        }
+    }
+
+    async function markRead(id, el) {
+        try {
+            await fetch(`/api/notifications/${id}/read`, { method: 'PUT' });
+            if (el) el.classList.remove('bg-light-warning');
+            const badge = el?.querySelector('.badge-light-danger');
+            if (badge) badge.remove();
+            loadStats();
+        } catch {}
+    }
+
+    async function markAllRead() {
+        try {
+            await fetch('/api/notifications/read-all', { method: 'PUT' });
+            addLog('success', 'Semua notifikasi ditandai dibaca');
+            loadHistory();
+            loadStats();
+        } catch (err) {
+            addLog('error', 'Gagal: ' + err.message);
+        }
+    }
+
+    // ============================================
+    // FCM Status Check
+    // ============================================
+    async function checkFCMStatus() {
+        // Service Worker
+        if ('serviceWorker' in navigator) {
+            try {
+                const reg = await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js');
+                if (reg) {
+                    document.getElementById('sw-status').className = 'badge badge-light-success';
+                    document.getElementById('sw-status').textContent = 'Registered';
+                    addLog('success', 'Service Worker terdaftar');
+                } else {
+                    document.getElementById('sw-status').className = 'badge badge-light-warning';
+                    document.getElementById('sw-status').textContent = 'Not Registered';
+                }
+            } catch {
+                document.getElementById('sw-status').className = 'badge badge-light-danger';
+                document.getElementById('sw-status').textContent = 'Error';
+            }
+        } else {
+            document.getElementById('sw-status').className = 'badge badge-light-danger';
+            document.getElementById('sw-status').textContent = 'Not Supported';
+        }
+
+        // Permission
+        if ('Notification' in window) {
+            const perm = Notification.permission;
+            const el = document.getElementById('perm-status');
+            el.textContent = perm;
+            el.className = perm === 'granted' ? 'badge badge-light-success' :
+                           perm === 'denied' ? 'badge badge-light-danger' :
+                           'badge badge-light-warning';
+        }
+
+        // FCM Token
+        if (NotificationManager.currentToken) {
+            document.getElementById('fcm-token-status').className = 'badge badge-light-success';
+            document.getElementById('fcm-token-status').textContent = 'Registered';
+        } else {
+            document.getElementById('fcm-token-status').className = 'badge badge-light-warning';
+            document.getElementById('fcm-token-status').textContent = 'Not Registered';
+        }
+
+        // Socket
+        if (socket?.connected) {
+            document.getElementById('socket-status').className = 'badge badge-light-success';
+            document.getElementById('socket-status').textContent = 'Connected';
+        }
+    }
+
+    async function requestFCMPermission() {
+        addLog('info', 'Requesting notification permission...');
+
+        try {
+            const permission = await Notification.requestPermission();
+            addLog(permission === 'granted' ? 'success' : 'error', `Permission: ${permission}`);
+
+            if (permission === 'granted') {
+                // Register service worker
+                const reg = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+                addLog('success', 'Service Worker registered');
+
+                // Get FCM token
+                if (!firebase.apps.length) {
+                    firebase.initializeApp({
+                        apiKey: "AIzaSyAlVxYvpR3xdvZDndYg7bbxJVUdYMU6BQ0",
+                        authDomain: "wa-api-massage.firebaseapp.com",
+                        projectId: "wa-api-massage",
+                        storageBucket: "wa-api-massage.firebasestorage.app",
+                        messagingSenderId: "552872690202",
+                        appId: "1:552872690202:web:386ce012f32f3b012bc7a3"
+                    });
+                }
+                const messaging = firebase.messaging();
+                const token = await messaging.getToken({
+                    vapidKey: 'BAPL5bqGjrmHDEaz2cIuRWkGLkABy3r45uf7dm29s79n9TmQLcm2JNgqROVW4dumPlqK-yaM6Rufnwz6LkqCR58',
+                    serviceWorkerRegistration: reg
+                });
+
+                if (token) {
+                    addLog('success', `FCM Token obtained: ${token.substring(0, 30)}...`);
+
+                    // Register with backend
+                    const res = await fetch('/api/notifications/fcm-token', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ token, platform: 'web', browser: 'chrome' })
+                    });
+                    const data = await res.json();
+                    addLog(data.success ? 'success' : 'error', `Token registration: ${data.success ? 'OK' : data.error}`);
+                }
+            }
+        } catch (err) {
+            addLog('error', `FCM Error: ${err.message}`);
+        }
+
+        checkFCMStatus();
+        loadStats();
+    }
+
+    // ============================================
+    // Log
+    // ============================================
+    function addLog(type, message) {
+        const container = document.getElementById('notif-log');
+        const time = new Date().toLocaleTimeString('id-ID');
+        const entry = document.createElement('div');
+        entry.className = `log-entry ${type}`;
+        entry.innerHTML = `<span class="log-time">[${time}]</span> ${escapeHtml(message)}`;
+        container.appendChild(entry);
+        container.scrollTop = container.scrollHeight;
+    }
+
+    function clearLog() {
+        document.getElementById('notif-log').innerHTML = '';
+        addLog('info', 'Log dibersihkan');
+    }
+
+    // ============================================
+    // Helpers
+    // ============================================
+    function getCookie(name) {
+        const v = `; ${document.cookie}`;
+        const parts = v.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+        return null;
+    }
+
+    function escapeHtml(str) {
+        const d = document.createElement('div');
+        d.textContent = str || '';
+        return d.innerHTML;
+    }
+
+    // Auto-refresh stats every 10s
+    setInterval(() => { loadStats(); }, 10000);
+    </script>
+</body>
+</html>

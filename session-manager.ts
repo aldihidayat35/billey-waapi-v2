@@ -11,6 +11,7 @@ import makeWASocket, {
 } from './src'
 import { logger as activityLogger } from './logger'
 import { messageLogDb, chatTemplateDb, autoReplyDb, autoReplyLogDb, autoReplyCooldownDb, autoForwardConfigDb, autoForwardTokenDb, autoForwardLogDb, db } from './database.js'
+import { getAuthorizedSocketIds } from './notification.js'
 import { readFileSync, existsSync, readdirSync, rmSync } from 'fs'
 import { join } from 'path'
 
@@ -36,9 +37,15 @@ export interface Session {
 export class SessionManager {
 	private sessions: Map<string, Session> = new Map()
 	private socketIO: any
+	private _notificationService: any = null
 
 	constructor(io: any) {
 		this.socketIO = io
+	}
+
+	/** Set notification service for incoming message notifications */
+	setNotificationService(service: any): void {
+		this._notificationService = service
 	}
 
 	/**
@@ -1069,9 +1076,9 @@ export class SessionManager {
 						console.error('⚠️ Auto-forward processing error:', autoForwardError)
 					}
 					
-					// Emit message for real-time updates
-					// Include mediaBase64 for immediate display
-					this.socketIO.emit('message-received', {
+					// Emit message for real-time updates (TARGETED — only authorized users)
+					const authorizedSockets = getAuthorizedSocketIds(sessionId, remoteJid)
+					const messageData = {
 						sessionId,
 						from: remoteJid,
 						to: fromMe ? remoteJid : (session.user?.id || sessionId),
@@ -1083,7 +1090,17 @@ export class SessionManager {
 						participant: msg.key.participant,
 						originalJid: msg.key.remoteJid,
 						mediaBase64: mediaBase64 // Include downloaded media
-					})
+					}
+					for (const sid of authorizedSockets) {
+						this.socketIO.to(sid).emit('message-received', messageData)
+					}
+
+					// Trigger notification for incoming messages (not fromMe)
+					if (!fromMe && this._notificationService) {
+						this._notificationService.notifyIncomingMessage(
+							sessionId, remoteJid, messageContent, messageType
+						).catch((err: any) => console.error('⚠️ Notification error:', err))
+					}
 					
 					console.log(`${fromMe ? '📱➡️' : '📨'} Message ${fromMe ? 'from Mobile' : 'received'}: ${remoteJid} - ${messageType}`)
 				}
