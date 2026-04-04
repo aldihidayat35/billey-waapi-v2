@@ -51,6 +51,9 @@ async function loadStandardComponents() {
         
         console.log('✅ Components loaded with scripts');
         
+        // Fire event so app-init.js can re-apply branding to newly injected DOM
+        document.dispatchEvent(new Event('components-loaded'));
+
         // Initialize Metronic components
         initializeMetronicComponents();
         

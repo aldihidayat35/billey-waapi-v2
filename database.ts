@@ -2183,6 +2183,70 @@ export const notificationDb = {
     }
 }
 
+// Migration: Create app_settings table
+try {
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS app_settings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            app_name TEXT NOT NULL DEFAULT 'Billey WA',
+            app_tagline TEXT DEFAULT 'WhatsApp Multi Session',
+            logo TEXT,
+            logo_small TEXT,
+            favicon TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+    `)
+    // Seed default row if empty
+    const existing = db.prepare('SELECT id FROM app_settings LIMIT 1').get()
+    if (!existing) {
+        db.prepare(`INSERT INTO app_settings (app_name, app_tagline) VALUES (?, ?)`).run('Billey WA', 'WhatsApp Multi Session')
+    }
+    console.log('✅ App settings migration complete')
+} catch (migrationError) {
+    console.error('⚠️ App settings migration error:', migrationError)
+}
+
+// App Settings Interface
+export interface AppSettingEntry {
+    id?: number
+    app_name: string
+    app_tagline?: string
+    logo?: string | null
+    logo_small?: string | null
+    favicon?: string | null
+    created_at?: string
+    updated_at?: string
+}
+
+// App Settings DB Functions
+export const appSettingDb = {
+    get: (): AppSettingEntry => {
+        const row = db.prepare('SELECT * FROM app_settings ORDER BY id ASC LIMIT 1').get() as AppSettingEntry | undefined
+        return row ?? { app_name: 'Billey WA', app_tagline: 'WhatsApp Multi Session' }
+    },
+
+    update: (data: Partial<AppSettingEntry>): void => {
+        const existing = db.prepare('SELECT id FROM app_settings LIMIT 1').get() as { id: number } | undefined
+        if (existing) {
+            const fields: string[] = []
+            const params: any[] = []
+            if (data.app_name !== undefined)  { fields.push('app_name = ?');   params.push(data.app_name) }
+            if (data.app_tagline !== undefined){ fields.push('app_tagline = ?'); params.push(data.app_tagline) }
+            if (data.logo !== undefined)       { fields.push('logo = ?');       params.push(data.logo) }
+            if (data.logo_small !== undefined) { fields.push('logo_small = ?'); params.push(data.logo_small) }
+            if (data.favicon !== undefined)    { fields.push('favicon = ?');    params.push(data.favicon) }
+            if (fields.length === 0) return
+            fields.push("updated_at = datetime('now')")
+            params.push(existing.id)
+            db.prepare(`UPDATE app_settings SET ${fields.join(', ')} WHERE id = ?`).run(...params)
+        } else {
+            db.prepare(`INSERT INTO app_settings (app_name, app_tagline, logo, logo_small, favicon) VALUES (?, ?, ?, ?, ?)`)
+              .run(data.app_name ?? 'Billey WA', data.app_tagline ?? '', data.logo ?? null, data.logo_small ?? null, data.favicon ?? null)
+        }
+    }
+}
+
 // Export database instance for direct queries if needed
 export { db }
 

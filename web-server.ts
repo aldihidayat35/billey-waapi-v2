@@ -3,7 +3,7 @@ import { createServer } from 'http'
 import { Server as SocketIO } from 'socket.io'
 import { SessionManager } from './session-manager'
 import { logger as activityLogger } from './logger'
-import { messageLogDb, sessionLogDb, chatTemplateDb, groupExportDb, autoReplyDb, autoReplyLogDb, autoReplyCooldownDb, autoForwardConfigDb, autoForwardTokenDb, autoForwardLogDb, db, dbMaintenance, memberSessionDb, startMediaAutoCleanup, fcmTokenDb, notificationDb } from './database.js'
+import { messageLogDb, sessionLogDb, chatTemplateDb, groupExportDb, autoReplyDb, autoReplyLogDb, autoReplyCooldownDb, autoForwardConfigDb, autoForwardTokenDb, autoForwardLogDb, db, dbMaintenance, memberSessionDb, startMediaAutoCleanup, fcmTokenDb, notificationDb, appSettingDb } from './database.js'
 import * as fs from 'fs'
 import * as path from 'path'
 import { fileURLToPath } from 'url'
@@ -68,6 +68,7 @@ const protectStaticFiles = (req: any, res: any, next: any) => {
 		'/fonts/',
 		'/media/',
 		'/plugins/',
+		'/uploads/',
 		'.css',
 		'.js',
 		'.png',
@@ -88,7 +89,12 @@ const protectStaticFiles = (req: any, res: any, next: any) => {
 	if (isPublic) {
 		return next()
 	}
-	
+
+	// API routes have their own auth middleware — never apply HTML redirect
+	if (path.startsWith('/api/')) {
+		return next()
+	}
+
 	// Check if it's an HTML file or a page route (no extension)
 	const isHtmlOrPage = path.endsWith('.html') || 
 						 (!path.includes('.') && path !== '/') ||
@@ -749,6 +755,37 @@ app.post('/api/member/messages/:sessionId/:contact/read', authMiddleware, (req, 
 			WHERE session_id = ? AND from_number = ? AND direction = 'incoming' AND status = 'received'
 		`).run(sessionId, contact)
 		res.json({ success: true, updated: result.changes })
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Bulk mark ALL conversations as read for this member/worker
+app.post('/api/member/read-all', authMiddleware, (req, res) => {
+	try {
+		const user = req.user!
+		const assignedIds = getWaSessionsForUser(user.id, user.role)
+		if (assignedIds.length === 0) return res.json({ success: true, updated: 0 })
+
+		let updated = 0
+		if (user.role === 'worker') {
+			const assignments = workerAssignmentDb.getForWorker(user.id)
+			for (const a of assignments) {
+				const r = db.prepare(`
+					UPDATE message_logs SET status = 'read'
+					WHERE session_id = ? AND from_number = ? AND direction = 'incoming' AND status = 'received'
+				`).run(a.session_id, a.contact)
+				updated += r.changes
+			}
+		} else {
+			const placeholders = assignedIds.map(() => '?').join(',')
+			const r = db.prepare(`
+				UPDATE message_logs SET status = 'read'
+				WHERE session_id IN (${placeholders}) AND direction = 'incoming' AND status = 'received'
+			`).run(...assignedIds)
+			updated = r.changes
+		}
+		res.json({ success: true, updated })
 	} catch (error: any) {
 		res.status(500).json({ success: false, error: error.message })
 	}
@@ -4564,6 +4601,142 @@ app.get('/api/health', (req, res) => {
 		timestamp: new Date().toISOString()
 	})
 })
+
+// ============================================
+// App Settings API
+// ============================================
+
+// Multer storage for settings uploads (logo, favicon)
+const settingsUploadDir = path.join(__dirname, 'public', 'uploads', 'settings')
+if (!fs.existsSync(settingsUploadDir)) fs.mkdirSync(settingsUploadDir, { recursive: true })
+
+const settingsStorage = multer.diskStorage({
+	destination: (_req, _file, cb) => cb(null, settingsUploadDir),
+	filename: (_req, file, cb) => {
+		const ext = path.extname(file.originalname).toLowerCase()
+		cb(null, `${file.fieldname}-${Date.now()}${ext}`)
+	}
+})
+
+const settingsUpload = multer({
+	storage: settingsStorage,
+	limits: { fileSize: 2 * 1024 * 1024 }, // 2 MB
+	fileFilter: (_req, file, cb) => {
+		const allowed = ['.png', '.jpg', '.jpeg', '.svg', '.ico', '.gif', '.webp']
+		const ext = path.extname(file.originalname).toLowerCase()
+		if (allowed.includes(ext)) cb(null, true)
+		else cb(new Error('Format file tidak didukung. Gunakan PNG, JPG, SVG, ICO.'))
+	}
+})
+
+// GET /api/settings/public — No auth required (used by all pages for branding)
+app.get('/api/settings/public', (req, res) => {
+	try {
+		const s = appSettingDb.get()
+		const baseUrl = `${req.protocol}://${req.get('host')}`
+		res.json({
+			success: true,
+			settings: {
+				app_name: s.app_name || 'Billey WA',
+				app_tagline: s.app_tagline || 'WhatsApp Multi Session',
+				logo_url: s.logo ? `/uploads/settings/${path.basename(s.logo)}` : null,
+				logo_small_url: s.logo_small ? `/uploads/settings/${path.basename(s.logo_small)}` : null,
+				favicon_url: s.favicon ? `/uploads/settings/${path.basename(s.favicon)}` : null
+			}
+		})
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// GET /api/settings — Admin only, returns raw paths too
+app.get('/api/settings', authMiddleware, adminMiddleware, (req, res) => {
+	try {
+		const s = appSettingDb.get()
+		res.json({
+			success: true,
+			settings: {
+				...s,
+				logo_url: s.logo ? `/uploads/settings/${path.basename(s.logo)}` : null,
+				logo_small_url: s.logo_small ? `/uploads/settings/${path.basename(s.logo_small)}` : null,
+				favicon_url: s.favicon ? `/uploads/settings/${path.basename(s.favicon)}` : null
+			}
+		})
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// POST /api/settings — Admin only, handles multipart upload
+app.post('/api/settings', authMiddleware, adminMiddleware,
+	(req: any, res: any, next: any) => {
+		// Wrap multer so upload errors return JSON (not Express HTML error page)
+		settingsUpload.fields([
+			{ name: 'logo', maxCount: 1 },
+			{ name: 'logo_small', maxCount: 1 },
+			{ name: 'favicon', maxCount: 1 }
+		])(req, res, (uploadErr: any) => {
+			if (uploadErr) return res.status(400).json({ success: false, error: uploadErr.message || 'Upload gagal' })
+			next()
+		})
+	},
+	(req: any, res: any) => {
+		try {
+			const files = req.files as Record<string, Express.Multer.File[]> | undefined
+			const current = appSettingDb.get()
+
+			const updateData: any = {}
+
+			if (req.body.app_name?.trim()) updateData.app_name = req.body.app_name.trim()
+			if (req.body.app_tagline !== undefined) updateData.app_tagline = req.body.app_tagline.trim()
+
+			// Handle logo upload — delete old file if replaced
+			if (files?.['logo']?.[0]) {
+				if (current.logo && fs.existsSync(current.logo)) fs.unlinkSync(current.logo)
+				updateData.logo = files['logo'][0].path
+			}
+			if (files?.['logo_small']?.[0]) {
+				if (current.logo_small && fs.existsSync(current.logo_small)) fs.unlinkSync(current.logo_small)
+				updateData.logo_small = files['logo_small'][0].path
+			}
+			if (files?.['favicon']?.[0]) {
+				if (current.favicon && fs.existsSync(current.favicon)) fs.unlinkSync(current.favicon)
+				updateData.favicon = files['favicon'][0].path
+			}
+
+			// Delete logo if remove flag sent
+			if (req.body.remove_logo === '1') {
+				if (current.logo && fs.existsSync(current.logo)) fs.unlinkSync(current.logo)
+				updateData.logo = null
+			}
+			if (req.body.remove_logo_small === '1') {
+				if (current.logo_small && fs.existsSync(current.logo_small)) fs.unlinkSync(current.logo_small)
+				updateData.logo_small = null
+			}
+			if (req.body.remove_favicon === '1') {
+				if (current.favicon && fs.existsSync(current.favicon)) fs.unlinkSync(current.favicon)
+				updateData.favicon = null
+			}
+
+			appSettingDb.update(updateData)
+
+			const updated = appSettingDb.get()
+			res.json({
+				success: true,
+				message: 'Pengaturan berhasil disimpan',
+				settings: {
+					...updated,
+					logo_url: updated.logo ? `/uploads/settings/${path.basename(updated.logo)}` : null,
+					logo_small_url: updated.logo_small ? `/uploads/settings/${path.basename(updated.logo_small)}` : null,
+					favicon_url: updated.favicon ? `/uploads/settings/${path.basename(updated.favicon)}` : null
+				}
+			})
+		} catch (error: any) {
+			console.error('Settings update error:', error)
+			res.status(500).json({ success: false, error: error.message })
+		}
+	}
+)
 
 function formatUptime(seconds: number): string {
 	const days = Math.floor(seconds / 86400)

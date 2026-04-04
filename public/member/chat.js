@@ -526,6 +526,9 @@ function wireUI() {
         location.reload();
     });
 
+    // Read All — mark every conversation as read
+    document.getElementById('btn-read-all').addEventListener('click', readAllConversations);
+
     // Search conversations
     document.getElementById('conv-search-input').addEventListener('input', (e) => {
         renderConversations(e.target.value);
@@ -656,6 +659,18 @@ function upsertConversation(sessionId, contact, content, msgType, direction, ts,
 }
 
 // Zero out unread for a conversation locally and persist to backend
+async function readAllConversations() {
+    // Optimistic update: zero all unread state immediately
+    S.conversations.forEach(c => { c.unread = 0; });
+    Object.keys(S.unread).forEach(sid => { S.unread[sid] = 0; });
+    renderConversations();
+    renderSessionTabs();
+    // Persist to backend
+    try {
+        await fetch('/api/member/read-all', { method: 'POST' });
+    } catch (e) {}
+}
+
 function markConversationRead(sessionId, contact) {
     const conv = S.conversations.find(c => c.sessionId === sessionId && c.contact === contact);
     if (conv && conv.unread > 0) {

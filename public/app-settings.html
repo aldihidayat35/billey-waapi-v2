@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pengaturan Aplikasi - Billey WA</title>
+
+    <link rel="shortcut icon" href="assets/media/logos/favicon.ico" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,400,500,600,700" />
+    <link href="assets/plugins/global/plugins.bundle.css" rel="stylesheet" type="text/css" />
+    <link href="assets/css/style.bundle.css" rel="stylesheet" type="text/css" />
+
+    <!-- Dynamic branding -->
+    <script src="/js/app-init.js"></script>
+
+    <style>
+        .preview-img {
+            max-height: 80px;
+            max-width: 200px;
+            border-radius: 8px;
+            border: 1px solid #e4e6ef;
+            padding: 4px;
+            background: #f9f9f9;
+            object-fit: contain;
+        }
+        .preview-img.dark-bg { background: #1e1e2d; }
+        .img-drop-zone {
+            border: 2px dashed #e4e6ef;
+            border-radius: 10px;
+            padding: 18px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color .2s, background .2s;
+        }
+        .img-drop-zone:hover { border-color: #009ef7; background: #f0f8ff; }
+        .img-drop-zone.drag-over { border-color: #009ef7; background: #e8f4ff; }
+        .img-drop-zone input[type=file] { display: none; }
+        .remove-btn { cursor: pointer; }
+    </style>
+</head>
+<body id="kt_app_body" data-kt-app-layout="dark-sidebar" data-kt-app-header-fixed="true"
+    data-kt-app-sidebar-enabled="true" data-kt-app-sidebar-fixed="true"
+    data-kt-app-sidebar-hoverable="true" data-kt-app-sidebar-push-header="true"
+    data-kt-app-sidebar-push-toolbar="true" data-kt-app-sidebar-push-footer="true"
+    data-kt-app-toolbar-enabled="true" class="app-default">
+
+    <div class="d-flex flex-column flex-root app-root" id="kt_app_root">
+        <div class="app-page flex-column flex-column-fluid" id="kt_app_page">
+
+            <div id="header-container"></div>
+
+            <div class="app-wrapper flex-column flex-row-fluid" id="kt_app_wrapper">
+                <div id="sidebar-container"></div>
+
+                <div class="app-main flex-column flex-row-fluid" id="kt_app_main">
+                    <div class="d-flex flex-column flex-column-fluid">
+
+                        <!-- Toolbar -->
+                        <div id="kt_app_toolbar" class="app-toolbar py-3 py-lg-6">
+                            <div id="kt_app_toolbar_container" class="app-container container-fluid d-flex flex-stack">
+                                <div class="page-title d-flex flex-column justify-content-center flex-wrap me-3">
+                                    <h1 class="page-heading d-flex text-dark fw-bold fs-3 flex-column justify-content-center my-0">
+                                        Pengaturan Aplikasi
+                                    </h1>
+                                    <ul class="breadcrumb breadcrumb-separatorless fw-semibold fs-7 my-0 pt-1">
+                                        <li class="breadcrumb-item text-muted"><a href="/" class="text-muted text-hover-primary">Home</a></li>
+                                        <li class="breadcrumb-item"><span class="bullet bg-gray-400 w-5px h-2px"></span></li>
+                                        <li class="breadcrumb-item text-muted">Pengaturan Aplikasi</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Content -->
+                        <div id="kt_app_content" class="app-content flex-column-fluid">
+                            <div id="kt_app_content_container" class="app-container container-fluid">
+
+                                <div id="alert-box" class="alert d-none mb-6" role="alert">
+                                    <span id="alert-msg"></span>
+                                </div>
+
+                                <form id="settings-form" enctype="multipart/form-data">
+
+                                    <!-- App Identity -->
+                                    <div class="card mb-6">
+                                        <div class="card-header">
+                                            <h3 class="card-title fw-bold">
+                                                <i class="bi bi-gear me-2 text-primary"></i>Identitas Aplikasi
+                                            </h3>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="row g-6">
+                                                <div class="col-md-6">
+                                                    <label class="required form-label fw-semibold">Nama Aplikasi</label>
+                                                    <input type="text" id="app_name" name="app_name" class="form-control"
+                                                        placeholder="cth. Billey WA" maxlength="80" required />
+                                                    <div class="form-text">Ditampilkan di sidebar, login, browser tab, dan notifikasi.</div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label fw-semibold">Tagline</label>
+                                                    <input type="text" id="app_tagline" name="app_tagline" class="form-control"
+                                                        placeholder="cth. WhatsApp Multi Session" maxlength="120" />
+                                                    <div class="form-text">Kalimat pendek di bawah nama aplikasi.</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Branding -->
+                                    <div class="card mb-6">
+                                        <div class="card-header">
+                                            <h3 class="card-title fw-bold">
+                                                <i class="bi bi-image me-2 text-success"></i>Branding & Logo
+                                            </h3>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="row g-8">
+
+                                                <!-- Logo -->
+                                                <div class="col-md-4">
+                                                    <label class="form-label fw-semibold">Logo Utama</label>
+                                                    <div id="logo-drop" class="img-drop-zone" onclick="document.getElementById('logo-input').click()">
+                                                        <input type="file" id="logo-input" name="logo" accept=".png,.jpg,.jpeg,.svg,.webp">
+                                                        <i class="bi bi-cloud-arrow-up fs-2 text-muted d-block mb-2"></i>
+                                                        <span class="text-muted fs-7">Klik atau seret file ke sini</span>
+                                                        <div class="form-text mt-1">PNG, JPG, SVG — Maks 2 MB</div>
+                                                    </div>
+                                                    <div id="logo-preview" class="mt-3 d-none">
+                                                        <img id="logo-preview-img" class="preview-img d-block" src="" alt="Logo preview" />
+                                                        <div class="d-flex align-items-center gap-2 mt-2">
+                                                            <span id="logo-preview-name" class="text-muted fs-8"></span>
+                                                            <span class="badge badge-light-danger remove-btn" onclick="removeLogo('logo')">
+                                                                <i class="bi bi-x me-1"></i>Hapus
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <input type="hidden" id="remove_logo" name="remove_logo" value="0">
+                                                </div>
+
+                                                <!-- Logo Small -->
+                                                <div class="col-md-4">
+                                                    <label class="form-label fw-semibold">Logo Kecil <span class="text-muted">(Sidebar Minimized)</span></label>
+                                                    <div id="logo_small-drop" class="img-drop-zone" onclick="document.getElementById('logo_small-input').click()">
+                                                        <input type="file" id="logo_small-input" name="logo_small" accept=".png,.jpg,.jpeg,.svg,.webp,.ico">
+                                                        <i class="bi bi-cloud-arrow-up fs-2 text-muted d-block mb-2"></i>
+                                                        <span class="text-muted fs-7">Klik atau seret file ke sini</span>
+                                                        <div class="form-text mt-1">PNG, SVG — Maks 2 MB</div>
+                                                    </div>
+                                                    <div id="logo_small-preview" class="mt-3 d-none">
+                                                        <img id="logo_small-preview-img" class="preview-img d-block" src="" alt="Logo Small preview" />
+                                                        <div class="d-flex align-items-center gap-2 mt-2">
+                                                            <span id="logo_small-preview-name" class="text-muted fs-8"></span>
+                                                            <span class="badge badge-light-danger remove-btn" onclick="removeLogo('logo_small')">
+                                                                <i class="bi bi-x me-1"></i>Hapus
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <input type="hidden" id="remove_logo_small" name="remove_logo_small" value="0">
+                                                </div>
+
+                                                <!-- Favicon -->
+                                                <div class="col-md-4">
+                                                    <label class="form-label fw-semibold">Favicon <span class="text-muted">(Browser Tab)</span></label>
+                                                    <div id="favicon-drop" class="img-drop-zone" onclick="document.getElementById('favicon-input').click()">
+                                                        <input type="file" id="favicon-input" name="favicon" accept=".ico,.png,.jpg,.jpeg,.svg">
+                                                        <i class="bi bi-cloud-arrow-up fs-2 text-muted d-block mb-2"></i>
+                                                        <span class="text-muted fs-7">Klik atau seret file ke sini</span>
+                                                        <div class="form-text mt-1">ICO, PNG — Maks 2 MB</div>
+                                                    </div>
+                                                    <div id="favicon-preview" class="mt-3 d-none">
+                                                        <img id="favicon-preview-img" class="preview-img d-block" style="max-height:40px;" src="" alt="Favicon preview" />
+                                                        <div class="d-flex align-items-center gap-2 mt-2">
+                                                            <span id="favicon-preview-name" class="text-muted fs-8"></span>
+                                                            <span class="badge badge-light-danger remove-btn" onclick="removeLogo('favicon')">
+                                                                <i class="bi bi-x me-1"></i>Hapus
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <input type="hidden" id="remove_favicon" name="remove_favicon" value="0">
+                                                </div>
+
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Live Preview -->
+                                    <div class="card mb-6">
+                                        <div class="card-header">
+                                            <h3 class="card-title fw-bold">
+                                                <i class="bi bi-eye me-2 text-warning"></i>Preview Live
+                                            </h3>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="row g-6">
+                                                <!-- Sidebar preview -->
+                                                <div class="col-md-6">
+                                                    <div class="fw-semibold fs-7 text-muted mb-3 text-uppercase">Sidebar</div>
+                                                    <div class="bg-dark rounded p-4 d-flex align-items-center gap-3">
+                                                        <img id="preview-sidebar-logo" src="assets/media/logos/default-dark.svg" class="h-30px" alt="Sidebar logo" />
+                                                        <div>
+                                                            <div class="text-white fw-bold fs-6" id="preview-app-name">Billey WA</div>
+                                                            <div class="text-gray-400 fs-8" id="preview-app-tagline">WhatsApp Multi Session</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <!-- Login preview -->
+                                                <div class="col-md-6">
+                                                    <div class="fw-semibold fs-7 text-muted mb-3 text-uppercase">Halaman Login</div>
+                                                    <div class="bg-white border rounded p-4 d-flex align-items-center gap-3">
+                                                        <div id="preview-login-icon" class="d-flex align-items-center justify-content-center rounded bg-success text-white fw-bold" style="width:44px;height:44px;font-size:22px;">
+                                                            <i class="bi bi-whatsapp"></i>
+                                                        </div>
+                                                        <img id="preview-login-logo" src="" alt="" class="h-40px d-none" />
+                                                        <div class="text-dark fw-bold fs-5" id="preview-login-name">Billey WA</div>
+                                                    </div>
+                                                </div>
+                                                <!-- Tab preview -->
+                                                <div class="col-12">
+                                                    <div class="fw-semibold fs-7 text-muted mb-3 text-uppercase">Browser Tab</div>
+                                                    <div class="bg-light border rounded p-3 d-flex align-items-center gap-3">
+                                                        <img id="preview-favicon" src="assets/media/logos/favicon.ico" class="w-16px h-16px" alt="Favicon" />
+                                                        <span class="text-dark fs-7 fw-semibold">Dashboard - <span id="preview-tab-name">Billey WA</span></span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Save Button -->
+                                    <div class="d-flex justify-content-end gap-3 mb-10">
+                                        <button type="button" class="btn btn-light" onclick="loadSettings()">
+                                            <i class="bi bi-arrow-counterclockwise me-1"></i>Reset
+                                        </button>
+                                        <button type="submit" id="btn-save" class="btn btn-primary">
+                                            <span id="btn-save-text"><i class="bi bi-save me-1"></i>Simpan Pengaturan</span>
+                                            <span id="btn-save-loading" class="d-none">
+                                                <span class="spinner-border spinner-border-sm me-2"></span>Menyimpan...
+                                            </span>
+                                        </button>
+                                    </div>
+
+                                </form>
+                            </div>
+                        </div>
+
+                    </div>
+                    <div id="footer-container"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="assets/plugins/global/plugins.bundle.js"></script>
+    <script src="assets/js/scripts.bundle.js"></script>
+    <script src="js/header.js"></script>
+
+    <script>
+    // Component loading (same pattern as users.html)
+    function loadHTMLWithScripts(containerId, html) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        const temp = document.createElement('div');
+        temp.innerHTML = html;
+        const scripts = temp.querySelectorAll('script');
+        scripts.forEach(s => s.remove());
+        container.innerHTML = temp.innerHTML;
+        scripts.forEach(oldScript => {
+            const newScript = document.createElement('script');
+            if (oldScript.src) newScript.src = oldScript.src;
+            else newScript.textContent = oldScript.textContent;
+            document.body.appendChild(newScript);
+        });
+    }
+
+    async function loadPageComponents() {
+        try {
+            const [headerRes, sidebarRes, footerRes] = await Promise.all([
+                fetch('components/header.html'),
+                fetch('components/sidebar.html'),
+                fetch('components/footer.html')
+            ]);
+            loadHTMLWithScripts('header-container', await headerRes.text());
+            loadHTMLWithScripts('sidebar-container', await sidebarRes.text());
+            loadHTMLWithScripts('footer-container', await footerRes.text());
+            // Initialize Metronic
+            if (typeof KTMenu !== 'undefined') KTMenu.createInstances();
+            if (typeof KTDrawer !== 'undefined') KTDrawer.createInstances();
+            if (typeof KTScroll !== 'undefined') KTScroll.createInstances();
+            if (typeof initializeHeader === 'function') initializeHeader();
+        } catch (e) {
+            console.error('Component load error:', e);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', loadPageComponents);
+    </script>
+
+    <script>
+    // ============================================================
+    // Settings Page Logic
+    // ============================================================
+
+    // Current settings loaded from server
+    let currentSettings = {};
+
+    async function loadSettings() {
+        try {
+            const res = await fetch('/api/settings');
+            const data = await res.json();
+            if (!data.success) return;
+            currentSettings = data.settings;
+            populateForm(currentSettings);
+        } catch (e) {
+            showAlert('Gagal memuat pengaturan: ' + e.message, 'danger');
+        }
+    }
+
+    function populateForm(s) {
+        document.getElementById('app_name').value = s.app_name || '';
+        document.getElementById('app_tagline').value = s.app_tagline || '';
+
+        // Reset remove flags
+        ['logo', 'logo_small', 'favicon'].forEach(key => {
+            document.getElementById('remove_' + key).value = '0';
+        });
+
+        // Show existing images
+        if (s.logo_url) showExistingFile('logo', s.logo_url, s.logo_url.split('/').pop());
+        else hidePreview('logo');
+
+        if (s.logo_small_url) showExistingFile('logo_small', s.logo_small_url, s.logo_small_url.split('/').pop());
+        else hidePreview('logo_small');
+
+        if (s.favicon_url) showExistingFile('favicon', s.favicon_url, s.favicon_url.split('/').pop());
+        else hidePreview('favicon');
+
+        updateLivePreview(s);
+    }
+
+    function showExistingFile(key, url, name) {
+        const preview = document.getElementById(key + '-preview');
+        const img = document.getElementById(key + '-preview-img');
+        const nameEl = document.getElementById(key + '-preview-name');
+        if (preview) preview.classList.remove('d-none');
+        if (img) img.src = url;
+        if (nameEl) nameEl.textContent = name || '';
+    }
+
+    function hidePreview(key) {
+        const preview = document.getElementById(key + '-preview');
+        if (preview) preview.classList.add('d-none');
+        const input = document.getElementById(key + '-input');
+        if (input) input.value = '';
+    }
+
+    function removeLogo(key) {
+        hidePreview(key);
+        document.getElementById('remove_' + key).value = '1';
+        // Clear file input so it's not re-uploaded
+        const input = document.getElementById(key + '-input');
+        if (input) input.value = '';
+
+        // Update live preview
+        if (key === 'logo') {
+            document.getElementById('preview-sidebar-logo').src = 'assets/media/logos/default-dark.svg';
+            document.getElementById('preview-login-logo').classList.add('d-none');
+            document.getElementById('preview-login-icon').classList.remove('d-none');
+        }
+        if (key === 'favicon') {
+            document.getElementById('preview-favicon').src = 'assets/media/logos/favicon.ico';
+        }
+    }
+
+    // File input change → show preview
+    function setupFileInput(key) {
+        const input = document.getElementById(key + '-input');
+        if (!input) return;
+
+        input.addEventListener('change', function () {
+            const file = this.files[0];
+            if (!file) return;
+            document.getElementById('remove_' + key).value = '0';
+            const url = URL.createObjectURL(file);
+            showExistingFile(key, url, file.name);
+
+            // Live preview
+            if (key === 'logo') {
+                document.getElementById('preview-sidebar-logo').src = url;
+                document.getElementById('preview-login-logo').src = url;
+                document.getElementById('preview-login-logo').classList.remove('d-none');
+                document.getElementById('preview-login-icon').classList.add('d-none');
+            }
+            if (key === 'favicon') {
+                document.getElementById('preview-favicon').src = url;
+            }
+        });
+
+        // Drag & drop
+        const drop = document.getElementById(key + '-drop');
+        if (drop) {
+            drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('drag-over'); });
+            drop.addEventListener('dragleave', () => drop.classList.remove('drag-over'));
+            drop.addEventListener('drop', e => {
+                e.preventDefault();
+                drop.classList.remove('drag-over');
+                const file = e.dataTransfer.files[0];
+                if (file) {
+                    const dt = new DataTransfer();
+                    dt.items.add(file);
+                    input.files = dt.files;
+                    input.dispatchEvent(new Event('change'));
+                }
+            });
+        }
+    }
+
+    function updateLivePreview(s) {
+        const name = s.app_name || document.getElementById('app_name').value || 'Billey WA';
+        const tagline = s.app_tagline || document.getElementById('app_tagline').value || '';
+
+        document.getElementById('preview-app-name').textContent = name;
+        document.getElementById('preview-login-name').textContent = name;
+        document.getElementById('preview-tab-name').textContent = name;
+        document.getElementById('preview-app-tagline').textContent = tagline;
+
+        if (s.logo_url) {
+            document.getElementById('preview-sidebar-logo').src = s.logo_url;
+            document.getElementById('preview-login-logo').src = s.logo_url;
+            document.getElementById('preview-login-logo').classList.remove('d-none');
+            document.getElementById('preview-login-icon').classList.add('d-none');
+        }
+        if (s.favicon_url) {
+            document.getElementById('preview-favicon').src = s.favicon_url;
+        }
+    }
+
+    // Live preview on typing
+    document.getElementById('app_name').addEventListener('input', function () {
+        const v = this.value || 'Billey WA';
+        document.getElementById('preview-app-name').textContent = v;
+        document.getElementById('preview-login-name').textContent = v;
+        document.getElementById('preview-tab-name').textContent = v;
+    });
+    document.getElementById('app_tagline').addEventListener('input', function () {
+        document.getElementById('preview-app-tagline').textContent = this.value;
+    });
+
+    // Form submit
+    document.getElementById('settings-form').addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const name = document.getElementById('app_name').value.trim();
+        if (!name) { showAlert('Nama aplikasi wajib diisi', 'danger'); return; }
+
+        setLoading(true);
+        try {
+            const formData = new FormData(this);
+            const res = await fetch('/api/settings', { method: 'POST', body: formData });
+            const data = await res.json();
+            if (data.success) {
+                showAlert('✅ Pengaturan berhasil disimpan!', 'success');
+                currentSettings = data.settings;
+                populateForm(currentSettings);
+                // Apply to current page immediately
+                if (window.APP_SETTINGS) {
+                    window.APP_SETTINGS = data.settings;
+                    // Re-apply branding
+                    const sidebarLogoDefault = document.getElementById('sidebar-logo-default');
+                    if (sidebarLogoDefault && data.settings.logo_url) sidebarLogoDefault.src = data.settings.logo_url;
+                }
+            } else {
+                showAlert('❌ ' + (data.error || 'Gagal menyimpan'), 'danger');
+            }
+        } catch (err) {
+            showAlert('❌ Terjadi kesalahan: ' + err.message, 'danger');
+        } finally {
+            setLoading(false);
+        }
+    });
+
+    function setLoading(on) {
+        document.getElementById('btn-save-text').classList.toggle('d-none', on);
+        document.getElementById('btn-save-loading').classList.toggle('d-none', !on);
+        document.getElementById('btn-save').disabled = on;
+    }
+
+    function showAlert(msg, type) {
+        const box = document.getElementById('alert-box');
+        const msgEl = document.getElementById('alert-msg');
+        box.className = 'alert alert-' + type;
+        msgEl.innerHTML = msg;
+        box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        if (type === 'success') setTimeout(() => box.classList.add('d-none'), 4000);
+    }
+
+    // Init
+    setupFileInput('logo');
+    setupFileInput('logo_small');
+    setupFileInput('favicon');
+
+    document.addEventListener('DOMContentLoaded', async function () {
+        // Guard: admin only
+        try {
+            const r = await fetch('/api/auth/me');
+            const d = await r.json();
+            if (!d.success || d.user?.role !== 'adminwa') { window.location.href = '/'; return; }
+        } catch { window.location.href = '/auth/login'; return; }
+        loadSettings();
+    });
+    </script>
+</body>
+</html>

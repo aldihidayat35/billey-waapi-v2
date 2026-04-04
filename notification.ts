@@ -292,7 +292,7 @@ export class NotificationService {
             type: payload.type,
             title: payload.title,
             body: payload.body,
-            data: payload.data ? JSON.stringify(payload.data) : null,
+            data: payload.data ? JSON.stringify(payload.data) : undefined,
             channel,
             status: (socketSent || fcmSent) ? 'delivered' : 'failed'
         }
