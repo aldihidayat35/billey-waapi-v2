@@ -291,11 +291,11 @@ public function sendInvoice(Invoice $invoice)
 
 ### Connection Refused
 - Pastikan WhatsApp API berjalan di port 8080
-- Cek dengan: `pm2 status`
+- Cek dengan: `check-status.bat`
 
 ### Session Not Connected
 - Scan ulang QR code di dashboard: http://localhost:8080
 
 ### Pesan Tidak Terkirim
 - Cek format nomor (harus 628xxx)
-- Cek logs: `pm2 logs baileys-waapi`
+- Cek log error di terminal server

@@ -4,10 +4,10 @@ title 🛑 Stop WhatsApp API
 color 0C
 
 echo.
-echo Menghentikan aplikasi...
-pm2 stop baileys-waapi
-echo.
-pm2 status
+echo Menghentikan aplikasi pada port 8080...
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr :8080 ^| findstr LISTENING') do (
+    taskkill /PID %%a /F >nul 2>&1
+)
 echo.
 echo Aplikasi dihentikan.
 pause

@@ -156,16 +156,13 @@ ipconfig /flushdns
 
 ### Browser tidak bisa akses?
 ```bash
-# 1. Check PM2 running
-pm2 list
-
-# 2. Check port 8080 listening
+# 1. Check port 8080 listening
 netstat -ano | findstr :8080
 
-# 3. Test with curl
+# 2. Test with curl
 curl http://wa-api.api:8080
 
-# 4. Try localhost instead
+# 3. Try localhost instead
 http://localhost:8080
 ```
 

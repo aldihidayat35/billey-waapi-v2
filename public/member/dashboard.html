@@ -8,7 +8,8 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>WhatsApp - Member Portal</title>
     <link rel="manifest" href="/manifest.json">
-    <link rel="apple-touch-icon" href="/assets/media/logos/pwa-192.png">
+    <link rel="icon" id="dynamic-favicon" href="/assets/media/logos/favicon.ico" type="image/x-icon">
+    <link rel="apple-touch-icon" id="dynamic-apple-icon" href="/assets/media/logos/pwa-192.png">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <style>
         :root {
@@ -34,7 +35,7 @@
             font-size: 15px; color: var(--wa-text1); background: var(--wa-chat-bg);
         }
         /* ── App shell ── */
-        .wa-app { display: flex; flex-direction: column; height: 100vh; }
+        .wa-app { display: flex; flex-direction: column; height: var(--app-height, 100vh); height: 100dvh; }
 
         /* ── Top bar ── */
         .wa-topbar {
@@ -472,6 +473,16 @@
         </div>
         <div class="media-preview" id="media-preview"></div>
         <input class="media-caption-inp" type="text" id="media-caption" placeholder="Tambahkan keterangan...">
+        <!-- Upload Progress -->
+        <div id="upload-progress" style="display:none; padding: 0 16px 8px;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                <small style="color:#8696a0;" id="upload-status">Mengunggah...</small>
+                <small style="font-weight:600; color:var(--wa-text1);" id="upload-percent">0%</small>
+            </div>
+            <div style="height:4px; background:#e9ecef; border-radius:2px; overflow:hidden;">
+                <div id="upload-bar" style="height:100%; width:0%; background:var(--wa-header); transition:width 0.3s ease;"></div>
+            </div>
+        </div>
         <button class="media-send-btn" id="media-send">
             <i class="bi bi-send-fill"></i> Kirim
         </button>
@@ -485,6 +496,27 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+// Fix mobile viewport height (address bar hide/show)
+function setAppHeight() {
+    document.documentElement.style.setProperty('--app-height', window.innerHeight + 'px');
+}
+window.addEventListener('resize', setAppHeight);
+setAppHeight();
+
+// Load dynamic branding from settings
+fetch('/api/settings/public').then(r => r.json()).then(d => {
+    if (d.success && d.settings) {
+        if (d.settings.favicon_url) {
+            const fav = document.getElementById('dynamic-favicon');
+            if (fav) { fav.href = d.settings.favicon_url; fav.type = 'image/png'; }
+            const apple = document.getElementById('dynamic-apple-icon');
+            if (apple) apple.href = d.settings.favicon_url;
+        }
+        if (d.settings.app_name) document.title = d.settings.app_name;
+    }
+}).catch(() => {});
+</script>
 <script src="/socket.io/socket.io.js"></script>
 <!-- Firebase SDK for push notifications -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>

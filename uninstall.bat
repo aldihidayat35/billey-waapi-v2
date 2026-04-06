@@ -8,24 +8,18 @@ echo ╔════════════════════════
 echo ║              Uninstall WhatsApp Multi-Session API            ║
 echo ╚══════════════════════════════════════════════════════════════╝
 echo.
-echo PERINGATAN: Ini akan menghapus aplikasi dari PM2
+echo PERINGATAN: Ini akan menghentikan server.
 echo Data session WhatsApp TIDAK akan dihapus.
 echo.
 set /p confirm="Lanjutkan? (Y/N): "
 if /i not "%confirm%"=="Y" exit /b
 
 echo.
-echo [1/3] Menghentikan aplikasi...
-pm2 stop baileys-waapi >nul 2>&1
-echo [✓] Aplikasi dihentikan
-
-echo [2/3] Menghapus dari PM2...
-pm2 delete baileys-waapi >nul 2>&1
-echo [✓] Dihapus dari PM2
-
-echo [3/3] Menyimpan konfigurasi...
-pm2 save >nul 2>&1
-echo [✓] Konfigurasi disimpan
+echo [1/1] Menghentikan server...
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":8080" ^| findstr "LISTENING"') do (
+    taskkill /PID %%a /F >nul 2>&1
+)
+echo [✓] Server dihentikan
 
 echo.
 echo ╔══════════════════════════════════════════════════════════════╗

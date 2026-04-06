@@ -21,7 +21,7 @@ import {
 } from './middleware.js'
 import multer from 'multer'
 import { NotificationService, registerUserSocket, unregisterUserSocket, registerAdminSocket, unregisterAdminSocket, isUserOnline, getOnlineUserCount } from './notification.js'
-import { saveMediaBase64, getMediaDir, getMediaPath, cleanupOldMedia, migrateMediaFromDb } from './media-storage.js'
+import { saveMedia, saveMediaBase64, getMediaDir, getMediaPath, cleanupOldMedia, migrateMediaFromDb } from './media-storage.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -38,7 +38,8 @@ const io = new SocketIO(server, {
 	cors: {
 		origin: '*',
 		methods: ['GET', 'POST']
-	}
+	},
+	maxHttpBufferSize: 50 * 1024 * 1024 // 50 MB – match express.json limit
 })
 
 const sessionManager = new SessionManager(io)
@@ -124,6 +125,34 @@ const protectStaticFiles = (req: any, res: any, next: any) => {
 
 // Apply protection middleware BEFORE static files
 app.use(protectStaticFiles)
+
+// Dynamic PWA manifest — must be before express.static to override public/manifest.json
+app.get('/manifest.json', (req, res) => {
+	try {
+		const s = appSettingDb.get()
+		const faviconUrl = s.favicon ? `/uploads/settings/${path.basename(s.favicon)}` : '/assets/media/logos/favicon.ico'
+		const manifest = {
+			name: s.app_name || 'Billey WA - WhatsApp Multi Session',
+			short_name: s.app_name || 'Billey WA',
+			description: s.app_tagline || 'WhatsApp Multi Session Manager & Chat Portal',
+			start_url: '/member/dashboard.html',
+			scope: '/',
+			display: 'standalone',
+			orientation: 'portrait',
+			theme_color: '#008069',
+			background_color: '#ffffff',
+			icons: [
+				{ src: faviconUrl, sizes: '64x64', type: 'image/x-icon' },
+				{ src: '/assets/media/logos/pwa-192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
+				{ src: '/assets/media/logos/pwa-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
+			]
+		}
+		res.setHeader('Content-Type', 'application/manifest+json')
+		res.json(manifest)
+	} catch {
+		res.sendFile(path.join(__dirname, 'public', 'manifest.json'))
+	}
+})
 
 // Serve static files (now protected by middleware above)
 app.use(express.static('public'))
@@ -1214,6 +1243,86 @@ app.get('/api/logs/statistics', (req, res) => {
 	} catch (error: any) {
 		console.error('Error fetching statistics:', error)
 		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// POST /api/chat/send-media — Send media via multipart upload (cookie auth, supports XHR progress)
+app.post('/api/chat/send-media', authMiddleware, upload.single('file'), async (req: any, res) => {
+	try {
+		const { sessionId, phone, caption, tempId } = req.body
+		const file = req.file
+		if (!sessionId || !phone || !file) {
+			return res.status(400).json({ success: false, error: 'sessionId, phone, dan file wajib diisi.' })
+		}
+		const sid = resolveSession(sessionId)
+		if (!sid) {
+			return res.status(503).json({ success: false, error: 'Tidak ada sesi WhatsApp yang terhubung.' })
+		}
+
+		const isImage = file.mimetype.startsWith('image/')
+		const isVideo = file.mimetype.startsWith('video/')
+		const mediaType = isImage ? 'image' : isVideo ? 'video' : 'document'
+
+		let result: any
+		if (isImage) {
+			result = await sessionManager.sendImage(sid, phone, file.buffer, caption || '', file.mimetype, file.originalname)
+		} else if (isVideo) {
+			result = await sessionManager.sendVideo(sid, phone, file.buffer, caption || '', file.mimetype, file.originalname)
+		} else {
+			result = await sessionManager.sendDocument(sid, phone, file.buffer, file.mimetype, file.originalname, caption || undefined)
+		}
+
+		const messageId = result?.key?.id || `${mediaType}_${Date.now()}`
+		const jid = phone.includes('@s.whatsapp.net') ? phone : `${phone.replace(/[^0-9]/g, '')}@s.whatsapp.net`
+
+		// Save media to file system
+		let mediaUrl: string | null = null
+		try {
+			mediaUrl = saveMedia(sid, messageId, file.buffer, file.mimetype, file.originalname)
+		} catch (saveErr) {
+			console.error('⚠️ Failed to save media file:', saveErr)
+		}
+
+		// Log to database
+		try {
+			messageLogDb.insert({
+				message_id: messageId,
+				session_id: sid,
+				direction: 'outgoing',
+				from_number: sid,
+				to_number: jid,
+				message_type: mediaType,
+				content: '',
+				caption: caption || '',
+				media_url: mediaUrl || undefined,
+				mimetype: file.mimetype,
+				filename: file.originalname,
+				file_size: file.buffer.length,
+				timestamp: new Date().toISOString(),
+				status: 'sent',
+				source: 'ui'
+			})
+		} catch (dbError) {
+			console.error('⚠️ Failed to save media to database:', dbError)
+		}
+
+		// Broadcast to all sockets so other tabs/users see the message
+		io.emit('message-sent', {
+			success: true,
+			sessionId: sid,
+			to: phone,
+			caption: caption || '',
+			filename: file.originalname || '',
+			tempId: tempId || null,
+			messageId,
+			mediaType,
+			mediaUrl: mediaUrl || null
+		})
+
+		res.json({ success: true, messageId, mediaType, mediaUrl, tempId })
+	} catch (error: any) {
+		console.error('[/api/chat/send-media]', error.message)
+		res.status(500).json({ success: false, error: error.message, tempId: req.body?.tempId })
 	}
 })
 

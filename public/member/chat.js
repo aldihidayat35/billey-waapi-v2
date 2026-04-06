@@ -385,11 +385,9 @@ function sendMediaMessage() {
     const phone = cleanPhone(S.activeContact);
     const tempId = 'tmp_' + Date.now();
     const file = S.selectedFile;
-    const base64 = S.selectedFileData;
 
     const isImage = file.type.startsWith('image/');
     const isVideo = file.type.startsWith('video/');
-    const eventType = isImage ? 'send-image' : isVideo ? 'send-video' : 'send-document';
 
     // Optimistic render
     const msg = {
@@ -400,7 +398,7 @@ function sendMediaMessage() {
         to_number: S.activeContact,
         message_type: isImage ? 'image' : isVideo ? 'video' : 'document',
         content: caption || '',
-        media_data: isImage ? base64 : null,
+        media_data: null,
         mimetype: file.type,
         filename: file.name,
         timestamp: new Date().toISOString(),
@@ -411,20 +409,106 @@ function sendMediaMessage() {
     renderMessages();
     scrollToBottom();
 
-    const payload = {
-        sessionId: S.activeSession,
-        phone,
-        caption,
-        mimetype: file.type,
-        filename: file.name,
-        tempId,
-        base64,
+    // Show progress UI
+    const progressEl = document.getElementById('upload-progress');
+    const statusEl = document.getElementById('upload-status');
+    const percentEl = document.getElementById('upload-percent');
+    const barEl = document.getElementById('upload-bar');
+    const sendBtn = document.getElementById('media-send');
+    progressEl.style.display = '';
+    barEl.style.transition = 'width 0.3s ease';
+    barEl.style.width = '0%';
+    percentEl.textContent = '0%';
+    statusEl.textContent = 'Mengunggah...';
+    sendBtn.disabled = true;
+    sendBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Mengunggah...';
+
+    // Build FormData for multipart upload
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('sessionId', S.activeSession);
+    formData.append('phone', phone);
+    formData.append('caption', caption);
+    formData.append('tempId', tempId);
+
+    // Track processing phase animation
+    let processingInterval = null;
+    let currentProcessPct = 70;
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/chat/send-media');
+
+    // Phase 1: Upload bytes (0% → 70%)
+    xhr.upload.onprogress = function(e) {
+        if (e.lengthComputable) {
+            const uploadPct = Math.round((e.loaded / e.total) * 70);
+            barEl.style.width = uploadPct + '%';
+            percentEl.textContent = uploadPct + '%';
+        }
     };
 
-    S.socket.emit(eventType, payload);
+    // Phase 2: Upload complete, server processing (70% → 95% animated)
+    xhr.upload.onloadend = function() {
+        statusEl.textContent = 'Memproses...';
+        sendBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Memproses...';
+        barEl.style.width = '70%';
+        percentEl.textContent = '70%';
 
-    // Close overlay
-    closeMediaOverlay();
+        processingInterval = setInterval(function() {
+            if (currentProcessPct < 95) {
+                currentProcessPct += 1;
+                barEl.style.width = currentProcessPct + '%';
+                percentEl.textContent = currentProcessPct + '%';
+            } else {
+                clearInterval(processingInterval);
+                processingInterval = null;
+            }
+        }, 300);
+    };
+
+    xhr.onload = function() {
+        if (processingInterval) clearInterval(processingInterval);
+
+        // Phase 3: Complete (100%)
+        statusEl.textContent = 'Selesai!';
+        barEl.style.width = '100%';
+        percentEl.textContent = '100%';
+
+        const isSuccess = xhr.status >= 200 && xhr.status < 300;
+
+        setTimeout(function() {
+            progressEl.style.display = 'none';
+            sendBtn.disabled = false;
+            sendBtn.innerHTML = '<i class="bi bi-send-fill"></i> Kirim';
+            closeMediaOverlay();
+
+            if (!isSuccess) {
+                try {
+                    const err = JSON.parse(xhr.responseText);
+                    console.error('Upload error:', err.error);
+                } catch(e) { console.error('Upload failed:', xhr.statusText); }
+                const pendingMsg = S.messages.get(tempId);
+                if (pendingMsg) { pendingMsg.status = 'failed'; renderMessages(); }
+            }
+        }, 500);
+    };
+
+    xhr.onerror = function() {
+        if (processingInterval) clearInterval(processingInterval);
+        statusEl.textContent = 'Gagal!';
+        barEl.style.background = '#dc3545';
+
+        setTimeout(function() {
+            progressEl.style.display = 'none';
+            barEl.style.background = '';
+            sendBtn.disabled = false;
+            sendBtn.innerHTML = '<i class="bi bi-send-fill"></i> Kirim';
+            closeMediaOverlay();
+        }, 1000);
+        console.error('Upload network error');
+    };
+
+    xhr.send(formData);
 }
 
 // ─── Socket Listeners ─────────────────────────────────────────

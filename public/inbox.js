@@ -1128,16 +1128,26 @@ function clearFile() {
 }
 
 function sendMedia() {
-    if (!State.selectedFile || !State.selectedFileData || !State.sessionId || !State.currentChat) return;
+    if (!State.selectedFile || !State.sessionId || !State.currentChat) return;
     
     const caption = DOM.mediaCaption?.value || '';
-    const base64 = State.selectedFileData.split(',')[1];
+    const file = State.selectedFile;
     
-    // Show loading
+    // Show progress UI
     const btn = DOM.sendMediaBtn;
     const originalText = btn.innerHTML;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Mengirim...';
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Mengunggah...';
     btn.disabled = true;
+    
+    const progressEl = document.getElementById('upload-progress');
+    const statusEl = document.getElementById('upload-status');
+    const percentEl = document.getElementById('upload-percent');
+    const barEl = document.getElementById('upload-bar');
+    progressEl.classList.remove('d-none');
+    barEl.style.transition = 'width 0.3s ease';
+    barEl.style.width = '0%';
+    percentEl.textContent = '0%';
+    statusEl.textContent = 'Mengunggah...';
     
     // Generate temp ID
     const tempId = `media_${Date.now()}`;
@@ -1150,42 +1160,104 @@ function sendMedia() {
         isFromMe: true,
         timestamp: Date.now(),
         status: 'pending',
-        filename: State.selectedFile.name,
-        mediaData: base64.substring(0, 100) // Just for identification
+        filename: file.name,
     };
     
     State.pendingMessages.set(tempId, { ...optimisticMsg, phone: State.currentChat });
     appendPendingMediaMessage(optimisticMsg, tempId);
     scrollToBottom();
     
-    // Send via socket
-    const payload = {
-        sessionId: State.sessionId,
-        phone: State.currentChat,
-        base64: base64,
-        mimetype: State.selectedFile.type,
-        tempId: tempId
+    // Build FormData for multipart upload
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('sessionId', State.sessionId);
+    formData.append('phone', State.currentChat);
+    formData.append('caption', caption);
+    formData.append('tempId', tempId);
+    
+    // Track processing phase animation
+    let processingInterval = null;
+    let currentProcessPct = 70;
+    
+    // Upload via XHR for progress tracking
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/chat/send-media');
+    
+    // Phase 1: Upload bytes (0% → 70%)
+    xhr.upload.onprogress = function(e) {
+        if (e.lengthComputable) {
+            const uploadPct = Math.round((e.loaded / e.total) * 70);
+            barEl.style.width = uploadPct + '%';
+            percentEl.textContent = uploadPct + '%';
+        }
     };
     
-    if (State.mediaType === 'image') {
-        payload.caption = caption;
-        socket.emit('send-image', payload);
-    } else if (State.mediaType === 'video') {
-        payload.caption = caption;
-        socket.emit('send-video', payload);
-    } else {
-        payload.filename = State.selectedFile.name;
-        socket.emit('send-document', payload);
-    }
+    // Phase 2: Upload complete, server processing (70% → 95% animated)
+    xhr.upload.onloadend = function() {
+        statusEl.textContent = 'Memproses...';
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Memproses...';
+        barEl.style.width = '70%';
+        percentEl.textContent = '70%';
+        
+        processingInterval = setInterval(function() {
+            if (currentProcessPct < 95) {
+                currentProcessPct += 1;
+                barEl.style.width = currentProcessPct + '%';
+                percentEl.textContent = currentProcessPct + '%';
+            } else {
+                clearInterval(processingInterval);
+                processingInterval = null;
+            }
+        }, 300);
+    };
     
-    // Close modal
-    State.mediaModal.hide();
-    btn.innerHTML = originalText;
-    btn.disabled = false;
+    xhr.onload = function() {
+        if (processingInterval) clearInterval(processingInterval);
+        
+        // Phase 3: Complete (100%)
+        statusEl.textContent = 'Selesai!';
+        barEl.style.width = '100%';
+        percentEl.textContent = '100%';
+        
+        const isSuccess = xhr.status >= 200 && xhr.status < 300;
+        
+        setTimeout(function() {
+            progressEl.classList.add('d-none');
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+            State.mediaModal.hide();
+            State.selectedFile = null;
+            State.selectedFileData = null;
+            
+            if (!isSuccess) {
+                try {
+                    const err = JSON.parse(xhr.responseText);
+                    console.error('Upload error:', err.error);
+                    const pending = document.querySelector(`[data-temp-id="${tempId}"]`);
+                    if (pending) {
+                        const statusIcon = pending.querySelector('.message-status');
+                        if (statusIcon) statusIcon.innerHTML = '<i class="bi bi-exclamation-circle text-danger"></i>';
+                    }
+                } catch(e) { console.error('Upload failed:', xhr.statusText); }
+            }
+        }, 500);
+    };
     
-    // Reset state
-    State.selectedFile = null;
-    State.selectedFileData = null;
+    xhr.onerror = function() {
+        if (processingInterval) clearInterval(processingInterval);
+        statusEl.textContent = 'Gagal!';
+        barEl.classList.replace('bg-success', 'bg-danger');
+        
+        setTimeout(function() {
+            progressEl.classList.add('d-none');
+            barEl.classList.replace('bg-danger', 'bg-success');
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }, 1000);
+        console.error('Upload network error');
+    };
+    
+    xhr.send(formData);
 }
 
 function appendPendingMediaMessage(msg, tempId) {

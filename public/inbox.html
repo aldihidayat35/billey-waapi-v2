@@ -1141,6 +1141,17 @@
                             <label class="form-label">Caption (Opsional)</label>
                             <textarea id="media-caption" class="form-control" rows="2" placeholder="Tambahkan caption..."></textarea>
                         </div>
+                        
+                        <!-- Upload Progress -->
+                        <div id="upload-progress" class="d-none mt-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <small class="text-muted" id="upload-status">Mengunggah...</small>
+                                <small class="fw-semibold" id="upload-percent">0%</small>
+                            </div>
+                            <div class="progress" style="height: 6px;">
+                                <div class="progress-bar bg-success" id="upload-bar" role="progressbar" style="width: 0%; transition: width 0.3s ease;"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">

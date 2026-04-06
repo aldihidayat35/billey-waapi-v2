@@ -13,15 +13,15 @@
 1. Clone repository:
    ```bash
    cd C:/laragon/www
-   git clone https://github.com/aldihidayat35/billey-waapi-v2.git Baileys
-   cd Baileys
+   git clone https://github.com/aldihidayat35/billey-waapi-v2.git
+   cd billey-waapi-v2
    ```
 
 2. Jalankan script instalasi:
    - **Double-click** file `install.bat`
    - Atau jalankan di terminal: `install.bat`
 
-3. Selesai! Aplikasi akan otomatis jalan saat Windows startup.
+3. Selesai! Buka http://localhost:8080
 
 ---
 
@@ -35,8 +35,8 @@
 #### Step 2: Clone Repository
 ```bash
 cd C:/laragon/www
-git clone https://github.com/aldihidayat35/billey-waapi-v2.git Baileys
-cd Baileys
+git clone https://github.com/aldihidayat35/billey-waapi-v2.git
+cd billey-waapi-v2
 ```
 
 #### Step 3: Install Dependencies
@@ -44,28 +44,13 @@ cd Baileys
 npm install
 ```
 
-#### Step 4: Install PM2 Global
+#### Step 4: Jalankan Server
 ```bash
-npm install -g pm2
-npm install -g pm2-windows-startup
+npx tsx web-server.ts
 ```
 
-#### Step 5: Setup PM2 Auto-Start
-```bash
-# Start aplikasi dengan PM2
-pm2 start web-server.ts --name baileys-waapi --interpreter ./node_modules/.bin/tsx
-
-# Save konfigurasi PM2
-pm2 save
-
-# Setup Windows startup
-pm2-startup install
-```
-
-#### Step 6: Verifikasi
-```bash
-pm2 status
-```
+#### Step 5: Verifikasi
+Buka browser ke http://localhost:8080
 
 ---
 
@@ -77,23 +62,18 @@ Setelah instalasi selesai:
 
 ---
 
-## 📝 Perintah PM2 Berguna
+## 📋 Perintah
 
 ```bash
-# Lihat status
-pm2 status
+# Start server
+start.bat
+# atau: npx tsx web-server.ts
 
-# Lihat logs
-pm2 logs baileys-waapi
+# Stop server
+stop.bat
 
-# Restart aplikasi
-pm2 restart baileys-waapi
-
-# Stop aplikasi
-pm2 stop baileys-waapi
-
-# Hapus dari PM2
-pm2 delete baileys-waapi
+# Check status
+check-status.bat
 ```
 
 ---
@@ -106,30 +86,24 @@ pm2 delete baileys-waapi
 
 ### Error: Port 8080 already in use
 - Ubah port di file `web-server.ts` atau stop aplikasi yang menggunakan port 8080
-
-### PM2 tidak auto-start saat Windows boot
-```bash
-pm2-startup install
-pm2 save
-```
+- Atau jalankan `stop.bat` untuk menghentikan proses di port 8080
 
 ### Aplikasi crash terus-menerus
-```bash
-pm2 logs baileys-waapi --lines 100
-```
+- Cek log error di terminal tempat server dijalankan
 
 ---
 
 ## 📂 Struktur Folder Penting
 
 ```
-Baileys/
+billey-waapi-v2/
 ├── data/               # Database SQLite
 ├── public/             # Frontend files
 ├── src/                # Source code Baileys
 ├── web-server.ts       # Main server file
 ├── install.bat         # Script instalasi otomatis
-└── start-baileys.bat   # Script start manual
+├── start.bat           # Start server
+└── stop.bat            # Stop server
 ```
 
 ---
@@ -137,8 +111,8 @@ Baileys/
 ## 🔄 Update Aplikasi
 
 ```bash
-cd C:/laragon/www/Baileys
+cd C:/laragon/www/billey-waapi-v2
 git pull origin main
 npm install
-pm2 restart baileys-waapi
+# Restart server (stop.bat lalu start.bat)
 ```
