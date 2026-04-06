@@ -18,6 +18,8 @@ const S = {
     selectedFileData: null,
     _loadingConversations: false,  // Guard against concurrent loads
     _conversationsLoaded: false,   // Track if initial load done
+    assignmentNotes: {},    // contact → { notes, priority }
+    adminPhone: '',         // admin phone for report feature
 };
 
 const COLORS = [
@@ -39,13 +41,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     S.socket = io();
     setupSocketListeners();
 
-    // 3. Load sessions
+    // 3. Load assignment notes (before sessions, so icons render on first paint)
+    await loadAssignmentNotes();
+
+    // 4. Load sessions (triggers selectSession → loadConversations → renderConversations)
     await loadSessions();
 
-    // 4. UI wiring
+    // 5. UI wiring
     wireUI();
+    wireNoteModal();
+    wireReportModal();
 
-    // 5. Poll unread every 60s as fallback sync
+    // 6. Load admin phone for report feature
+    try {
+        const rp = await fetch('/api/settings/public');
+        const dp = await rp.json();
+        if (dp.success && dp.settings?.admin_phone) S.adminPhone = dp.settings.admin_phone;
+    } catch {}
+
+    // 7. Poll unread every 60s as fallback sync
     loadUnread();
     setInterval(loadUnread, 60000);
 });
@@ -80,6 +94,82 @@ async function loadSessions() {
             selectSession(S.sessions[0].id);
         }
     }
+}
+
+// ─── Assignment Notes ──────────────────────────────────────────
+async function loadAssignmentNotes() {
+    try {
+        const r = await fetch('/api/member/assignment-notes');
+        const d = await r.json();
+        S.assignmentNotes = {};
+        for (const n of (d.notes || [])) {
+            if (n.notes || n.priority !== 'low') {
+                S.assignmentNotes[n.contact] = { notes: n.notes || '', priority: n.priority || 'low', session_id: n.session_id };
+            }
+        }
+    } catch { S.assignmentNotes = {}; }
+}
+
+function openNoteModal(contact) {
+    const n = S.assignmentNotes[contact];
+    if (!n) return;
+    const modal = document.getElementById('note-modal');
+    const overlay = document.getElementById('note-modal-overlay');
+    const priorityLabels = { low: 'Low', medium: 'Medium', critical: 'Critical' };
+    modal.className = 'note-modal priority-' + n.priority;
+    document.getElementById('note-priority-badge').textContent = priorityLabels[n.priority] || 'Low';
+    document.getElementById('note-content').textContent = n.notes || '(Tidak ada catatan)';
+    overlay.classList.add('show');
+}
+
+function closeNoteModal() {
+    document.getElementById('note-modal-overlay').classList.remove('show');
+}
+
+function wireNoteModal() {
+    document.getElementById('note-modal-close').addEventListener('click', closeNoteModal);
+    document.getElementById('note-modal-overlay').addEventListener('click', (e) => {
+        if (e.target === document.getElementById('note-modal-overlay')) closeNoteModal();
+    });
+}
+
+// ─── Report Modal ──────────────────────────────────────────────
+function openReportModal(contact) {
+    const overlay = document.getElementById('report-modal-overlay');
+    document.getElementById('report-worker-name').value = S.user?.name || '-';
+    document.getElementById('report-client-phone').value = cleanPhone(contact);
+    document.getElementById('report-text').value = '';
+    overlay.dataset.contact = contact;
+    overlay.classList.add('show');
+    document.getElementById('report-text').focus();
+}
+
+function closeReportModal() {
+    document.getElementById('report-modal-overlay').classList.remove('show');
+}
+
+function wireReportModal() {
+    document.getElementById('report-modal-close').addEventListener('click', closeReportModal);
+    document.getElementById('report-modal-overlay').addEventListener('click', (e) => {
+        if (e.target === document.getElementById('report-modal-overlay')) closeReportModal();
+    });
+    document.getElementById('report-send-btn').addEventListener('click', () => {
+        const reportText = document.getElementById('report-text').value.trim();
+        if (!reportText) {
+            Swal.fire({ toast: true, position: 'top-end', icon: 'warning', title: 'Laporan tidak boleh kosong', timer: 2000, showConfirmButton: false });
+            return;
+        }
+        if (!S.adminPhone) {
+            Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: 'Nomor admin belum diatur', timer: 2500, showConfirmButton: false });
+            return;
+        }
+        const workerName = S.user?.name || '-';
+        const clientPhone = document.getElementById('report-client-phone').value;
+        const message = `*Laporan Worker*\n\nWorker : ${workerName}\nClient : ${clientPhone}\nLaporan : ${reportText}`;
+        const waUrl = `https://wa.me/${S.adminPhone}?text=${encodeURIComponent(message)}`;
+        window.open(waUrl, '_blank');
+        closeReportModal();
+    });
 }
 
 function renderSessionTabs() {
@@ -174,11 +264,14 @@ function renderConversations(filter = '') {
         const typeIcon = c.lastMessageType && c.lastMessageType !== 'text' ? '📎 ' : '';
         const lastMsg = c.lastMessage ? truncate(`${typeIcon}${c.lastMessage}`, 40) : '—';
         const displayPhone = maskPhone(phone);
+        const noteData = S.assignmentNotes[c.contact];
+        const noteIcon = noteData ? `<span class="note-icon note-${noteData.priority}" data-note-contact="${c.contact}" title="Catatan penugasan"><i class="bi bi-sticky-fill"></i></span>` : '';
+        const reportIcon = `<span class="report-icon" data-report-contact="${c.contact}" title="Laporan"><i class="bi bi-flag-fill"></i></span>`;
         return `<div class="conv-item ${active}" data-contact="${c.contact}">
             <div class="conv-ava" style="background:${color};">${initials}</div>
             <div class="conv-body">
                 <div class="conv-row1">
-                    <div class="conv-name">${escHtml(displayPhone)}</div>
+                    <div class="conv-name">${escHtml(displayPhone)}${noteIcon}${reportIcon}</div>
                     <div class="conv-time">${time}</div>
                 </div>
                 <div class="conv-row2">
@@ -191,6 +284,18 @@ function renderConversations(filter = '') {
 
     list.querySelectorAll('.conv-item').forEach(el => {
         el.addEventListener('click', () => openChat(el.dataset.contact));
+    });
+    list.querySelectorAll('.note-icon[data-note-contact]').forEach(el => {
+        el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openNoteModal(el.dataset.noteContact);
+        });
+    });
+    list.querySelectorAll('.report-icon[data-report-contact]').forEach(el => {
+        el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openReportModal(el.dataset.reportContact);
+        });
     });
 }
 
@@ -213,6 +318,23 @@ async function openChat(contact) {
     document.getElementById('chat-hdr-avatar').textContent = phone.slice(-2);
     document.getElementById('chat-hdr-name').textContent = maskPhone(phone);
     document.getElementById('chat-hdr-phone').textContent = isPhoneVisible() ? contact : '***';
+
+    // Note icon in header
+    const hdrNote = document.getElementById('chat-hdr-note');
+    const noteData = S.assignmentNotes[contact];
+    if (noteData) {
+        hdrNote.className = 'note-icon-hdr note-' + noteData.priority;
+        hdrNote.classList.remove('d-none');
+        hdrNote.onclick = () => openNoteModal(contact);
+    } else {
+        hdrNote.classList.add('d-none');
+    }
+
+    // Report icon in header
+    const hdrReport = document.getElementById('chat-hdr-report');
+    if (hdrReport) {
+        hdrReport.onclick = () => openReportModal(contact);
+    }
 
     // Show chat UI elements
     document.getElementById('chat-hdr').classList.remove('d-none');

@@ -81,6 +81,30 @@
 
                                 <form id="settings-form" enctype="multipart/form-data">
 
+                                    <!-- Tab Navigation -->
+                                    <ul class="nav nav-tabs nav-line-tabs nav-line-tabs-2x mb-6 fs-6">
+                                        <li class="nav-item">
+                                            <a class="nav-link active" data-bs-toggle="tab" href="#tab-identity">
+                                                <i class="bi bi-gear me-2"></i>Identitas Aplikasi
+                                            </a>
+                                        </li>
+                                        <li class="nav-item">
+                                            <a class="nav-link" data-bs-toggle="tab" href="#tab-branding">
+                                                <i class="bi bi-image me-2"></i>Branding & Logo
+                                            </a>
+                                        </li>
+                                        <li class="nav-item">
+                                            <a class="nav-link" data-bs-toggle="tab" href="#tab-about">
+                                                <i class="bi bi-info-circle me-2"></i>About Apps
+                                            </a>
+                                        </li>
+                                    </ul>
+
+                                    <div class="tab-content">
+
+                                    <!-- Tab: Identitas Aplikasi -->
+                                    <div class="tab-pane fade show active" id="tab-identity">
+
                                     <!-- App Identity -->
                                     <div class="card mb-6">
                                         <div class="card-header">
@@ -107,6 +131,10 @@
                                     </div>
 
                                     <!-- Branding -->
+                                    <!-- Tab: Branding -->
+                                    </div><!-- end tab-identity -->
+                                    <div class="tab-pane fade" id="tab-branding">
+
                                     <div class="card mb-6">
                                         <div class="card-header">
                                             <h3 class="card-title fw-bold">
@@ -226,6 +254,34 @@
                                         </div>
                                     </div>
 
+                                    </div><!-- end tab-branding -->
+
+                                    <!-- Tab: About Apps -->
+                                    <div class="tab-pane fade" id="tab-about">
+                                    <div class="card mb-6">
+                                        <div class="card-header">
+                                            <h3 class="card-title fw-bold">
+                                                <i class="bi bi-info-circle me-2 text-info"></i>About Apps
+                                            </h3>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="row g-6">
+                                                <div class="col-md-6">
+                                                    <label class="form-label fw-semibold">Nomor HP Admin (WhatsApp)</label>
+                                                    <div class="input-group">
+                                                        <span class="input-group-text"><i class="bi bi-whatsapp text-success"></i></span>
+                                                        <input type="text" id="admin_phone" name="admin_phone" class="form-control"
+                                                            placeholder="cth. 6281234567890" maxlength="20" />
+                                                    </div>
+                                                    <div class="form-text">Nomor WhatsApp admin untuk menerima laporan dari worker. Format: 62xxx (tanpa + atau spasi).</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    </div><!-- end tab-about -->
+
+                                    </div><!-- end tab-content -->
+
                                     <!-- Save Button -->
                                     <div class="d-flex justify-content-end gap-3 mb-10">
                                         <button type="button" class="btn btn-light" onclick="loadSettings()">
@@ -318,6 +374,7 @@
     function populateForm(s) {
         document.getElementById('app_name').value = s.app_name || '';
         document.getElementById('app_tagline').value = s.app_tagline || '';
+        document.getElementById('admin_phone').value = s.admin_phone || '';
 
         // Reset remove flags
         ['logo', 'logo_small', 'favicon'].forEach(key => {

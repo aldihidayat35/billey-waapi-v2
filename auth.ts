@@ -149,6 +149,8 @@ export function initAuthTables(): void {
             worker_id INTEGER NOT NULL,
             session_id TEXT NOT NULL,
             contact TEXT NOT NULL,
+            notes TEXT DEFAULT '',
+            priority TEXT DEFAULT 'low' CHECK(priority IN ('low', 'medium', 'critical')),
             assigned_by INTEGER NOT NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (worker_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -157,7 +159,37 @@ export function initAuthTables(): void {
         );
         CREATE INDEX IF NOT EXISTS idx_worker_assignments_worker ON worker_assignments(worker_id);
         CREATE INDEX IF NOT EXISTS idx_worker_assignments_session ON worker_assignments(session_id);
+
+        CREATE TABLE IF NOT EXISTS assignment_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            worker_id INTEGER NOT NULL,
+            worker_name TEXT,
+            session_id TEXT NOT NULL,
+            contact TEXT NOT NULL,
+            notes TEXT DEFAULT '',
+            priority TEXT DEFAULT 'low',
+            action TEXT DEFAULT 'assigned',
+            assigned_by INTEGER NOT NULL,
+            assigned_by_name TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_assignment_logs_worker ON assignment_logs(worker_id);
+        CREATE INDEX IF NOT EXISTS idx_assignment_logs_created ON assignment_logs(created_at);
     `)
+
+    // Migration: Add notes/priority columns to worker_assignments if they don't exist
+    try {
+        const waInfo = db.prepare("PRAGMA table_info(worker_assignments)").all() as any[]
+        const waCols = waInfo.map(c => c.name)
+        if (!waCols.includes('notes')) {
+            db.exec("ALTER TABLE worker_assignments ADD COLUMN notes TEXT DEFAULT ''")
+            console.log('✅ Added notes column to worker_assignments')
+        }
+        if (!waCols.includes('priority')) {
+            db.exec("ALTER TABLE worker_assignments ADD COLUMN priority TEXT DEFAULT 'low'")
+            console.log('✅ Added priority column to worker_assignments')
+        }
+    } catch (e) { /* columns already exist */ }
 
     // Create default admin if no users exist
     createDefaultAdmin()
@@ -589,6 +621,7 @@ export function login(email: string, password: string, ipAddress?: string, userA
             role: user.role,
             token: user.token,
             status: user.status,
+            phone_visible: user.phone_visible ?? 1,
             created_at: user.created_at,
             updated_at: user.updated_at
         }
@@ -679,9 +712,9 @@ export function userOwnsSession(userId: number, sessionId: string, role: UserRol
 // ============================================
 export const workerAssignmentDb = {
     // Get all assignments for a worker
-    getForWorker: (workerId: number): { session_id: string; contact: string }[] => {
+    getForWorker: (workerId: number): { session_id: string; contact: string; notes: string; priority: string }[] => {
         return db.prepare(`
-            SELECT session_id, contact FROM worker_assignments WHERE worker_id = ?
+            SELECT session_id, contact, notes, priority FROM worker_assignments WHERE worker_id = ?
         `).all(workerId) as any[]
     },
 
@@ -693,16 +726,33 @@ export const workerAssignmentDb = {
         return rows.map(r => r.contact)
     },
 
-    // Replace all assignments for a worker (bulk set)
-    replaceForWorker: (workerId: number, assignments: { session_id: string; contact: string }[], assignedBy: number): { success: boolean; error?: string } => {
+    // Get assignment note for a specific worker-session-contact
+    getNote: (workerId: number, sessionId: string, contact: string): { notes: string; priority: string } | null => {
+        const row = db.prepare(`
+            SELECT notes, priority FROM worker_assignments
+            WHERE worker_id = ? AND session_id = ? AND contact = ?
+        `).get(workerId, sessionId, contact) as any
+        return row || null
+    },
+
+    // Get all notes for a worker (used by member API)
+    getNotesForWorker: (workerId: number): { session_id: string; contact: string; notes: string; priority: string }[] => {
+        return db.prepare(`
+            SELECT session_id, contact, notes, priority FROM worker_assignments
+            WHERE worker_id = ? AND (notes IS NOT NULL AND notes != '' OR priority != 'low')
+        `).all(workerId) as any[]
+    },
+
+    // Replace all assignments for a worker (bulk set) with notes/priority
+    replaceForWorker: (workerId: number, assignments: { session_id: string; contact: string; notes?: string; priority?: string }[], assignedBy: number): { success: boolean; error?: string } => {
         try {
             const del = db.prepare('DELETE FROM worker_assignments WHERE worker_id = ?')
-            const ins = db.prepare('INSERT OR IGNORE INTO worker_assignments (worker_id, session_id, contact, assigned_by) VALUES (?, ?, ?, ?)')
+            const ins = db.prepare('INSERT OR IGNORE INTO worker_assignments (worker_id, session_id, contact, notes, priority, assigned_by) VALUES (?, ?, ?, ?, ?, ?)')
             
             db.transaction(() => {
                 del.run(workerId)
                 for (const a of assignments) {
-                    ins.run(workerId, a.session_id, a.contact, assignedBy)
+                    ins.run(workerId, a.session_id, a.contact, a.notes || '', a.priority || 'low', assignedBy)
                 }
             })()
             return { success: true }
@@ -719,6 +769,60 @@ export const workerAssignmentDb = {
             LIMIT 1
         `).get(workerId, sessionId, contact)
         return !!result
+    }
+}
+
+// ============================================
+// Assignment Log Operations
+// ============================================
+export const assignmentLogDb = {
+    // Insert log entries for a batch of assignments
+    logAssignment: (workerId: number, workerName: string, assignments: { session_id: string; contact: string; notes?: string; priority?: string }[], assignedBy: number, assignedByName: string): void => {
+        const ins = db.prepare(`
+            INSERT INTO assignment_logs (worker_id, worker_name, session_id, contact, notes, priority, action, assigned_by, assigned_by_name)
+            VALUES (?, ?, ?, ?, ?, ?, 'assigned', ?, ?)
+        `)
+        db.transaction(() => {
+            for (const a of assignments) {
+                ins.run(workerId, workerName, a.session_id, a.contact, a.notes || '', a.priority || 'low', assignedBy, assignedByName)
+            }
+        })()
+    },
+
+    // Get all logs with optional filters
+    getLogs: (options: { page?: number; limit?: number; priority?: string; workerId?: number; dateFrom?: string; dateTo?: string } = {}): { logs: any[]; total: number } => {
+        const page = options.page || 1
+        const limit = options.limit || 50
+        const offset = (page - 1) * limit
+
+        let where = 'WHERE 1=1'
+        const params: any[] = []
+
+        if (options.priority) {
+            where += ' AND al.priority = ?'
+            params.push(options.priority)
+        }
+        if (options.workerId) {
+            where += ' AND al.worker_id = ?'
+            params.push(options.workerId)
+        }
+        if (options.dateFrom) {
+            where += ' AND al.created_at >= ?'
+            params.push(options.dateFrom)
+        }
+        if (options.dateTo) {
+            where += " AND al.created_at <= ? || ' 23:59:59'"
+            params.push(options.dateTo)
+        }
+
+        const total = (db.prepare(`SELECT COUNT(*) as count FROM assignment_logs al ${where}`).get(...params) as any)?.count || 0
+        const logs = db.prepare(`
+            SELECT al.* FROM assignment_logs al ${where}
+            ORDER BY al.created_at DESC
+            LIMIT ? OFFSET ?
+        `).all(...params, limit, offset) as any[]
+
+        return { logs, total }
     }
 }
 

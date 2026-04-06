@@ -363,6 +363,131 @@
             .msg-row.in        { padding-right: 24px; }
         }
         .d-none { display: none !important; }
+
+        /* Assignment Note Icons */
+        .note-icon {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 20px; height: 20px; border-radius: 4px; cursor: pointer;
+            font-size: 11px; flex-shrink: 0; margin-left: 4px;
+            transition: transform .15s;
+        }
+        .note-icon:hover { transform: scale(1.15); }
+        .note-icon.note-low { background: #e8f5e9; color: #4caf50; }
+        .note-icon.note-medium { background: #fff3e0; color: #ff9800; }
+        .note-icon.note-critical { background: #ffebee; color: #f44336; }
+        .note-icon-hdr {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 26px; height: 26px; border-radius: 6px; cursor: pointer;
+            font-size: 13px; flex-shrink: 0; margin-left: 8px;
+            transition: transform .15s;
+        }
+        .note-icon-hdr:hover { transform: scale(1.1); }
+        .note-icon-hdr.note-low { background: #e8f5e9; color: #4caf50; }
+        .note-icon-hdr.note-medium { background: #fff3e0; color: #ff9800; }
+        .note-icon-hdr.note-critical { background: #ffebee; color: #f44336; }
+
+        /* Report Icon (conv-list) */
+        .report-icon {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 20px; height: 20px; border-radius: 4px; cursor: pointer;
+            font-size: 11px; flex-shrink: 0; margin-left: 4px;
+            background: #e3f2fd; color: #1976d2;
+            transition: transform .15s;
+        }
+        .report-icon:hover { transform: scale(1.15); background: #bbdefb; }
+        /* Report Icon (header) */
+        .report-icon-hdr {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 26px; height: 26px; border-radius: 6px; cursor: pointer;
+            font-size: 13px; flex-shrink: 0; margin-left: 4px;
+            background: #e3f2fd; color: #1976d2;
+            transition: transform .15s;
+        }
+        .report-icon-hdr:hover { transform: scale(1.1); background: #bbdefb; }
+
+        /* Report Modal */
+        .report-modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,.45); z-index: 9999;
+            align-items: center; justify-content: center;
+        }
+        .report-modal-overlay.show { display: flex; }
+        .report-modal {
+            background: #fff; border-radius: 12px; width: 92%; max-width: 420px;
+            box-shadow: 0 8px 30px rgba(0,0,0,.18); overflow: hidden;
+            border-top: 4px solid #1976d2;
+        }
+        .report-modal-hdr {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 14px 16px; border-bottom: 1px solid #eee;
+        }
+        .report-modal-hdr-left { display: flex; align-items: center; gap: 8px; }
+        .report-modal-icon { font-size: 18px; color: #1976d2; }
+        .report-modal-title { font-weight: 600; font-size: 15px; color: #333; }
+        .report-modal-close {
+            background: none; border: none; font-size: 20px; color: #999;
+            cursor: pointer; padding: 4px; line-height: 1;
+        }
+        .report-modal-close:hover { color: #333; }
+        .report-modal-body { padding: 16px; }
+        .report-modal-body label { font-size: 13px; font-weight: 600; color: #555; margin-bottom: 4px; display: block; }
+        .report-modal-body input[readonly] {
+            background: #f5f5f5; border: 1px solid #e0e0e0; border-radius: 6px;
+            padding: 8px 12px; width: 100%; font-size: 14px; color: #333; margin-bottom: 12px;
+        }
+        .report-modal-body textarea {
+            width: 100%; border: 1px solid #ddd; border-radius: 6px;
+            padding: 8px 12px; font-size: 14px; resize: vertical; min-height: 80px;
+            margin-bottom: 12px;
+        }
+        .report-modal-body textarea:focus { outline: none; border-color: #1976d2; }
+        .report-send-btn {
+            display: block; width: 100%; padding: 10px; border: none; border-radius: 8px;
+            background: #25d366; color: #fff; font-size: 15px; font-weight: 600;
+            cursor: pointer; transition: background .2s;
+        }
+        .report-send-btn:hover { background: #1ebe5d; }
+
+        /* Note Modal */
+        .note-modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,.45); z-index: 9999;
+            align-items: center; justify-content: center;
+        }
+        .note-modal-overlay.show { display: flex; }
+        .note-modal {
+            background: #fff; border-radius: 12px; width: 340px; max-width: 90vw;
+            box-shadow: 0 8px 32px rgba(0,0,0,.25); overflow: hidden;
+            border-top: 4px solid #4caf50;
+        }
+        .note-modal.priority-medium { border-top-color: #ff9800; }
+        .note-modal.priority-critical { border-top-color: #f44336; }
+        .note-modal-hdr {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 14px 16px; border-bottom: 1px solid #eee;
+        }
+        .note-modal-hdr-left { display: flex; align-items: center; gap: 8px; }
+        .note-modal-icon { font-size: 18px; color: #4caf50; }
+        .note-modal.priority-medium .note-modal-icon { color: #ff9800; }
+        .note-modal.priority-critical .note-modal-icon { color: #f44336; }
+        .note-modal-title { font-weight: 600; font-size: 15px; color: #333; }
+        .note-modal-close {
+            background: none; border: none; font-size: 20px; color: #999;
+            cursor: pointer; padding: 4px; line-height: 1;
+        }
+        .note-modal-close:hover { color: #333; }
+        .note-modal-body { padding: 16px; }
+        .note-priority-badge {
+            display: inline-block; padding: 3px 10px; border-radius: 12px;
+            font-size: 12px; font-weight: 600; margin-bottom: 10px;
+            background: #e8f5e9; color: #4caf50;
+        }
+        .note-modal.priority-medium .note-priority-badge { background: #fff3e0; color: #ff9800; }
+        .note-modal.priority-critical .note-priority-badge { background: #ffebee; color: #f44336; }
+        .note-content {
+            font-size: 14px; color: #444; line-height: 1.5;
+            white-space: pre-wrap; word-break: break-word;
+        }
     </style>
 </head>
 <body>
@@ -435,6 +560,8 @@
                     <div class="hdr-name" id="chat-hdr-name">&mdash;</div>
                     <div class="hdr-sub"  id="chat-hdr-phone">&mdash;</div>
                 </div>
+                <span class="note-icon-hdr d-none" id="chat-hdr-note" title="Catatan penugasan"><i class="bi bi-sticky-fill"></i></span>
+                <span class="report-icon-hdr" id="chat-hdr-report" title="Laporan"><i class="bi bi-flag-fill"></i></span>
             </div>
 
             <!-- Empty state (desktop) -->
@@ -493,6 +620,47 @@
 <div class="img-viewer" id="image-viewer">
     <button class="img-viewer-close" id="img-viewer-close"><i class="bi bi-x"></i></button>
     <img id="image-viewer-img" alt="">
+</div>
+
+<!-- Assignment Note Modal -->
+<div class="note-modal-overlay" id="note-modal-overlay">
+    <div class="note-modal" id="note-modal">
+        <div class="note-modal-hdr">
+            <div class="note-modal-hdr-left">
+                <i class="bi bi-sticky-fill note-modal-icon"></i>
+                <span class="note-modal-title">Catatan Penugasan</span>
+            </div>
+            <button class="note-modal-close" id="note-modal-close"><i class="bi bi-x"></i></button>
+        </div>
+        <div class="note-modal-body">
+            <div class="note-priority-badge" id="note-priority-badge">Low</div>
+            <div class="note-content" id="note-content">-</div>
+        </div>
+    </div>
+</div>
+
+<!-- Report Modal -->
+<div class="report-modal-overlay" id="report-modal-overlay">
+    <div class="report-modal" id="report-modal">
+        <div class="report-modal-hdr">
+            <div class="report-modal-hdr-left">
+                <i class="bi bi-flag-fill report-modal-icon"></i>
+                <span class="report-modal-title">Laporan Client</span>
+            </div>
+            <button class="report-modal-close" id="report-modal-close"><i class="bi bi-x"></i></button>
+        </div>
+        <div class="report-modal-body">
+            <label>Nama Worker</label>
+            <input type="text" id="report-worker-name" readonly />
+            <label>Nomor Client</label>
+            <input type="text" id="report-client-phone" readonly />
+            <label>Laporan</label>
+            <textarea id="report-text" placeholder="Tulis laporan di sini..."></textarea>
+            <button class="report-send-btn" id="report-send-btn">
+                <i class="bi bi-whatsapp me-1"></i> Kirim via WhatsApp
+            </button>
+        </div>
+    </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>

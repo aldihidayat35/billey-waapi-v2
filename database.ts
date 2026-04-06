@@ -2272,6 +2272,7 @@ try {
             logo TEXT,
             logo_small TEXT,
             favicon TEXT,
+            admin_phone TEXT DEFAULT '',
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
@@ -2286,6 +2287,15 @@ try {
     console.error('⚠️ App settings migration error:', migrationError)
 }
 
+// Migration: Add admin_phone column to app_settings if missing
+try {
+    const settingsCols = db.prepare("PRAGMA table_info(app_settings)").all() as any[]
+    if (!settingsCols.some((c: any) => c.name === 'admin_phone')) {
+        db.exec(`ALTER TABLE app_settings ADD COLUMN admin_phone TEXT DEFAULT ''`)
+        console.log('✅ admin_phone column added to app_settings')
+    }
+} catch (e) { console.error('⚠️ admin_phone migration error:', e) }
+
 // App Settings Interface
 export interface AppSettingEntry {
     id?: number
@@ -2294,6 +2304,7 @@ export interface AppSettingEntry {
     logo?: string | null
     logo_small?: string | null
     favicon?: string | null
+    admin_phone?: string
     created_at?: string
     updated_at?: string
 }
@@ -2315,6 +2326,7 @@ export const appSettingDb = {
             if (data.logo !== undefined)       { fields.push('logo = ?');       params.push(data.logo) }
             if (data.logo_small !== undefined) { fields.push('logo_small = ?'); params.push(data.logo_small) }
             if (data.favicon !== undefined)    { fields.push('favicon = ?');    params.push(data.favicon) }
+            if ((data as any).admin_phone !== undefined) { fields.push('admin_phone = ?'); params.push((data as any).admin_phone) }
             if (fields.length === 0) return
             fields.push("updated_at = datetime('now')")
             params.push(existing.id)

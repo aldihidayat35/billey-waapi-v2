@@ -12,7 +12,7 @@ import cookieParser from 'cookie-parser'
 import { 
 	login, logout, validateSession, userDb, sessionDb, 
 	linkWaSessionToUser, unlinkWaSessionFromUser, getWaSessionsForUser, userOwnsSession,
-	User, UserRole, generateToken, hashPassword, workerAssignmentDb
+	User, UserRole, generateToken, hashPassword, workerAssignmentDb, assignmentLogDb
 } from './auth.js'
 import { 
 	authMiddleware, adminMiddleware, optionalAuthMiddleware, 
@@ -579,16 +579,43 @@ app.put('/api/workers/:id/assignments', authMiddleware, adminMiddleware, (req, r
 		if (!worker || worker.role !== 'worker') {
 			return res.status(404).json({ success: false, error: 'Worker tidak ditemukan' })
 		}
-		const { assignments } = req.body // [{session_id, contact}]
+		const { assignments } = req.body // assignments: [{session_id, contact, notes?, priority?}]
 		if (!Array.isArray(assignments)) {
 			return res.status(400).json({ success: false, error: 'Format assignments tidak valid' })
 		}
-		const result = workerAssignmentDb.replaceForWorker(workerId, assignments, req.user!.id)
+		// Sanitize per-contact notes/priority
+		const enriched = assignments.map((a: any) => ({
+			session_id: a.session_id,
+			contact: a.contact,
+			notes: a.notes || '',
+			priority: ['low', 'medium', 'critical'].includes(a.priority) ? a.priority : 'low'
+		}))
+		const result = workerAssignmentDb.replaceForWorker(workerId, enriched, req.user!.id)
 		if (result.success) {
+			// Log the assignment
+			try {
+				assignmentLogDb.logAssignment(workerId, worker.name, enriched, req.user!.id, req.user!.name)
+			} catch (logErr) { console.error('⚠️ Failed to log assignment:', logErr) }
 			res.json({ success: true, message: 'Penugasan berhasil disimpan' })
 		} else {
 			res.status(400).json(result)
 		}
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Get assignment logs (admin only)
+app.get('/api/assignment-logs', authMiddleware, adminMiddleware, (req, res) => {
+	try {
+		const page = parseInt(req.query.page as string) || 1
+		const limit = parseInt(req.query.limit as string) || 50
+		const priority = req.query.priority as string || undefined
+		const workerId = req.query.workerId ? parseInt(req.query.workerId as string) : undefined
+		const dateFrom = req.query.dateFrom as string || undefined
+		const dateTo = req.query.dateTo as string || undefined
+		const result = assignmentLogDb.getLogs({ page, limit, priority, workerId, dateFrom, dateTo })
+		res.json({ success: true, ...result })
 	} catch (error: any) {
 		res.status(500).json({ success: false, error: error.message })
 	}
@@ -637,6 +664,21 @@ app.get('/api/member/sessions', authMiddleware, (req, res) => {
 			}
 		})
 		res.json({ success: true, sessions })
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Get assignment notes for the logged-in worker/member
+app.get('/api/member/assignment-notes', authMiddleware, (req, res) => {
+	try {
+		const user = req.user!
+		if (user.role === 'worker') {
+			const notes = workerAssignmentDb.getNotesForWorker(user.id)
+			return res.json({ success: true, notes })
+		}
+		// Members don't have per-contact assignments, return empty
+		res.json({ success: true, notes: [] })
 	} catch (error: any) {
 		res.status(500).json({ success: false, error: error.message })
 	}
@@ -4851,7 +4893,8 @@ app.get('/api/settings/public', (req, res) => {
 				app_tagline: s.app_tagline || 'WhatsApp Multi Session',
 				logo_url: s.logo ? `/uploads/settings/${path.basename(s.logo)}` : null,
 				logo_small_url: s.logo_small ? `/uploads/settings/${path.basename(s.logo_small)}` : null,
-				favicon_url: s.favicon ? `/uploads/settings/${path.basename(s.favicon)}` : null
+				favicon_url: s.favicon ? `/uploads/settings/${path.basename(s.favicon)}` : null,
+				admin_phone: (s as any).admin_phone || ''
 			}
 		})
 	} catch (error: any) {
@@ -4899,6 +4942,7 @@ app.post('/api/settings', authMiddleware, adminMiddleware,
 
 			if (req.body.app_name?.trim()) updateData.app_name = req.body.app_name.trim()
 			if (req.body.app_tagline !== undefined) updateData.app_tagline = req.body.app_tagline.trim()
+			if (req.body.admin_phone !== undefined) updateData.admin_phone = req.body.admin_phone.trim()
 
 			// Handle logo upload — delete old file if replaced
 			if (files?.['logo']?.[0]) {

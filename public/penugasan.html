@@ -45,6 +45,40 @@
         }
         .chip .remove { margin-left: 6px; cursor: pointer; opacity: .75; }
         .chip .remove:hover { opacity: 1; }
+        .priority-btn { transition: all .15s; }
+        .priority-btn.active { color: #fff !important; }
+        .priority-btn.active[data-priority="low"] { background-color: #50cd89 !important; border-color: #50cd89 !important; }
+        .priority-btn.active[data-priority="medium"] { background-color: #ffc700 !important; border-color: #ffc700 !important; color: #3f4254 !important; }
+        .priority-btn.active[data-priority="critical"] { background-color: #f1416c !important; border-color: #f1416c !important; }
+        .contact-note-row {
+            background: #f9f9fb; border: 1px solid #e8e8ef; border-radius: 8px;
+            padding: 10px 12px; margin-bottom: 6px; transition: border-color .15s;
+        }
+        .contact-note-row:hover { border-color: #c4c4d4; }
+        .contact-note-row .cnr-top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+        .contact-note-row .cnr-phone { font-weight: 600; font-size: 13px; flex: 1; min-width: 0; }
+        .contact-note-row .cnr-session { font-size: 11px; color: #a1a5b7; }
+        .contact-note-row .cnr-remove {
+            background: none; border: none; color: #b5b5c3; cursor: pointer; font-size: 16px; padding: 0 2px; line-height: 1;
+        }
+        .contact-note-row .cnr-remove:hover { color: #f1416c; }
+        .contact-note-row .cnr-body { display: flex; gap: 8px; align-items: flex-start; }
+        .contact-note-row .cnr-priority { display: flex; gap: 3px; flex-shrink: 0; padding-top: 2px; }
+        .contact-note-row .cnr-priority .pbtn {
+            width: 26px; height: 22px; border-radius: 4px; border: 1.5px solid #e0e0e0;
+            background: #fff; cursor: pointer; font-size: 10px; display: flex; align-items: center;
+            justify-content: center; transition: all .12s; padding: 0;
+        }
+        .contact-note-row .cnr-priority .pbtn:hover { border-color: #bbb; }
+        .contact-note-row .cnr-priority .pbtn.active-low { background: #50cd89; border-color: #50cd89; color: #fff; }
+        .contact-note-row .cnr-priority .pbtn.active-medium { background: #ffc700; border-color: #ffc700; color: #3f4254; }
+        .contact-note-row .cnr-priority .pbtn.active-critical { background: #f1416c; border-color: #f1416c; color: #fff; }
+        .contact-note-row .cnr-notes {
+            flex: 1; min-width: 0; border: 1px solid #e4e6ef; border-radius: 6px;
+            padding: 4px 8px; font-size: 12px; resize: none; min-height: 32px; max-height: 80px;
+            font-family: inherit; line-height: 1.4;
+        }
+        .contact-note-row .cnr-notes:focus { border-color: #7239ea; outline: none; }
     </style>
 </head>
 <body id="kt_app_body" data-kt-app-layout="dark-sidebar" data-kt-app-header-fixed="true" data-kt-app-sidebar-enabled="true" data-kt-app-sidebar-fixed="true" data-kt-app-sidebar-hoverable="true" data-kt-app-sidebar-push-header="true" data-kt-app-sidebar-push-toolbar="true" data-kt-app-sidebar-push-footer="true" data-kt-app-toolbar-enabled="true" class="app-default">
@@ -134,9 +168,11 @@
                     <div class="contact-list-wrap border rounded" id="contact-list">
                         <div class="text-center text-muted py-8">Pilih session terlebih dahulu</div>
                     </div>
-                    <div id="selection-summary" class="mt-3 p-3 rounded bg-light-primary" style="display:none;">
-                        <span class="fw-bold fs-7 text-primary">Dipilih: <span id="selected-count">0</span> nomor</span>
-                        <div id="selected-chips" class="mt-2"></div>
+                    <div id="selection-summary" class="mt-3" style="display:none;">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="fw-bold fs-7 text-primary"><i class="bi bi-check2-circle me-1"></i>Dipilih: <span id="selected-count">0</span> nomor</span>
+                        </div>
+                        <div id="selected-contact-list"></div>
                     </div>
                 </div>
                 <div class="modal-footer border-0 pt-0">
@@ -158,6 +194,8 @@
         let assignModal = null, currentWorkerId = null;
         let sessions = [], activeSession = null, contacts = [];
         let selectedContacts = {};
+        // Per-contact notes map: key = 'sessionId|contact', value = {notes, priority}
+        let contactNotesMap = {};
 
         function loadHTMLWithScripts(containerId, html) {
             const container = document.getElementById(containerId);
@@ -260,6 +298,7 @@
         async function openAssign(workerId, workerName) {
             currentWorkerId = workerId;
             selectedContacts = {}; contacts = []; activeSession = null;
+            contactNotesMap = {};
             document.getElementById('assign-modal-title').textContent = 'Penugasan: ' + workerName;
             document.getElementById('assign-modal-subtitle').textContent = 'Pilih session dan nomor chat yang ditugaskan';
             document.getElementById('contact-search').value = '';
@@ -272,6 +311,7 @@
                 for (const a of (d.assignments || [])) {
                     if (!selectedContacts[a.session_id]) selectedContacts[a.session_id] = new Set();
                     selectedContacts[a.session_id].add(a.contact);
+                    contactNotesMap[a.session_id + '|' + a.contact] = { notes: a.notes || '', priority: a.priority || 'low' };
                 }
             } catch {}
             renderSessionButtons();
@@ -348,21 +388,62 @@
         }
 
         function updateSummary() {
-            let total = 0, chips = '';
+            // Save current textarea values before re-render
+            document.querySelectorAll('.cnr-notes[data-key]').forEach(el => {
+                const key = el.dataset.key;
+                if (contactNotesMap[key]) contactNotesMap[key].notes = el.value;
+            });
+
+            let total = 0, rows = '';
             for (const [sid, set] of Object.entries(selectedContacts)) {
                 for (const contact of set) {
                     total++;
+                    const key = sid + '|' + contact;
+                    if (!contactNotesMap[key]) contactNotesMap[key] = { notes: '', priority: 'low' };
+                    const nd = contactNotesMap[key];
                     const phone = cleanPhone(contact);
                     const sName = (sessions.find(s => s.id === sid) || {}).name || sid;
-                    chips += '<span class="chip">' + esc(sName) + ': ' + esc(phone) + ' <span class="remove" onclick="removeChip(\'' + esc(sid) + '\',\'' + esc(contact) + '\')">&times;</span></span>';
+                    rows += '<div class="contact-note-row" data-key="' + esc(key) + '">' +
+                        '<div class="cnr-top">' +
+                            '<span class="cnr-phone">' + esc(phone) + '</span>' +
+                            '<span class="cnr-session">' + esc(sName) + '</span>' +
+                            '<button class="cnr-remove" onclick="removeContact(\'' + esc(sid) + '\',\'' + esc(contact) + '\')" title="Hapus">&times;</button>' +
+                        '</div>' +
+                        '<div class="cnr-body">' +
+                            '<div class="cnr-priority">' +
+                                '<button class="pbtn ' + (nd.priority === 'low' ? 'active-low' : '') + '" data-p="low" data-key="' + esc(key) + '" onclick="setPriority(this)" title="Low"><i class="bi bi-flag"></i></button>' +
+                                '<button class="pbtn ' + (nd.priority === 'medium' ? 'active-medium' : '') + '" data-p="medium" data-key="' + esc(key) + '" onclick="setPriority(this)" title="Medium"><i class="bi bi-flag-fill"></i></button>' +
+                                '<button class="pbtn ' + (nd.priority === 'critical' ? 'active-critical' : '') + '" data-p="critical" data-key="' + esc(key) + '" onclick="setPriority(this)" title="Critical"><i class="bi bi-exclamation-triangle-fill"></i></button>' +
+                            '</div>' +
+                            '<textarea class="cnr-notes" data-key="' + esc(key) + '" rows="1" placeholder="Catatan...">' + esc(nd.notes) + '</textarea>' +
+                        '</div>' +
+                    '</div>';
                 }
             }
             document.getElementById('selected-count').textContent = total;
-            document.getElementById('selected-chips').innerHTML = chips;
+            document.getElementById('selected-contact-list').innerHTML = rows;
             document.getElementById('selection-summary').style.display = total > 0 ? 'block' : 'none';
+
+            // Auto-resize textareas
+            document.querySelectorAll('.cnr-notes').forEach(el => {
+                el.addEventListener('input', () => { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; });
+                el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px';
+            });
         }
 
-        function removeChip(sid, contact) {
+        function setPriority(btn) {
+            const key = btn.dataset.key;
+            const p = btn.dataset.p;
+            if (!contactNotesMap[key]) contactNotesMap[key] = { notes: '', priority: 'low' };
+            contactNotesMap[key].priority = p;
+            // Update sibling buttons
+            const row = btn.closest('.cnr-priority');
+            row.querySelectorAll('.pbtn').forEach(b => b.className = 'pbtn' + (b.dataset.p === p ? ' active-' + p : ''));
+        }
+
+        function removeContact(sid, contact) {
+            const key = sid + '|' + contact;
+            delete contactNotesMap[key];
             if (selectedContacts[sid]) { selectedContacts[sid].delete(contact); if (!selectedContacts[sid].size) delete selectedContacts[sid]; }
             if (activeSession === sid) renderContacts(document.getElementById('contact-search').value);
             updateSummary();
@@ -370,8 +451,18 @@
 
         async function saveAssignment() {
             if (!currentWorkerId) return;
+            // Collect latest textarea values
+            document.querySelectorAll('.cnr-notes[data-key]').forEach(el => {
+                const key = el.dataset.key;
+                if (contactNotesMap[key]) contactNotesMap[key].notes = el.value.trim();
+            });
             const assignments = [];
-            for (const [sid, set] of Object.entries(selectedContacts)) for (const contact of set) assignments.push({ session_id: sid, contact });
+            for (const [sid, set] of Object.entries(selectedContacts)) {
+                for (const contact of set) {
+                    const nd = contactNotesMap[sid + '|' + contact] || { notes: '', priority: 'low' };
+                    assignments.push({ session_id: sid, contact, notes: nd.notes, priority: nd.priority });
+                }
+            }
             const btn = document.getElementById('btn-save-assignment');
             btn.disabled = true;
             btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Menyimpan...';
