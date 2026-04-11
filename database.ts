@@ -228,6 +228,29 @@ db.exec(`
     CREATE INDEX IF NOT EXISTS idx_member_sessions_session ON member_sessions(session_id);
 `)
 
+// ── Migration: Create contacts table (nomor yang pernah chat) ─────────────
+try {
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS contacts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT NOT NULL,
+            phone_number TEXT NOT NULL,
+            push_name TEXT,
+            is_registered INTEGER DEFAULT 0,
+            first_chat_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            last_chat_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            synced_to_crm INTEGER DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(session_id, phone_number)
+        );
+        CREATE INDEX IF NOT EXISTS idx_contacts_session ON contacts(session_id);
+        CREATE INDEX IF NOT EXISTS idx_contacts_phone ON contacts(phone_number);
+        CREATE INDEX IF NOT EXISTS idx_contacts_synced ON contacts(synced_to_crm);
+    `)
+    console.log('✅ Contacts table initialized')
+} catch (e) { /* table may already exist */ }
+
 // Migration: Add media columns to chat_templates if they don't exist
 try {
     // Check if media_data column exists
@@ -515,16 +538,18 @@ export const messageLogDb = {
         // Priority 1: exact JID match
         if (exactJid) {
             stmt = db.prepare(`
-                SELECT id, message_id, session_id, direction, from_number, to_number,
-                    message_type, content, caption, media_url, filename, file_size, mimetype,
-                    timestamp, status, source, created_at, updated_at,
-                    CASE WHEN (media_url IS NOT NULL AND media_url != '') 
-                         OR (media_data IS NOT NULL AND media_data != '') THEN 1 ELSE 0 END AS has_media
-                FROM message_logs 
-                WHERE session_id = ? 
-                AND (from_number = ? OR to_number = ?)
-                ORDER BY timestamp ASC
-                LIMIT ?
+                SELECT * FROM (
+                    SELECT id, message_id, session_id, direction, from_number, to_number,
+                        message_type, content, caption, media_url, filename, file_size, mimetype,
+                        timestamp, status, source, created_at, updated_at,
+                        CASE WHEN (media_url IS NOT NULL AND media_url != '') 
+                             OR (media_data IS NOT NULL AND media_data != '') THEN 1 ELSE 0 END AS has_media
+                    FROM message_logs 
+                    WHERE session_id = ? 
+                    AND (from_number = ? OR to_number = ?)
+                    ORDER BY timestamp DESC
+                    LIMIT ?
+                ) sub ORDER BY sub.timestamp ASC
             `)
             result = stmt.all(sessionId, exactJid, exactJid, limit) as any[]
             if (result.length > 0) return result
@@ -534,16 +559,18 @@ export const messageLogDb = {
         if (digits.length >= 8) {
             const pattern = `%${digits}%`
             stmt = db.prepare(`
-                SELECT id, message_id, session_id, direction, from_number, to_number,
-                    message_type, content, caption, media_url, filename, file_size, mimetype,
-                    timestamp, status, source, created_at, updated_at,
-                    CASE WHEN (media_url IS NOT NULL AND media_url != '') 
-                         OR (media_data IS NOT NULL AND media_data != '') THEN 1 ELSE 0 END AS has_media
-                FROM message_logs 
-                WHERE session_id = ? 
-                AND (from_number LIKE ? OR to_number LIKE ?)
-                ORDER BY timestamp ASC
-                LIMIT ?
+                SELECT * FROM (
+                    SELECT id, message_id, session_id, direction, from_number, to_number,
+                        message_type, content, caption, media_url, filename, file_size, mimetype,
+                        timestamp, status, source, created_at, updated_at,
+                        CASE WHEN (media_url IS NOT NULL AND media_url != '') 
+                             OR (media_data IS NOT NULL AND media_data != '') THEN 1 ELSE 0 END AS has_media
+                    FROM message_logs 
+                    WHERE session_id = ? 
+                    AND (from_number LIKE ? OR to_number LIKE ?)
+                    ORDER BY timestamp DESC
+                    LIMIT ?
+                ) sub ORDER BY sub.timestamp ASC
             `)
             return stmt.all(sessionId, pattern, pattern, limit) as any[]
         }
@@ -2368,5 +2395,85 @@ try {
 
 // Export database instance for direct queries if needed
 export { db }
+
+// ═══════════════════════════════════════════════════════════════════════
+//  CONTACTS DB FUNCTIONS (nomor WA yang pernah chat)
+// ═══════════════════════════════════════════════════════════════════════
+
+export interface ContactEntry {
+    id?: number
+    session_id: string
+    phone_number: string
+    push_name?: string
+    is_registered?: number
+    first_chat_at?: string
+    last_chat_at?: string
+    synced_to_crm?: number
+}
+
+export const contactDb = {
+    /**
+     * Upsert contact saat ada chat masuk.
+     * Return true jika contact baru (pertama kali).
+     */
+    upsert: (sessionId: string, phoneNumber: string, pushName?: string): boolean => {
+        const existing = db.prepare(
+            'SELECT id, synced_to_crm FROM contacts WHERE session_id = ? AND phone_number = ?'
+        ).get(sessionId, phoneNumber) as any
+
+        if (existing) {
+            db.prepare(`
+                UPDATE contacts 
+                SET last_chat_at = CURRENT_TIMESTAMP, 
+                    push_name = COALESCE(?, push_name),
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            `).run(pushName || null, existing.id)
+            return false
+        }
+
+        db.prepare(`
+            INSERT INTO contacts (session_id, phone_number, push_name, first_chat_at, last_chat_at)
+            VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        `).run(sessionId, phoneNumber, pushName || null)
+        return true
+    },
+
+    /**
+     * Get contacts yang belum disync ke CRM.
+     */
+    getUnsyncedContacts: (limit: number = 100): ContactEntry[] => {
+        return db.prepare(`
+            SELECT * FROM contacts WHERE synced_to_crm = 0 ORDER BY created_at ASC LIMIT ?
+        `).all(limit) as ContactEntry[]
+    },
+
+    /**
+     * Mark contacts as synced.
+     */
+    markSynced: (ids: number[]): void => {
+        if (ids.length === 0) return
+        const placeholders = ids.map(() => '?').join(',')
+        db.prepare(`UPDATE contacts SET synced_to_crm = 1, updated_at = CURRENT_TIMESTAMP WHERE id IN (${placeholders})`).run(...ids)
+    },
+
+    /**
+     * Get all contacts for a session.
+     */
+    getBySession: (sessionId: string): ContactEntry[] => {
+        return db.prepare(
+            'SELECT * FROM contacts WHERE session_id = ? ORDER BY last_chat_at DESC'
+        ).all(sessionId) as ContactEntry[]
+    },
+
+    /**
+     * Check if contact exists.
+     */
+    exists: (sessionId: string, phoneNumber: string): boolean => {
+        return db.prepare(
+            'SELECT 1 FROM contacts WHERE session_id = ? AND phone_number = ?'
+        ).get(sessionId, phoneNumber) !== undefined
+    },
+}
 
 console.log('✅ Database initialized at:', DB_PATH)

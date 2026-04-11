@@ -50,3 +50,5 @@ temp/
 data/*.db-wal
 data/*.db-shm
 NUL
+#data/media
+data/media/ 

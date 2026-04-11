@@ -833,6 +833,9 @@ function wireUI() {
     document.getElementById('image-viewer').addEventListener('click', () => {
         document.getElementById('image-viewer').classList.remove('show');
     });
+
+    // Template picker
+    wireTemplatePicker();
 }
 
 function handleFileSelect(e) {
@@ -1041,3 +1044,83 @@ function autoResizeTextarea(el) {
 }
 
 console.log('✅ Member chat portal initialized');
+
+// ─── Template Picker (Instant Chat) ──────────────────────────
+const TPL = {
+    templates: [],
+    loaded: false,
+};
+
+async function loadTemplates() {
+    if (TPL.loaded) return;
+    try {
+        const r = await fetch('/api/member/templates');
+        const d = await r.json();
+        TPL.templates = d.templates || [];
+        TPL.loaded = true;
+    } catch { TPL.templates = []; }
+}
+
+function openTemplatePicker() {
+    const overlay = document.getElementById('tpl-overlay');
+    overlay.classList.add('show');
+    document.getElementById('tpl-search-input').value = '';
+    loadTemplates().then(() => renderTemplateList());
+    setTimeout(() => document.getElementById('tpl-search-input').focus(), 200);
+}
+
+function closeTemplatePicker() {
+    document.getElementById('tpl-overlay').classList.remove('show');
+}
+
+function renderTemplateList(filter = '') {
+    const list = document.getElementById('tpl-list');
+    let items = TPL.templates;
+    if (filter) {
+        const f = filter.toLowerCase();
+        items = items.filter(t =>
+            t.code.toLowerCase().includes(f) ||
+            (t.title || '').toLowerCase().includes(f) ||
+            (t.content || '').toLowerCase().includes(f)
+        );
+    }
+
+    if (items.length === 0) {
+        list.innerHTML = `<div class="tpl-empty"><i class="bi bi-chat-square-text"></i>${filter ? 'Tidak ditemukan' : 'Belum ada template'}</div>`;
+        return;
+    }
+
+    list.innerHTML = '';
+    items.forEach((t, idx) => {
+        const preview = t.content.length > 100 ? t.content.substring(0, 100) + '…' : t.content;
+        const mediaBadge = t.has_media ? `<span class="tpl-media-badge"><i class="bi bi-image"></i>Gambar</span>` : '';
+        const title = t.title ? `<div class="tpl-title">${escHtml(t.title)}</div>` : '';
+        const div = document.createElement('div');
+        div.className = 'tpl-item';
+        div.dataset.idx = idx;
+        div.innerHTML = `<div><span class="tpl-code">${escHtml(t.code)}</span>${mediaBadge}</div>${title}<div class="tpl-preview">${escHtml(preview)}</div>`;
+        div.addEventListener('click', () => {
+            closeTemplatePicker();
+            const input = document.getElementById('msg-input');
+            if (t.has_media) {
+                input.value = '#' + t.code;
+            } else {
+                input.value = t.content;
+            }
+            autoResizeTextarea(input);
+            input.focus();
+        });
+        list.appendChild(div);
+    });
+}
+
+function wireTemplatePicker() {
+    document.getElementById('btn-template')?.addEventListener('click', openTemplatePicker);
+    document.getElementById('tpl-close')?.addEventListener('click', closeTemplatePicker);
+    document.getElementById('tpl-overlay')?.addEventListener('click', (e) => {
+        if (e.target === document.getElementById('tpl-overlay')) closeTemplatePicker();
+    });
+    document.getElementById('tpl-search-input')?.addEventListener('input', (e) => {
+        renderTemplateList(e.target.value);
+    });
+}

@@ -316,3 +316,45 @@ export function getSessionFilter(user: User | undefined, sessionIdColumn: string
     const placeholders = sessions.map(() => '?').join(',')
     return { condition: `AND ${sessionIdColumn} IN (${placeholders})`, params: sessions }
 }
+
+/**
+ * Combined middleware: accepts either a valid static API key (X-Api-Key / WA_API_KEY)
+ * OR a session-authenticated admin user.
+ * Used for user-management endpoints so external CRM integrations can call them.
+ */
+export function adminOrApiKeyMiddleware(req: Request, res: Response, next: NextFunction): void {
+    // ── Try API key first ──
+    const providedKey = req.headers['x-api-key'] as string || req.query.api_key as string
+    const envKey = process.env.WA_API_KEY
+
+    if (envKey && providedKey && providedKey === envKey) {
+        // Authenticated via static API key — attach a synthetic admin context
+        req.user = { id: 0, name: 'CRM System', email: 'crm@system', role: 'adminwa', token: '', status: 'aktif', phone_visible: 0, password: '', created_at: '', updated_at: '' }
+        return next()
+    }
+
+    // ── Fall back to session auth + admin role check ──
+    const sessionToken = req.cookies?.[SESSION_COOKIE_NAME] ||
+                         req.headers['x-session-token'] as string ||
+                         req.headers.authorization?.replace('Bearer ', '')
+
+    if (!sessionToken) {
+        res.status(401).json({ success: false, error: 'Autentikasi diperlukan. Gunakan X-Api-Key atau login sebagai admin.' })
+        return
+    }
+
+    const user = validateSession(sessionToken)
+    if (!user) {
+        res.clearCookie(SESSION_COOKIE_NAME)
+        res.status(401).json({ success: false, error: 'Sesi tidak valid atau sudah berakhir.' })
+        return
+    }
+    if (user.role !== 'adminwa') {
+        res.status(403).json({ success: false, error: 'Akses ditolak. Diperlukan hak admin.' })
+        return
+    }
+
+    req.user = user
+    req.sessionToken = sessionToken
+    next()
+}

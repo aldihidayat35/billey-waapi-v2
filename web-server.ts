@@ -15,7 +15,7 @@ import {
 	User, UserRole, generateToken, hashPassword, workerAssignmentDb, assignmentLogDb
 } from './auth.js'
 import { 
-	authMiddleware, adminMiddleware, optionalAuthMiddleware, 
+	authMiddleware, adminMiddleware, adminOrApiKeyMiddleware, optionalAuthMiddleware, 
 	sessionOwnerMiddleware, tokenMiddleware, apiKeyMiddleware, SESSION_COOKIE_NAME,
 	getUserSessionIds, getSessionFilter, getUserFilter
 } from './middleware.js'
@@ -305,7 +305,7 @@ app.post('/api/auth/change-password', authMiddleware, (req, res) => {
 // ============================================
 
 // Get all users
-app.get('/api/users', authMiddleware, adminMiddleware, (req, res) => {
+app.get('/api/users', adminOrApiKeyMiddleware, (req, res) => {
 	try {
 		const { page, limit, role, status, search } = req.query
 		const result = userDb.getAll({
@@ -322,7 +322,7 @@ app.get('/api/users', authMiddleware, adminMiddleware, (req, res) => {
 })
 
 // Get user stats
-app.get('/api/users/stats', authMiddleware, adminMiddleware, (req, res) => {
+app.get('/api/users/stats', adminOrApiKeyMiddleware, (req, res) => {
 	try {
 		const stats = userDb.getCountByRole()
 		res.json({ success: true, stats })
@@ -332,7 +332,7 @@ app.get('/api/users/stats', authMiddleware, adminMiddleware, (req, res) => {
 })
 
 // Get single user
-app.get('/api/users/:id', authMiddleware, adminMiddleware, (req, res) => {
+app.get('/api/users/:id', adminOrApiKeyMiddleware, (req, res) => {
 	try {
 		const id = parseInt(req.params.id)
 		const user = userDb.getById(id)
@@ -349,7 +349,7 @@ app.get('/api/users/:id', authMiddleware, adminMiddleware, (req, res) => {
 })
 
 // Create user
-app.post('/api/users', authMiddleware, adminMiddleware, (req, res) => {
+app.post('/api/users', adminOrApiKeyMiddleware, (req, res) => {
 	try {
 		const { name, email, password, role, status, phone_visible } = req.body
 
@@ -371,6 +371,17 @@ app.post('/api/users', authMiddleware, adminMiddleware, (req, res) => {
 		
 		if (result.success) {
 			const newUser = userDb.getById(result.id!)
+
+			// Notify CRM about worker changes
+			if (newUser && (role === 'worker' || newUser.role === 'worker')) {
+				import('./crm-sync.js').then(({ notifyWorkerChanged }) => {
+					notifyWorkerChanged('created', {
+						id: newUser.id!, name: newUser.name, email: newUser.email,
+						role: newUser.role, status: newUser.status,
+					}).catch(() => {})
+				}).catch(() => {})
+			}
+
 			res.json({ 
 				success: true, 
 				message: 'User berhasil dibuat',
@@ -385,7 +396,7 @@ app.post('/api/users', authMiddleware, adminMiddleware, (req, res) => {
 })
 
 // Update user
-app.put('/api/users/:id', authMiddleware, adminMiddleware, (req, res) => {
+app.put('/api/users/:id', adminOrApiKeyMiddleware, (req, res) => {
 	try {
 		const id = parseInt(req.params.id)
 		const { name, email, role, status, phone_visible } = req.body
@@ -394,6 +405,17 @@ app.put('/api/users/:id', authMiddleware, adminMiddleware, (req, res) => {
 		
 		if (result.success) {
 			const updatedUser = userDb.getById(id)
+
+			// Notify CRM about worker changes
+			if (updatedUser && updatedUser.role === 'worker') {
+				import('./crm-sync.js').then(({ notifyWorkerChanged }) => {
+					notifyWorkerChanged('updated', {
+						id: updatedUser.id!, name: updatedUser.name, email: updatedUser.email,
+						role: updatedUser.role, status: updatedUser.status,
+					}).catch(() => {})
+				}).catch(() => {})
+			}
+
 			res.json({ 
 				success: true, 
 				message: 'User berhasil diupdate',
@@ -408,7 +430,7 @@ app.put('/api/users/:id', authMiddleware, adminMiddleware, (req, res) => {
 })
 
 // Delete user
-app.delete('/api/users/:id', authMiddleware, adminMiddleware, (req, res) => {
+app.delete('/api/users/:id', adminOrApiKeyMiddleware, (req, res) => {
 	try {
 		const id = parseInt(req.params.id)
 		
@@ -428,7 +450,7 @@ app.delete('/api/users/:id', authMiddleware, adminMiddleware, (req, res) => {
 })
 
 // Reset user password (admin)
-app.post('/api/users/:id/reset-password', authMiddleware, adminMiddleware, (req, res) => {
+app.post('/api/users/:id/reset-password', adminOrApiKeyMiddleware, (req, res) => {
 	try {
 		const id = parseInt(req.params.id)
 		const { newPassword } = req.body
@@ -448,7 +470,7 @@ app.post('/api/users/:id/reset-password', authMiddleware, adminMiddleware, (req,
 })
 
 // Regenerate user token
-app.post('/api/users/:id/regenerate-token', authMiddleware, adminMiddleware, (req, res) => {
+app.post('/api/users/:id/regenerate-token', adminOrApiKeyMiddleware, (req, res) => {
 	try {
 		const id = parseInt(req.params.id)
 		const result = userDb.regenerateToken(id)
@@ -468,7 +490,7 @@ app.post('/api/users/:id/regenerate-token', authMiddleware, adminMiddleware, (re
 })
 
 // Link WhatsApp session to user
-app.post('/api/users/:id/link-session', authMiddleware, adminMiddleware, (req, res) => {
+app.post('/api/users/:id/link-session', adminOrApiKeyMiddleware, (req, res) => {
 	try {
 		const userId = parseInt(req.params.id)
 		const { sessionId } = req.body
@@ -491,7 +513,7 @@ app.post('/api/users/:id/link-session', authMiddleware, adminMiddleware, (req, r
 })
 
 // Get sessions owned by user
-app.get('/api/users/:id/sessions', authMiddleware, adminMiddleware, (req, res) => {
+app.get('/api/users/:id/sessions', adminOrApiKeyMiddleware, (req, res) => {
 	try {
 		const userId = parseInt(req.params.id)
 		const user = userDb.getById(userId)
@@ -508,7 +530,7 @@ app.get('/api/users/:id/sessions', authMiddleware, adminMiddleware, (req, res) =
 })
 
 // Unlink WhatsApp session from user
-app.post('/api/users/:id/unlink-session', authMiddleware, adminMiddleware, (req, res) => {
+app.post('/api/users/:id/unlink-session', adminOrApiKeyMiddleware, (req, res) => {
 	try {
 		const userId = parseInt(req.params.id)
 		const { sessionId } = req.body
@@ -523,7 +545,7 @@ app.post('/api/users/:id/unlink-session', authMiddleware, adminMiddleware, (req,
 })
 
 // Bulk set sessions for a member — replaces all existing assignments
-app.put('/api/users/:id/sessions', authMiddleware, adminMiddleware, (req, res) => {
+app.put('/api/users/:id/sessions', adminOrApiKeyMiddleware, (req, res) => {
 	try {
 		const userId = parseInt(req.params.id)
 		const { sessionIds } = req.body // string[]
@@ -542,7 +564,7 @@ app.put('/api/users/:id/sessions', authMiddleware, adminMiddleware, (req, res) =
 // ============================================
 
 // Get all workers with their assignment counts
-app.get('/api/workers', authMiddleware, adminMiddleware, (req, res) => {
+app.get('/api/workers', adminOrApiKeyMiddleware, (req, res) => {
 	try {
 		const workers = db.prepare(`
 			SELECT u.id, u.name, u.email, u.status, u.created_at,
@@ -557,7 +579,7 @@ app.get('/api/workers', authMiddleware, adminMiddleware, (req, res) => {
 })
 
 // Get assignments for a specific worker
-app.get('/api/workers/:id/assignments', authMiddleware, adminMiddleware, (req, res) => {
+app.get('/api/workers/:id/assignments', adminOrApiKeyMiddleware, (req, res) => {
 	try {
 		const workerId = parseInt(req.params.id)
 		const worker = userDb.getById(workerId)
@@ -572,7 +594,7 @@ app.get('/api/workers/:id/assignments', authMiddleware, adminMiddleware, (req, r
 })
 
 // Save assignments for a worker (replace all)
-app.put('/api/workers/:id/assignments', authMiddleware, adminMiddleware, (req, res) => {
+app.put('/api/workers/:id/assignments', adminOrApiKeyMiddleware, (req, res) => {
 	try {
 		const workerId = parseInt(req.params.id)
 		const worker = userDb.getById(workerId)
@@ -606,7 +628,7 @@ app.put('/api/workers/:id/assignments', authMiddleware, adminMiddleware, (req, r
 })
 
 // Get assignment logs (admin only)
-app.get('/api/assignment-logs', authMiddleware, adminMiddleware, (req, res) => {
+app.get('/api/assignment-logs', adminOrApiKeyMiddleware, (req, res) => {
 	try {
 		const page = parseInt(req.query.page as string) || 1
 		const limit = parseInt(req.query.limit as string) || 50
@@ -622,7 +644,7 @@ app.get('/api/assignment-logs', authMiddleware, adminMiddleware, (req, res) => {
 })
 
 // Get all contacts for a session (for assignment picker)
-app.get('/api/sessions/:sessionId/contacts', authMiddleware, adminMiddleware, (req, res) => {
+app.get('/api/sessions/:sessionId/contacts', adminOrApiKeyMiddleware, (req, res) => {
 	try {
 		const { sessionId } = req.params
 		const rows = db.prepare(`
@@ -758,15 +780,17 @@ app.get('/api/member/messages/:sessionId/:contact', authMiddleware, (req, res) =
 		}
 
 		const messages = db.prepare(`
-			SELECT id, message_id, session_id, direction, from_number, to_number,
-				message_type, content, caption, media_url, filename, file_size, mimetype,
-				timestamp, status, source, created_at, updated_at,
-				CASE WHEN (media_url IS NOT NULL AND media_url != '') 
-				     OR (media_data IS NOT NULL AND media_data != '') THEN 1 ELSE 0 END AS has_media
-			FROM message_logs
-			WHERE session_id = ? AND (from_number = ? OR to_number = ?)
-			ORDER BY timestamp ASC
-			LIMIT ?
+			SELECT * FROM (
+				SELECT id, message_id, session_id, direction, from_number, to_number,
+					message_type, content, caption, media_url, filename, file_size, mimetype,
+					timestamp, status, source, created_at, updated_at,
+					CASE WHEN (media_url IS NOT NULL AND media_url != '') 
+					     OR (media_data IS NOT NULL AND media_data != '') THEN 1 ELSE 0 END AS has_media
+				FROM message_logs
+				WHERE session_id = ? AND (from_number = ? OR to_number = ?)
+				ORDER BY timestamp DESC
+				LIMIT ?
+			) sub ORDER BY sub.timestamp ASC
 		`).all(sessionId, contact, contact, limit) as any[]
 
 		res.json({ success: true, messages })
@@ -931,6 +955,29 @@ app.post('/api/member/read-all', authMiddleware, (req, res) => {
 })
 
 // ============================================
+// Member Templates API (Instant Chat / Template Picker)
+// ============================================
+
+app.get('/api/member/templates', authMiddleware, (req, res) => {
+	try {
+		const templates = chatTemplateDb.getAll({ activeOnly: true })
+		// Strip media_data from list response to keep it lightweight
+		const lightweight = templates.map((t: any) => ({
+			id: t.id,
+			code: t.code,
+			title: t.title,
+			content: t.content,
+			description: t.description,
+			has_media: !!t.media_data,
+			media_mimetype: t.media_mimetype || null,
+		}))
+		res.json({ success: true, templates: lightweight })
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// ============================================
 // User Frontend Routes
 // ============================================
 
@@ -1033,6 +1080,39 @@ function resolveSession(sessionId?: string): string | null {
 	const connected = all.find(s => s.isConnected)
 	return connected?.id ?? null
 }
+
+// ════════════════════════════════════════════════════════════════
+//  WEBHOOK: Order Status from Jokiin CRM
+// ════════════════════════════════════════════════════════════════
+app.post('/api/webhook/order-status', apiKeyMiddleware, async (req, res) => {
+	try {
+		const { order_id, status, nomor_client } = req.body
+		if (!order_id || !status || !nomor_client) {
+			return res.status(400).json({ success: false, error: 'order_id, status, nomor_client wajib diisi.' })
+		}
+
+		const { handleOrderStatusWebhook } = await import('./crm-sync.js')
+		const result = handleOrderStatusWebhook({ order_id, status, nomor_client })
+
+		// Auto-send WA message to client
+		if (result.sendMessage) {
+			const sessionId = resolveSession(req.body.session_id)
+			if (sessionId) {
+				const phone = result.sendMessage.to.replace(/[^0-9]/g, '')
+				const jid = `${phone}@s.whatsapp.net`
+				try {
+					await sessionManager.sendMessage(sessionId, jid, result.sendMessage.message)
+				} catch (sendErr: any) {
+					console.error('⚠️ Failed to send order status WA:', sendErr.message)
+				}
+			}
+		}
+
+		res.json({ success: true, message: 'Order status processed' })
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
 
 // POST /api/wa/send — kirim pesan teks
 // Body (JSON): { to, message, session_id? }
@@ -1452,7 +1532,7 @@ app.get('/api/session/:sessionId', (req, res) => {
 })
 
 // Get conversations for a session (for inbox page — admin only)
-app.get('/api/messages/conversations/:sessionId', authMiddleware, adminMiddleware, (req, res) => {
+app.get('/api/messages/conversations/:sessionId', adminOrApiKeyMiddleware, (req, res) => {
 	try {
 		const { sessionId } = req.params
 		const conversations = activityLogger.getConversations(sessionId)
@@ -1464,7 +1544,7 @@ app.get('/api/messages/conversations/:sessionId', authMiddleware, adminMiddlewar
 })
 
 // Get messages for a specific chat (for inbox page — admin only)
-app.get('/api/messages/chat/:sessionId/:phone', authMiddleware, adminMiddleware, (req, res) => {
+app.get('/api/messages/chat/:sessionId/:phone', adminOrApiKeyMiddleware, (req, res) => {
 	try {
 		const { sessionId, phone } = req.params
 		const messages = activityLogger.getChatMessages(sessionId, phone)
@@ -1476,7 +1556,7 @@ app.get('/api/messages/chat/:sessionId/:phone', authMiddleware, adminMiddleware,
 })
 
 // Get contacts for a session (admin only)
-app.get('/api/contacts/:sessionId', authMiddleware, adminMiddleware, (req, res) => {
+app.get('/api/contacts/:sessionId', adminOrApiKeyMiddleware, (req, res) => {
 	try {
 		const { sessionId } = req.params
 		const contacts = activityLogger.getContacts(sessionId)
@@ -1488,7 +1568,7 @@ app.get('/api/contacts/:sessionId', authMiddleware, adminMiddleware, (req, res) 
 })
 
 // Get logs by date (admin only)
-app.get('/api/logs/date/:date', authMiddleware, adminMiddleware, (req, res) => {
+app.get('/api/logs/date/:date', adminOrApiKeyMiddleware, (req, res) => {
 	try {
 		const date = req.params.date
 		const type = (req.query.type as 'session' | 'message') || 'message'
@@ -1501,7 +1581,7 @@ app.get('/api/logs/date/:date', authMiddleware, adminMiddleware, (req, res) => {
 })
 
 // Clear old logs (admin only)
-app.delete('/api/logs/clear', authMiddleware, adminMiddleware, (req, res) => {
+app.delete('/api/logs/clear', adminOrApiKeyMiddleware, (req, res) => {
 	try {
 		const days = parseInt(req.query.days as string) || 30
 		const deletedCount = activityLogger.clearOldLogs(days)
@@ -1604,7 +1684,7 @@ app.put('/api/notifications/read-all', authMiddleware, (req, res) => {
 })
 
 // Admin: send notification to specific user (testing/manual)
-app.post('/api/notifications/send', authMiddleware, adminMiddleware, async (req, res) => {
+app.post('/api/notifications/send', adminOrApiKeyMiddleware, async (req, res) => {
 	try {
 		const { userId, title, body, type } = req.body
 		if (!userId || !title) {
@@ -1624,7 +1704,7 @@ app.post('/api/notifications/send', authMiddleware, adminMiddleware, async (req,
 })
 
 // Admin: get notification stats
-app.get('/api/notifications/stats', authMiddleware, adminMiddleware, (req, res) => {
+app.get('/api/notifications/stats', adminOrApiKeyMiddleware, (req, res) => {
 	try {
 		const onlineCount = getOnlineUserCount()
 		const totalTokens = (db.prepare('SELECT COUNT(*) as count FROM fcm_tokens').get() as any)?.count || 0
@@ -4903,7 +4983,7 @@ app.get('/api/settings/public', (req, res) => {
 })
 
 // GET /api/settings — Admin only, returns raw paths too
-app.get('/api/settings', authMiddleware, adminMiddleware, (req, res) => {
+app.get('/api/settings', adminOrApiKeyMiddleware, (req, res) => {
 	try {
 		const s = appSettingDb.get()
 		res.json({
@@ -4921,7 +5001,7 @@ app.get('/api/settings', authMiddleware, adminMiddleware, (req, res) => {
 })
 
 // POST /api/settings — Admin only, handles multipart upload
-app.post('/api/settings', authMiddleware, adminMiddleware,
+app.post('/api/settings', adminOrApiKeyMiddleware,
 	(req: any, res: any, next: any) => {
 		// Wrap multer so upload errors return JSON (not Express HTML error page)
 		settingsUpload.fields([
@@ -5008,6 +5088,16 @@ function formatUptime(seconds: number): string {
 }
 
 const PORT = process.env.PORT || 8080
+
+server.on('error', (err: NodeJS.ErrnoException) => {
+	if (err.code === 'EADDRINUSE') {
+		console.error(`❌ Port ${PORT} is already in use. Please stop the other process first.`)
+		console.error(`   Run: npx kill-port ${PORT}   or find and stop the process using port ${PORT}.`)
+		process.exit(1)
+	} else {
+		throw err
+	}
+})
 
 server.listen(PORT, async () => {
 	console.log(`🚀 Server running on http://localhost:${PORT}`)

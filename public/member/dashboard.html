@@ -488,6 +488,76 @@
             font-size: 14px; color: #444; line-height: 1.5;
             white-space: pre-wrap; word-break: break-word;
         }
+        /* Template Picker */
+        .tpl-overlay {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,.45); z-index: 250;
+            align-items: flex-end; justify-content: center;
+        }
+        .tpl-overlay.show { display: flex; }
+        .tpl-panel {
+            background: #fff; border-radius: 16px 16px 0 0; width: 100%; max-width: 520px;
+            max-height: 70vh; display: flex; flex-direction: column;
+            box-shadow: 0 -4px 30px rgba(0,0,0,.15); overflow: hidden;
+            animation: tplSlideUp .25s ease;
+        }
+        @keyframes tplSlideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        .tpl-hdr {
+            display: flex; align-items: center; padding: 14px 16px;
+            border-bottom: 1px solid #eee; gap: 10px; flex-shrink: 0;
+        }
+        .tpl-hdr i { font-size: 20px; color: var(--wa-header); }
+        .tpl-hdr-title { font-weight: 600; font-size: 15px; flex: 1; }
+        .tpl-hdr-close {
+            background: var(--wa-hover); border: none; width: 30px; height: 30px;
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; font-size: 15px; color: var(--wa-text2);
+        }
+        .tpl-search {
+            padding: 10px 16px; border-bottom: 1px solid #f0f0f0; flex-shrink: 0;
+        }
+        .tpl-search input {
+            width: 100%; background: var(--wa-hover); border: none; border-radius: 8px;
+            padding: 8px 12px; font-size: 14px; outline: none; color: var(--wa-text1);
+        }
+        .tpl-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+        .tpl-item {
+            padding: 12px 16px; border-bottom: 1px solid #f5f5f5;
+            cursor: pointer; transition: background .1s;
+        }
+        .tpl-item:hover { background: #f0faf4; }
+        .tpl-item:active { background: #e0f5eb; }
+        .tpl-code {
+            font-family: 'Consolas', monospace; font-weight: 700; font-size: 13px;
+            color: var(--wa-header); background: #f0faf4; padding: 2px 8px;
+            border-radius: 4px; display: inline-block; margin-bottom: 4px;
+        }
+        .tpl-code::before { content: '#'; color: #25d366; }
+        .tpl-title { font-weight: 600; font-size: 14px; color: var(--wa-text1); margin-bottom: 2px; }
+        .tpl-preview {
+            font-size: 12px; color: var(--wa-text2); white-space: pre-wrap;
+            max-height: 40px; overflow: hidden; line-height: 1.4;
+        }
+        .tpl-media-badge {
+            display: inline-flex; align-items: center; gap: 3px;
+            font-size: 11px; color: #1976d2; background: #e3f2fd;
+            padding: 1px 6px; border-radius: 4px; margin-left: 6px;
+        }
+        .tpl-empty {
+            padding: 40px 20px; text-align: center; color: var(--wa-text2);
+        }
+        .tpl-empty i { font-size: 36px; color: #ddd; display: block; margin-bottom: 8px; }
+        .btn-template {
+            background: none; border: none; color: var(--wa-text2); font-size: 22px;
+            padding: 8px; cursor: pointer; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            transition: background .15s; flex-shrink: 0;
+        }
+        .btn-template:hover { background: rgba(0,0,0,.06); color: var(--wa-header); }
+        @media (min-width: 769px) {
+            .tpl-panel { border-radius: 16px; margin-bottom: 20px; max-height: 60vh; }
+            .tpl-overlay { align-items: center; }
+        }
     </style>
 </head>
 <body>
@@ -579,6 +649,9 @@
                 <button class="btn-attach" id="btn-attach" title="Lampirkan file">
                     <i class="bi bi-paperclip"></i>
                 </button>
+                <button class="btn-template" id="btn-template" title="Template Chat">
+                    <i class="bi bi-lightning-charge-fill"></i>
+                </button>
                 <input type="file" id="file-input" style="display:none;"
                     accept="image/*,video/*,application/pdf,application/msword,.docx,.xlsx,.pptx">
                 <textarea id="msg-input" rows="1" placeholder="Ketik pesan..."></textarea>
@@ -659,6 +732,23 @@
             <button class="report-send-btn" id="report-send-btn">
                 <i class="bi bi-whatsapp me-1"></i> Kirim via WhatsApp
             </button>
+        </div>
+    </div>
+</div>
+
+<!-- Template Picker Overlay -->
+<div class="tpl-overlay" id="tpl-overlay">
+    <div class="tpl-panel">
+        <div class="tpl-hdr">
+            <i class="bi bi-lightning-charge-fill"></i>
+            <span class="tpl-hdr-title">Pilih Template</span>
+            <button class="tpl-hdr-close" id="tpl-close"><i class="bi bi-x"></i></button>
+        </div>
+        <div class="tpl-search">
+            <input type="text" id="tpl-search-input" placeholder="Cari template...">
+        </div>
+        <div class="tpl-list" id="tpl-list">
+            <div class="tpl-empty"><i class="bi bi-hourglass-split"></i>Memuat template...</div>
         </div>
     </div>
 </div>

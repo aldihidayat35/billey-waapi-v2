@@ -39,6 +39,7 @@ export class SessionManager {
 	private sessions: Map<string, Session> = new Map()
 	private socketIO: any
 	private _notificationService: any = null
+	private _crmSyncEnabled: boolean = !!(process.env.CRM_API_URL && process.env.CRM_API_TOKEN)
 
 	constructor(io: any) {
 		this.socketIO = io
@@ -619,8 +620,9 @@ export class SessionManager {
 											
 											// Track this message
 											if (result?.key?.id) {
-												uiSentMessages.add(result.key.id)
-												setTimeout(() => uiSentMessages.delete(result.key.id), 30000)
+												const msgId = result.key.id
+												uiSentMessages.add(msgId)
+												setTimeout(() => uiSentMessages.delete(msgId), 30000)
 											}
 											
 											// Log the template message
@@ -634,8 +636,8 @@ export class SessionManager {
 												content: '',
 												caption: template.content,
 												status: 'sent',
-												messageId: result?.key?.id || `template_${Date.now()}`,
-												source: 'template'
+												messageId: result?.key?.id ?? `template_${Date.now()}`,
+												source: 'mobile'
 											})
 											
 											// Emit template-sent event
@@ -660,8 +662,9 @@ export class SessionManager {
 											
 											// Track this message
 											if (result?.key?.id) {
-												uiSentMessages.add(result.key.id)
-												setTimeout(() => uiSentMessages.delete(result.key.id), 30000)
+												const msgId = result.key.id
+												uiSentMessages.add(msgId)
+												setTimeout(() => uiSentMessages.delete(msgId), 30000)
 											}
 											
 											// Log the template message
@@ -674,8 +677,8 @@ export class SessionManager {
 												messageType: 'text',
 												content: template.content,
 												status: 'sent',
-												messageId: result?.key?.id || `template_${Date.now()}`,
-												source: 'template'
+												messageId: result?.key?.id ?? `template_${Date.now()}`,
+												source: 'mobile'
 											})
 											
 											// Emit template-sent event
@@ -817,7 +820,7 @@ export class SessionManager {
 										is_group: isGroup ? 1 : 0,
 										matched_text: messageContent.substring(0, 500),
 										trigger_value: matchedRule.trigger_value,
-										response_sent: null,
+										response_sent: undefined,
 										status: 'cooldown',
 										error_message: 'Sender is in cooldown period'
 									})
@@ -929,7 +932,7 @@ export class SessionManager {
 											caption: matchedRule.response_type !== 'text' ? matchedRule.response_content : undefined,
 											status: 'sent',
 											messageId: replyResult?.key?.id || `auto_reply_${Date.now()}`,
-											source: 'auto-reply'
+											source: 'mobile'
 										})
 										
 										// Emit auto-reply-sent event
@@ -1125,6 +1128,35 @@ export class SessionManager {
 							sessionId, remoteJid, messageContent, messageType
 						).catch((err: any) => console.error('⚠️ Notification error:', err))
 					}
+
+					// ── CRM Contact Sync (1x saat pertama chat) ──
+					if (!fromMe && this._crmSyncEnabled) {
+						const phoneDigits = remoteJid.replace(/@.*$/, '')
+						import('./crm-sync.js').then(({ syncNewContact }) => {
+							syncNewContact(sessionId, phoneDigits, msg.pushName || undefined)
+								.catch((err: any) => console.error('⚠️ CRM sync error:', err))
+						}).catch(() => {})
+					}
+
+					// ── CRM Order Processing (perintah *proses, *selesai, dll) ──
+					// fromMe: admin kirim ke client → client number = remoteJid
+					// !fromMe: client kirim ke admin → client number = remoteJid (pengirim)
+					if (this._crmSyncEnabled && messageType === 'text' && messageContent) {
+						const clientPhone = remoteJid.replace(/@.*$/, '')
+						import('./crm-sync.js').then(({ forwardMessageToCrm }) => {
+							forwardMessageToCrm(messageContent, clientPhone, sessionId)
+								.then((result: any) => {
+									// Kirim reply feedback ke client (baik sukses maupun gagal)
+									const reply = result.response?.reply
+									if (reply) {
+										sock.sendMessage(remoteJid, { text: reply })
+											.then(() => console.log(`📤 Feedback sent to ${clientPhone}`))
+											.catch((err: any) => console.error('⚠️ Failed to send feedback:', err))
+									}
+								})
+								.catch((err: any) => console.error('⚠️ CRM order forward error:', err))
+						}).catch(() => {})
+					}
 					
 					console.log(`${fromMe ? '📱➡️' : '📨'} Message ${fromMe ? 'from Mobile' : 'received'}: ${remoteJid} - ${messageType}`)
 				}
@@ -1157,9 +1189,10 @@ export class SessionManager {
 		
 		// Track this message to prevent duplicate display
 		if (result?.key?.id) {
-			uiSentMessages.add(result.key.id)
+			const msgId = result.key.id
+			uiSentMessages.add(msgId)
 			// Clean up after 30 seconds
-			setTimeout(() => uiSentMessages.delete(result.key.id), 30000)
+			setTimeout(() => uiSentMessages.delete(msgId), 30000)
 		}
 		
 		return result
@@ -1183,30 +1216,27 @@ export class SessionManager {
 			? phone
 			: `${phone.replace(/[^0-9]/g, '')}@s.whatsapp.net`
 
-		const messageContent: AnyMessageContent = {
+		const imageMsg: { image: Buffer; caption?: string; mimetype?: string } = {
 			image: imageBuffer,
 		}
 
 		if (caption) {
-			messageContent.caption = caption
+			imageMsg.caption = caption
 		}
 
 		if (mimetype) {
-			messageContent.mimetype = mimetype
-		}
-
-		if (filename) {
-			messageContent.fileName = filename
+			imageMsg.mimetype = mimetype
 		}
 
 		console.log('📤 Sending image to', jid, 'size:', imageBuffer.length, 'bytes')
-		const result = await session.sock.sendMessage(jid, messageContent)
+		const result = await session.sock.sendMessage(jid, imageMsg)
 		console.log('✅ Image sent successfully')
 		
 		// Track this message to prevent duplicate display
 		if (result?.key?.id) {
-			uiSentMessages.add(result.key.id)
-			setTimeout(() => uiSentMessages.delete(result.key.id), 30000)
+			const msgId = result.key.id
+			uiSentMessages.add(msgId)
+			setTimeout(() => uiSentMessages.delete(msgId), 30000)
 		}
 		
 		return result
@@ -1230,30 +1260,27 @@ export class SessionManager {
 			? phone
 			: `${phone.replace(/[^0-9]/g, '')}@s.whatsapp.net`
 
-		const messageContent: AnyMessageContent = {
+		const videoMsg: { video: Buffer; caption?: string; mimetype?: string } = {
 			video: videoBuffer,
 		}
 
 		if (caption) {
-			messageContent.caption = caption
+			videoMsg.caption = caption
 		}
 
 		if (mimetype) {
-			messageContent.mimetype = mimetype
-		}
-
-		if (filename) {
-			messageContent.fileName = filename
+			videoMsg.mimetype = mimetype
 		}
 
 		console.log('📤 Sending video to', jid, 'size:', videoBuffer.length, 'bytes')
-		const result = await session.sock.sendMessage(jid, messageContent)
+		const result = await session.sock.sendMessage(jid, videoMsg)
 		console.log('✅ Video sent successfully')
 		
 		// Track this message to prevent duplicate display
 		if (result?.key?.id) {
-			uiSentMessages.add(result.key.id)
-			setTimeout(() => uiSentMessages.delete(result.key.id), 30000)
+			const msgId = result.key.id
+			uiSentMessages.add(msgId)
+			setTimeout(() => uiSentMessages.delete(msgId), 30000)
 		}
 		
 		return result
@@ -1277,32 +1304,30 @@ export class SessionManager {
 			? phone
 			: `${phone.replace(/[^0-9]/g, '')}@s.whatsapp.net`
 
-		const messageContent: AnyMessageContent = {
+		const docMsg: { document: Buffer; mimetype: string; fileName?: string; caption?: string } = {
 			document: documentBuffer,
-		}
-
-		if (mimetype) {
-			messageContent.mimetype = mimetype
+			mimetype: mimetype || 'application/octet-stream',
 		}
 
 		if (filename) {
-			messageContent.fileName = filename
+			docMsg.fileName = filename
 		} else {
-			messageContent.fileName = 'document'
+			docMsg.fileName = 'document'
 		}
 
 		if (caption) {
-			messageContent.caption = caption
+			docMsg.caption = caption
 		}
 
 		console.log('📤 Sending document to', jid, 'size:', documentBuffer.length, 'bytes')
-		const result = await session.sock.sendMessage(jid, messageContent)
+		const result = await session.sock.sendMessage(jid, docMsg)
 		console.log('✅ Document sent successfully')
 		
 		// Track this message to prevent duplicate display
 		if (result?.key?.id) {
-			uiSentMessages.add(result.key.id)
-			setTimeout(() => uiSentMessages.delete(result.key.id), 30000)
+			const msgId = result.key.id
+			uiSentMessages.add(msgId)
+			setTimeout(() => uiSentMessages.delete(msgId), 30000)
 		}
 		
 		return result
@@ -1632,7 +1657,7 @@ export class SessionManager {
 			let resolvedOwner = metadata.owner || ''
 			if (metadata.ownerPn) {
 				resolvedOwner = metadata.ownerPn
-			} else if (resolvedJids.has(metadata.owner)) {
+			} else if (metadata.owner && resolvedJids.has(metadata.owner)) {
 				resolvedOwner = resolvedJids.get(metadata.owner)!
 			}
 			
@@ -1640,7 +1665,7 @@ export class SessionManager {
 			let resolvedSubjectOwner = metadata.subjectOwner || ''
 			if (metadata.subjectOwnerPn) {
 				resolvedSubjectOwner = metadata.subjectOwnerPn
-			} else if (resolvedJids.has(metadata.subjectOwner)) {
+			} else if (metadata.subjectOwner && resolvedJids.has(metadata.subjectOwner)) {
 				resolvedSubjectOwner = resolvedJids.get(metadata.subjectOwner)!
 			}
 
@@ -1685,7 +1710,7 @@ export class SessionManager {
 			const jid = groupId.includes('@g.us') ? groupId : `${groupId}@g.us`
 			const code = await session.sock.groupInviteCode(jid)
 			console.log(`✅ Invite code for ${jid}: ${code}`)
-			return code
+			return code || ''
 		} catch (error) {
 			console.error('❌ Error getting invite code:', error)
 			throw error
@@ -1706,7 +1731,7 @@ export class SessionManager {
 			const jid = groupId.includes('@g.us') ? groupId : `${groupId}@g.us`
 			const newCode = await session.sock.groupRevokeInvite(jid)
 			console.log(`✅ New invite code for ${jid}: ${newCode}`)
-			return newCode
+			return newCode || ''
 		} catch (error) {
 			console.error('❌ Error revoking invite:', error)
 			throw error
@@ -1728,7 +1753,7 @@ export class SessionManager {
 			const code = inviteCode.replace('https://chat.whatsapp.com/', '').trim()
 			const groupId = await session.sock.groupAcceptInvite(code)
 			console.log(`✅ Joined group: ${groupId}`)
-			return groupId
+			return groupId || ''
 		} catch (error) {
 			console.error('❌ Error joining group:', error)
 			throw error
@@ -1944,8 +1969,9 @@ export class SessionManager {
 			
 			// Track this message
 			if (result?.key?.id) {
-				uiSentMessages.add(result.key.id)
-				setTimeout(() => uiSentMessages.delete(result.key.id), 30000)
+				const msgId = result.key.id
+				uiSentMessages.add(msgId)
+				setTimeout(() => uiSentMessages.delete(msgId), 30000)
 			}
 			
 			return result
@@ -1988,7 +2014,7 @@ export class SessionManager {
 		try {
 			const jid = groupId.includes('@g.us') ? groupId : `${groupId}@g.us`
 			const url = await session.sock.profilePictureUrl(jid, 'image')
-			return url
+			return url ?? null
 		} catch (error) {
 			// No profile picture
 			return null
