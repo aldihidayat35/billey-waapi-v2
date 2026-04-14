@@ -177,7 +177,22 @@ export function initAuthTables(): void {
         CREATE INDEX IF NOT EXISTS idx_assignment_logs_created ON assignment_logs(created_at);
     `)
 
-    // Migration: Add notes/priority columns to worker_assignments if they don't exist
+    // Create hidden_messages table
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS hidden_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            message_id TEXT NOT NULL,
+            session_id TEXT NOT NULL,
+            hidden_by INTEGER NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(message_id),
+            FOREIGN KEY (hidden_by) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_hidden_messages_session ON hidden_messages(session_id);
+        CREATE INDEX IF NOT EXISTS idx_hidden_messages_message ON hidden_messages(message_id);
+    `)
+
+    // Migration: Add columns to worker_assignments if they don't exist
     try {
         const waInfo = db.prepare("PRAGMA table_info(worker_assignments)").all() as any[]
         const waCols = waInfo.map(c => c.name)
@@ -188,6 +203,22 @@ export function initAuthTables(): void {
         if (!waCols.includes('priority')) {
             db.exec("ALTER TABLE worker_assignments ADD COLUMN priority TEXT DEFAULT 'low'")
             console.log('✅ Added priority column to worker_assignments')
+        }
+        if (!waCols.includes('start_datetime')) {
+            db.exec("ALTER TABLE worker_assignments ADD COLUMN start_datetime TEXT DEFAULT NULL")
+            console.log('✅ Added start_datetime column to worker_assignments')
+        }
+        if (!waCols.includes('end_datetime')) {
+            db.exec("ALTER TABLE worker_assignments ADD COLUMN end_datetime TEXT DEFAULT NULL")
+            console.log('✅ Added end_datetime column to worker_assignments')
+        }
+        if (!waCols.includes('visibility_start')) {
+            db.exec("ALTER TABLE worker_assignments ADD COLUMN visibility_start TEXT DEFAULT NULL")
+            console.log('✅ Added visibility_start column to worker_assignments')
+        }
+        if (!waCols.includes('visibility_end')) {
+            db.exec("ALTER TABLE worker_assignments ADD COLUMN visibility_end TEXT DEFAULT NULL")
+            console.log('✅ Added visibility_end column to worker_assignments')
         }
     } catch (e) { /* columns already exist */ }
 
@@ -712,9 +743,20 @@ export function userOwnsSession(userId: number, sessionId: string, role: UserRol
 // ============================================
 export const workerAssignmentDb = {
     // Get all assignments for a worker
-    getForWorker: (workerId: number): { session_id: string; contact: string; notes: string; priority: string }[] => {
+    getForWorker: (workerId: number): { session_id: string; contact: string; notes: string; priority: string; start_datetime: string | null; end_datetime: string | null; visibility_start: string | null; visibility_end: string | null }[] => {
         return db.prepare(`
-            SELECT session_id, contact, notes, priority FROM worker_assignments WHERE worker_id = ?
+            SELECT session_id, contact, notes, priority, start_datetime, end_datetime, visibility_start, visibility_end FROM worker_assignments WHERE worker_id = ?
+        `).all(workerId) as any[]
+    },
+
+    // Get active assignments for a worker (exclude expired)
+    getActiveForWorker: (workerId: number): { session_id: string; contact: string; notes: string; priority: string; start_datetime: string | null; end_datetime: string | null; visibility_start: string | null; visibility_end: string | null }[] => {
+        return db.prepare(`
+            SELECT session_id, contact, notes, priority, start_datetime, end_datetime, visibility_start, visibility_end
+            FROM worker_assignments
+            WHERE worker_id = ?
+              AND (end_datetime IS NULL OR end_datetime >= datetime('now', 'localtime'))
+              AND (start_datetime IS NULL OR start_datetime <= datetime('now', 'localtime'))
         `).all(workerId) as any[]
     },
 
@@ -726,7 +768,17 @@ export const workerAssignmentDb = {
         return rows.map(r => r.contact)
     },
 
-    // Get assignment note for a specific worker-session-contact
+    // Get assignment detail for a specific worker-session-contact
+    getAssignment: (workerId: number, sessionId: string, contact: string): { notes: string; priority: string; start_datetime: string | null; end_datetime: string | null; visibility_start: string | null; visibility_end: string | null } | null => {
+        const row = db.prepare(`
+            SELECT notes, priority, start_datetime, end_datetime, visibility_start, visibility_end
+            FROM worker_assignments
+            WHERE worker_id = ? AND session_id = ? AND contact = ?
+        `).get(workerId, sessionId, contact) as any
+        return row || null
+    },
+
+    // Get assignment note for a specific worker-session-contact (legacy alias)
     getNote: (workerId: number, sessionId: string, contact: string): { notes: string; priority: string } | null => {
         const row = db.prepare(`
             SELECT notes, priority FROM worker_assignments
@@ -736,23 +788,24 @@ export const workerAssignmentDb = {
     },
 
     // Get all notes for a worker (used by member API)
-    getNotesForWorker: (workerId: number): { session_id: string; contact: string; notes: string; priority: string }[] => {
+    getNotesForWorker: (workerId: number): { session_id: string; contact: string; notes: string; priority: string; start_datetime: string | null; end_datetime: string | null; visibility_start: string | null; visibility_end: string | null }[] => {
         return db.prepare(`
-            SELECT session_id, contact, notes, priority FROM worker_assignments
-            WHERE worker_id = ? AND (notes IS NOT NULL AND notes != '' OR priority != 'low')
+            SELECT session_id, contact, notes, priority, start_datetime, end_datetime, visibility_start, visibility_end
+            FROM worker_assignments
+            WHERE worker_id = ?
         `).all(workerId) as any[]
     },
 
-    // Replace all assignments for a worker (bulk set) with notes/priority
-    replaceForWorker: (workerId: number, assignments: { session_id: string; contact: string; notes?: string; priority?: string }[], assignedBy: number): { success: boolean; error?: string } => {
+    // Replace all assignments for a worker (bulk set) with notes/priority/time settings
+    replaceForWorker: (workerId: number, assignments: { session_id: string; contact: string; notes?: string; priority?: string; start_datetime?: string | null; end_datetime?: string | null; visibility_start?: string | null; visibility_end?: string | null }[], assignedBy: number): { success: boolean; error?: string } => {
         try {
             const del = db.prepare('DELETE FROM worker_assignments WHERE worker_id = ?')
-            const ins = db.prepare('INSERT OR IGNORE INTO worker_assignments (worker_id, session_id, contact, notes, priority, assigned_by) VALUES (?, ?, ?, ?, ?, ?)')
+            const ins = db.prepare('INSERT OR IGNORE INTO worker_assignments (worker_id, session_id, contact, notes, priority, start_datetime, end_datetime, visibility_start, visibility_end, assigned_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
             
             db.transaction(() => {
                 del.run(workerId)
                 for (const a of assignments) {
-                    ins.run(workerId, a.session_id, a.contact, a.notes || '', a.priority || 'low', assignedBy)
+                    ins.run(workerId, a.session_id, a.contact, a.notes || '', a.priority || 'low', a.start_datetime || null, a.end_datetime || null, a.visibility_start || null, a.visibility_end || null, assignedBy)
                 }
             })()
             return { success: true }
@@ -761,14 +814,72 @@ export const workerAssignmentDb = {
         }
     },
 
-    // Check if worker has access to a specific contact
+    // Check if worker has access to a specific contact (also checks time range)
     hasAccess: (workerId: number, sessionId: string, contact: string): boolean => {
         const result = db.prepare(`
             SELECT 1 FROM worker_assignments
             WHERE worker_id = ? AND session_id = ? AND contact = ?
+              AND (end_datetime IS NULL OR end_datetime >= datetime('now', 'localtime'))
+              AND (start_datetime IS NULL OR start_datetime <= datetime('now', 'localtime'))
             LIMIT 1
         `).get(workerId, sessionId, contact)
         return !!result
+    }
+}
+
+// ============================================
+// Hidden Messages Management
+// ============================================
+export const hiddenMessageDb = {
+    // Hide a single message
+    hide: (messageId: string, sessionId: string, hiddenBy: number): void => {
+        db.prepare(`
+            INSERT OR IGNORE INTO hidden_messages (message_id, session_id, hidden_by)
+            VALUES (?, ?, ?)
+        `).run(messageId, sessionId, hiddenBy)
+    },
+
+    // Unhide a single message
+    unhide: (messageId: string): void => {
+        db.prepare('DELETE FROM hidden_messages WHERE message_id = ?').run(messageId)
+    },
+
+    // Bulk hide messages
+    bulkHide: (messageIds: string[], sessionId: string, hiddenBy: number): void => {
+        const ins = db.prepare(`INSERT OR IGNORE INTO hidden_messages (message_id, session_id, hidden_by) VALUES (?, ?, ?)`)
+        db.transaction(() => {
+            for (const id of messageIds) {
+                ins.run(id, sessionId, hiddenBy)
+            }
+        })()
+    },
+
+    // Bulk unhide messages
+    bulkUnhide: (messageIds: string[]): void => {
+        if (messageIds.length === 0) return
+        const placeholders = messageIds.map(() => '?').join(',')
+        db.prepare(`DELETE FROM hidden_messages WHERE message_id IN (${placeholders})`).run(...messageIds)
+    },
+
+    // Get all hidden message_ids for a session
+    getHiddenForSession: (sessionId: string): Set<string> => {
+        const rows = db.prepare('SELECT message_id FROM hidden_messages WHERE session_id = ?').all(sessionId) as any[]
+        return new Set(rows.map(r => r.message_id))
+    },
+
+    // Check if a message is hidden
+    isHidden: (messageId: string): boolean => {
+        return !!db.prepare('SELECT 1 FROM hidden_messages WHERE message_id = ? LIMIT 1').get(messageId)
+    },
+
+    // Get all hidden message_ids for a session+contact
+    getHiddenForContact: (sessionId: string, contact: string): Set<string> => {
+        const rows = db.prepare(`
+            SELECT hm.message_id FROM hidden_messages hm
+            JOIN message_logs ml ON hm.message_id = ml.message_id
+            WHERE hm.session_id = ? AND (ml.from_number = ? OR ml.to_number = ?)
+        `).all(sessionId, contact, contact) as any[]
+        return new Set(rows.map(r => r.message_id))
     }
 }
 

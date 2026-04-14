@@ -79,6 +79,27 @@
             font-family: inherit; line-height: 1.4;
         }
         .contact-note-row .cnr-notes:focus { border-color: #7239ea; outline: none; }
+        /* Time Range Settings */
+        .cnr-time-section {
+            margin-top: 8px; padding-top: 8px; border-top: 1px dashed #e4e6ef;
+        }
+        .cnr-time-row {
+            display: flex; align-items: center; gap: 6px; margin-bottom: 4px; flex-wrap: wrap;
+        }
+        .cnr-time-row label {
+            font-size: 11px; color: #a1a5b7; font-weight: 600; min-width: 90px; flex-shrink: 0;
+        }
+        .cnr-time-row input[type="datetime-local"],
+        .cnr-time-row input[type="time"] {
+            border: 1px solid #e4e6ef; border-radius: 5px; padding: 3px 6px;
+            font-size: 11px; font-family: inherit; color: #5e6278; flex: 1; min-width: 0; max-width: 180px;
+        }
+        .cnr-time-row input:focus { border-color: #7239ea; outline: none; }
+        .cnr-time-row .cbx-label {
+            display: inline-flex; align-items: center; gap: 4px;
+            font-size: 11px; color: #7e8299; cursor: pointer; user-select: none;
+        }
+        .cnr-time-row .cbx-label input { margin: 0; cursor: pointer; }
     </style>
 </head>
 <body id="kt_app_body" data-kt-app-layout="dark-sidebar" data-kt-app-header-fixed="true" data-kt-app-sidebar-enabled="true" data-kt-app-sidebar-fixed="true" data-kt-app-sidebar-hoverable="true" data-kt-app-sidebar-push-header="true" data-kt-app-sidebar-push-toolbar="true" data-kt-app-sidebar-push-footer="true" data-kt-app-toolbar-enabled="true" class="app-default">
@@ -311,7 +332,12 @@
                 for (const a of (d.assignments || [])) {
                     if (!selectedContacts[a.session_id]) selectedContacts[a.session_id] = new Set();
                     selectedContacts[a.session_id].add(a.contact);
-                    contactNotesMap[a.session_id + '|' + a.contact] = { notes: a.notes || '', priority: a.priority || 'low' };
+                    contactNotesMap[a.session_id + '|' + a.contact] = {
+                        notes: a.notes || '', priority: a.priority || 'low',
+                        start_datetime: a.start_datetime || '', end_datetime: a.end_datetime || '',
+                        visibility_start: a.visibility_start || '', visibility_end: a.visibility_end || '',
+                        no_visibility_limit: !a.visibility_start && !a.visibility_end
+                    };
                 }
             } catch {}
             renderSessionButtons();
@@ -388,10 +414,25 @@
         }
 
         function updateSummary() {
-            // Save current textarea values before re-render
+            // Save current field values before re-render
             document.querySelectorAll('.cnr-notes[data-key]').forEach(el => {
                 const key = el.dataset.key;
                 if (contactNotesMap[key]) contactNotesMap[key].notes = el.value;
+            });
+            document.querySelectorAll('.cnr-start-dt[data-key]').forEach(el => {
+                if (contactNotesMap[el.dataset.key]) contactNotesMap[el.dataset.key].start_datetime = el.value;
+            });
+            document.querySelectorAll('.cnr-end-dt[data-key]').forEach(el => {
+                if (contactNotesMap[el.dataset.key]) contactNotesMap[el.dataset.key].end_datetime = el.value;
+            });
+            document.querySelectorAll('.cnr-vis-start[data-key]').forEach(el => {
+                if (contactNotesMap[el.dataset.key]) contactNotesMap[el.dataset.key].visibility_start = el.value;
+            });
+            document.querySelectorAll('.cnr-vis-end[data-key]').forEach(el => {
+                if (contactNotesMap[el.dataset.key]) contactNotesMap[el.dataset.key].visibility_end = el.value;
+            });
+            document.querySelectorAll('.cnr-vis-unlimited[data-key]').forEach(el => {
+                if (contactNotesMap[el.dataset.key]) contactNotesMap[el.dataset.key].no_visibility_limit = el.checked;
             });
 
             let total = 0, rows = '';
@@ -399,10 +440,11 @@
                 for (const contact of set) {
                     total++;
                     const key = sid + '|' + contact;
-                    if (!contactNotesMap[key]) contactNotesMap[key] = { notes: '', priority: 'low' };
+                    if (!contactNotesMap[key]) contactNotesMap[key] = { notes: '', priority: 'low', start_datetime: '', end_datetime: '', visibility_start: '', visibility_end: '', no_visibility_limit: true };
                     const nd = contactNotesMap[key];
                     const phone = cleanPhone(contact);
                     const sName = (sessions.find(s => s.id === sid) || {}).name || sid;
+                    const noVisLimit = nd.no_visibility_limit;
                     rows += '<div class="contact-note-row" data-key="' + esc(key) + '">' +
                         '<div class="cnr-top">' +
                             '<span class="cnr-phone">' + esc(phone) + '</span>' +
@@ -417,6 +459,23 @@
                             '</div>' +
                             '<textarea class="cnr-notes" data-key="' + esc(key) + '" rows="1" placeholder="Catatan...">' + esc(nd.notes) + '</textarea>' +
                         '</div>' +
+                        '<div class="cnr-time-section">' +
+                            '<div class="cnr-time-row">' +
+                                '<label><i class="bi bi-calendar-event me-1"></i>Mulai tugas</label>' +
+                                '<input type="datetime-local" class="cnr-start-dt" data-key="' + esc(key) + '" value="' + esc(nd.start_datetime || '') + '">' +
+                            '</div>' +
+                            '<div class="cnr-time-row">' +
+                                '<label><i class="bi bi-calendar-check me-1"></i>Selesai tugas</label>' +
+                                '<input type="datetime-local" class="cnr-end-dt" data-key="' + esc(key) + '" value="' + esc(nd.end_datetime || '') + '">' +
+                            '</div>' +
+                            '<div class="cnr-time-row">' +
+                                '<label><i class="bi bi-eye me-1"></i>Visibilitas chat</label>' +
+                                '<input type="time" class="cnr-vis-start" data-key="' + esc(key) + '" value="' + esc(nd.visibility_start || '') + '"' + (noVisLimit ? ' disabled' : '') + '>' +
+                                '<span style="font-size:11px;color:#bbb">s/d</span>' +
+                                '<input type="time" class="cnr-vis-end" data-key="' + esc(key) + '" value="' + esc(nd.visibility_end || '') + '"' + (noVisLimit ? ' disabled' : '') + '>' +
+                                '<label class="cbx-label ms-1"><input type="checkbox" class="cnr-vis-unlimited" data-key="' + esc(key) + '"' + (noVisLimit ? ' checked' : '') + ' onchange="toggleVisLimit(this)"> Tanpa batas</label>' +
+                            '</div>' +
+                        '</div>' +
                     '</div>';
                 }
             }
@@ -429,6 +488,16 @@
                 el.addEventListener('input', () => { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; });
                 el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px';
             });
+        }
+
+        function toggleVisLimit(cbx) {
+            const key = cbx.dataset.key;
+            const row = cbx.closest('.cnr-time-section');
+            const starts = row.querySelectorAll('.cnr-vis-start');
+            const ends = row.querySelectorAll('.cnr-vis-end');
+            starts.forEach(el => { el.disabled = cbx.checked; if (cbx.checked) el.value = ''; });
+            ends.forEach(el => { el.disabled = cbx.checked; if (cbx.checked) el.value = ''; });
+            if (contactNotesMap[key]) contactNotesMap[key].no_visibility_limit = cbx.checked;
         }
 
         function setPriority(btn) {
@@ -451,16 +520,34 @@
 
         async function saveAssignment() {
             if (!currentWorkerId) return;
-            // Collect latest textarea values
+            // Collect latest field values
             document.querySelectorAll('.cnr-notes[data-key]').forEach(el => {
                 const key = el.dataset.key;
                 if (contactNotesMap[key]) contactNotesMap[key].notes = el.value.trim();
+            });
+            document.querySelectorAll('.cnr-start-dt[data-key]').forEach(el => {
+                if (contactNotesMap[el.dataset.key]) contactNotesMap[el.dataset.key].start_datetime = el.value;
+            });
+            document.querySelectorAll('.cnr-end-dt[data-key]').forEach(el => {
+                if (contactNotesMap[el.dataset.key]) contactNotesMap[el.dataset.key].end_datetime = el.value;
+            });
+            document.querySelectorAll('.cnr-vis-start[data-key]').forEach(el => {
+                if (contactNotesMap[el.dataset.key]) contactNotesMap[el.dataset.key].visibility_start = el.value;
+            });
+            document.querySelectorAll('.cnr-vis-end[data-key]').forEach(el => {
+                if (contactNotesMap[el.dataset.key]) contactNotesMap[el.dataset.key].visibility_end = el.value;
             });
             const assignments = [];
             for (const [sid, set] of Object.entries(selectedContacts)) {
                 for (const contact of set) {
                     const nd = contactNotesMap[sid + '|' + contact] || { notes: '', priority: 'low' };
-                    assignments.push({ session_id: sid, contact, notes: nd.notes, priority: nd.priority });
+                    assignments.push({
+                        session_id: sid, contact, notes: nd.notes, priority: nd.priority,
+                        start_datetime: nd.start_datetime || null,
+                        end_datetime: nd.end_datetime || null,
+                        visibility_start: nd.no_visibility_limit ? null : (nd.visibility_start || null),
+                        visibility_end: nd.no_visibility_limit ? null : (nd.visibility_end || null),
+                    });
                 }
             }
             const btn = document.getElementById('btn-save-assignment');

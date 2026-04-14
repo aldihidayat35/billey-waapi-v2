@@ -12,7 +12,7 @@ import cookieParser from 'cookie-parser'
 import { 
 	login, logout, validateSession, userDb, sessionDb, 
 	linkWaSessionToUser, unlinkWaSessionFromUser, getWaSessionsForUser, userOwnsSession,
-	User, UserRole, generateToken, hashPassword, workerAssignmentDb, assignmentLogDb
+	User, UserRole, generateToken, hashPassword, workerAssignmentDb, assignmentLogDb, hiddenMessageDb
 } from './auth.js'
 import { 
 	authMiddleware, adminMiddleware, adminOrApiKeyMiddleware, optionalAuthMiddleware, 
@@ -601,16 +601,20 @@ app.put('/api/workers/:id/assignments', adminOrApiKeyMiddleware, (req, res) => {
 		if (!worker || worker.role !== 'worker') {
 			return res.status(404).json({ success: false, error: 'Worker tidak ditemukan' })
 		}
-		const { assignments } = req.body // assignments: [{session_id, contact, notes?, priority?}]
+		const { assignments } = req.body // assignments: [{session_id, contact, notes?, priority?, start_datetime?, end_datetime?, visibility_start?, visibility_end?}]
 		if (!Array.isArray(assignments)) {
 			return res.status(400).json({ success: false, error: 'Format assignments tidak valid' })
 		}
-		// Sanitize per-contact notes/priority
+		// Sanitize per-contact fields
 		const enriched = assignments.map((a: any) => ({
 			session_id: a.session_id,
 			contact: a.contact,
 			notes: a.notes || '',
-			priority: ['low', 'medium', 'critical'].includes(a.priority) ? a.priority : 'low'
+			priority: ['low', 'medium', 'critical'].includes(a.priority) ? a.priority : 'low',
+			start_datetime: a.start_datetime || null,
+			end_datetime: a.end_datetime || null,
+			visibility_start: a.visibility_start || null,
+			visibility_end: a.visibility_end || null,
 		}))
 		const result = workerAssignmentDb.replaceForWorker(workerId, enriched, req.user!.id)
 		if (result.success) {
@@ -730,10 +734,10 @@ app.get('/api/member/conversations', authMiddleware, (req, res) => {
 			LIMIT 200
 		`).all(...assignedIds) as any[]
 
-		// Worker: filter to only assigned contacts
+		// Worker: filter to only active assigned contacts (excludes expired assignments)
 		let filteredRows = rows
 		if (user.role === 'worker') {
-			const assignments = workerAssignmentDb.getForWorker(user.id)
+			const assignments = workerAssignmentDb.getActiveForWorker(user.id)
 			const assignedContacts = new Set(assignments.map(a => `${a.session_id}:${a.contact}`))
 			filteredRows = rows.filter(r => assignedContacts.has(`${r.session_id}:${r.contact}`))
 		}
@@ -774,12 +778,12 @@ app.get('/api/member/messages/:sessionId/:contact', authMiddleware, (req, res) =
 			return res.status(403).json({ success: false, error: 'Anda tidak memiliki akses ke session ini' })
 		}
 
-		// Worker: check contact-level access
+		// Worker: check contact-level access (also enforces time range)
 		if (user.role === 'worker' && !workerAssignmentDb.hasAccess(user.id, sessionId, contact)) {
 			return res.status(403).json({ success: false, error: 'Anda tidak memiliki akses ke kontak ini' })
 		}
 
-		const messages = db.prepare(`
+		let messages = db.prepare(`
 			SELECT * FROM (
 				SELECT id, message_id, session_id, direction, from_number, to_number,
 					message_type, content, caption, media_url, filename, file_size, mimetype,
@@ -792,6 +796,46 @@ app.get('/api/member/messages/:sessionId/:contact', authMiddleware, (req, res) =
 				LIMIT ?
 			) sub ORDER BY sub.timestamp ASC
 		`).all(sessionId, contact, contact, limit) as any[]
+
+		// Get hidden message IDs for this session+contact
+		const hiddenIds = hiddenMessageDb.getHiddenForContact(sessionId, contact)
+
+		if (user.role === 'worker') {
+			// Worker: get visibility settings from assignment
+			const assignment = workerAssignmentDb.getAssignment(user.id, sessionId, contact)
+			const visStart = assignment?.visibility_start || null
+			const visEnd = assignment?.visibility_end || null
+
+			// Filter by visibility time window (based on message timestamp)
+			if (visStart && visEnd) {
+				messages = messages.filter((m: any) => {
+					const msgDate = new Date(m.timestamp)
+					const hh = msgDate.getHours().toString().padStart(2, '0')
+					const mm = msgDate.getMinutes().toString().padStart(2, '0')
+					const hhmm = `${hh}:${mm}`
+					return hhmm >= visStart && hhmm <= visEnd
+				})
+			}
+
+			// Exclude hidden messages for workers
+			messages = messages.filter((m: any) => !hiddenIds.has(m.message_id))
+
+			// Add assignment info for header display
+			const assignmentInfo = assignment ? {
+				start_datetime: assignment.start_datetime,
+				end_datetime: assignment.end_datetime,
+				visibility_start: assignment.visibility_start,
+				visibility_end: assignment.visibility_end,
+			} : null
+
+			return res.json({ success: true, messages, assignment: assignmentInfo })
+		}
+
+		// Admin/Member: include all messages, but mark hidden ones
+		messages = messages.map((m: any) => ({
+			...m,
+			is_hidden: hiddenIds.has(m.message_id)
+		}))
 
 		res.json({ success: true, messages })
 	} catch (error: any) {
@@ -949,6 +993,52 @@ app.post('/api/member/read-all', authMiddleware, (req, res) => {
 			updated = r.changes
 		}
 		res.json({ success: true, updated })
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// ============================================
+// Chat Hide/Unhide API Endpoints (Admin & Member)
+// ============================================
+
+// Hide messages (admin & member only)
+app.post('/api/chat/hide', authMiddleware, (req, res) => {
+	try {
+		const user = req.user!
+		if (user.role === 'worker') {
+			return res.status(403).json({ success: false, error: 'Worker tidak bisa menyembunyikan chat' })
+		}
+		const { message_ids, session_id } = req.body
+		if (!Array.isArray(message_ids) || !session_id) {
+			return res.status(400).json({ success: false, error: 'message_ids (array) dan session_id wajib diisi' })
+		}
+		if (message_ids.length === 0) {
+			return res.status(400).json({ success: false, error: 'Tidak ada pesan yang dipilih' })
+		}
+		if (message_ids.length > 500) {
+			return res.status(400).json({ success: false, error: 'Maksimal 500 pesan per request' })
+		}
+		hiddenMessageDb.bulkHide(message_ids, session_id, user.id)
+		res.json({ success: true, message: `${message_ids.length} pesan berhasil disembunyikan` })
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Unhide messages (admin & member only)
+app.post('/api/chat/unhide', authMiddleware, (req, res) => {
+	try {
+		const user = req.user!
+		if (user.role === 'worker') {
+			return res.status(403).json({ success: false, error: 'Worker tidak bisa menampilkan kembali chat' })
+		}
+		const { message_ids } = req.body
+		if (!Array.isArray(message_ids) || message_ids.length === 0) {
+			return res.status(400).json({ success: false, error: 'message_ids (array) wajib diisi' })
+		}
+		hiddenMessageDb.bulkUnhide(message_ids)
+		res.json({ success: true, message: `${message_ids.length} pesan berhasil ditampilkan kembali` })
 	} catch (error: any) {
 		res.status(500).json({ success: false, error: error.message })
 	}
@@ -1548,7 +1638,15 @@ app.get('/api/messages/chat/:sessionId/:phone', adminOrApiKeyMiddleware, (req, r
 	try {
 		const { sessionId, phone } = req.params
 		const messages = activityLogger.getChatMessages(sessionId, phone)
-		res.json({ success: true, messages })
+
+		// Mark hidden messages for admin/member UI
+		const hiddenIds = hiddenMessageDb.getHiddenForContact(sessionId, phone)
+		const enriched = messages.map((m: any) => ({
+			...m,
+			is_hidden: hiddenIds.has(m.message_id)
+		}))
+
+		res.json({ success: true, messages: enriched })
 	} catch (error: any) {
 		console.error('Error fetching chat messages:', error)
 		res.status(500).json({ success: false, error: error.message })

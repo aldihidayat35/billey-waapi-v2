@@ -923,6 +923,30 @@
                 max-width: 85%;
             }
         }
+        /* Hide/Unhide button */
+        .msg-hide-btn {
+            position: absolute; top: 4px; right: 4px; z-index: 2;
+            background: rgba(0,0,0,.05); border: none; border-radius: 50%;
+            width: 26px; height: 26px; display: none; align-items: center; justify-content: center;
+            font-size: 13px; color: #8696a0; cursor: pointer; transition: background .12s, color .12s;
+        }
+        .message-bubble:hover .msg-hide-btn { display: flex; }
+        .msg-hide-btn:hover { background: rgba(0,0,0,.12); color: #111; }
+        .message-row.out .msg-hide-btn { right: auto; left: 4px; }
+
+        /* Hidden message style */
+        .message-bubble.msg-hidden {
+            opacity: 0.45;
+            background-image: repeating-linear-gradient(135deg, transparent, transparent 6px, rgba(0,0,0,.04) 6px, rgba(0,0,0,.04) 12px) !important;
+        }
+        .message-bubble.msg-hidden .msg-hide-btn { display: flex; color: #e74c3c; }
+
+        /* Hidden badge */
+        .msg-hidden-badge {
+            display: inline-flex; align-items: center;
+            font-size: 10px; color: #dc3545; font-weight: 600;
+            margin-right: 4px; letter-spacing: .02em;
+        }
     </style>
 </head>
 <body id="kt_app_body" data-kt-app-layout="dark-sidebar" data-kt-app-header-fixed="true" data-kt-app-sidebar-enabled="true" data-kt-app-sidebar-fixed="true" data-kt-app-sidebar-hoverable="true" data-kt-app-sidebar-push-header="true" data-kt-app-sidebar-push-toolbar="true" data-kt-app-sidebar-push-footer="true" data-kt-app-toolbar-enabled="true" class="app-default">

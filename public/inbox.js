@@ -791,13 +791,21 @@ function renderMessageBubble(msg, msgId) {
         console.error('❌ renderContent error:', e, msg);
         content = `<div class="message-text" style="color: #999; font-style: italic;">Pesan tidak dapat ditampilkan</div>`;
     }
+
+    // Hide/unhide feature (admin always sees the button)
+    const isHidden = msg.is_hidden === true || msg.is_hidden === 1;
+    const hiddenClass = isHidden ? ' msg-hidden' : '';
+    const hideBtn = `<button class="msg-hide-btn" data-msgid="${escapeHtml(msgId)}" data-hidden="${isHidden ? '1' : '0'}" onclick="toggleHideMsg(this)" title="${isHidden ? 'Tampilkan kembali' : 'Sembunyikan dari worker'}"><i class="bi ${isHidden ? 'bi-eye-slash-fill' : 'bi-eye'}"></i></button>`;
+    const hideBadge = isHidden ? '<span class="msg-hidden-badge"><i class="bi bi-eye-slash me-1"></i>Disembunyikan</span>' : '';
     
     return `
         <div class="message-row ${rowClass} ${isConsecutive ? 'consecutive' : ''}" data-id="${msgId}">
-            <div class="message-bubble">
+            <div class="message-bubble${hiddenClass}">
+                ${hideBtn}
                 ${content}
                 <span class="message-footer">
                     <span class="message-time">${timestamp}</span>
+                    ${hideBadge}
                     ${status}
                 </span>
             </div>
@@ -913,6 +921,62 @@ function renderStatus(status) {
             return '<span class="message-status pending"><i class="bi bi-clock"></i></span>';
         default:
             return '<span class="message-status sent"><i class="bi bi-check2"></i></span>';
+    }
+}
+
+// ============================================
+// HIDE/UNHIDE MESSAGES (Admin)
+// ============================================
+async function toggleHideMsg(btn) {
+    const msgId = btn.dataset.msgid;
+    const isHidden = btn.dataset.hidden === '1';
+    const endpoint = isHidden ? '/api/chat/unhide' : '/api/chat/hide';
+    const body = isHidden
+        ? { message_ids: [msgId] }
+        : { message_ids: [msgId], session_id: State.sessionId };
+    try {
+        const r = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        const d = await r.json();
+        if (d.success) {
+            // Update in-memory message state
+            const msg = State.messages.get(msgId);
+            if (msg) msg.is_hidden = !isHidden;
+            // Re-render the bubble inline (no page refresh needed)
+            const bubble = btn.closest('.message-bubble');
+            if (bubble) {
+                if (!isHidden) {
+                    // Was visible → now hidden
+                    bubble.classList.add('msg-hidden');
+                    btn.dataset.hidden = '1';
+                    btn.title = 'Tampilkan kembali';
+                    btn.innerHTML = '<i class="bi bi-eye-slash-fill"></i>';
+                    // Add badge
+                    const footer = bubble.querySelector('.message-footer');
+                    if (footer && !footer.querySelector('.msg-hidden-badge')) {
+                        const badge = document.createElement('span');
+                        badge.className = 'msg-hidden-badge';
+                        badge.innerHTML = '<i class="bi bi-eye-slash me-1"></i>Disembunyikan';
+                        footer.insertBefore(badge, footer.querySelector('.message-status') || null);
+                    }
+                } else {
+                    // Was hidden → now visible
+                    bubble.classList.remove('msg-hidden');
+                    btn.dataset.hidden = '0';
+                    btn.title = 'Sembunyikan dari worker';
+                    btn.innerHTML = '<i class="bi bi-eye"></i>';
+                    const badge = bubble.querySelector('.msg-hidden-badge');
+                    if (badge) badge.remove();
+                }
+            }
+        } else {
+            console.error('Toggle hide failed:', d.error);
+        }
+    } catch (e) {
+        console.error('Toggle hide error:', e);
     }
 }
 

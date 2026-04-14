@@ -103,9 +103,11 @@ async function loadAssignmentNotes() {
         const d = await r.json();
         S.assignmentNotes = {};
         for (const n of (d.notes || [])) {
-            if (n.notes || n.priority !== 'low') {
-                S.assignmentNotes[n.contact] = { notes: n.notes || '', priority: n.priority || 'low', session_id: n.session_id };
-            }
+            S.assignmentNotes[n.contact] = {
+                notes: n.notes || '', priority: n.priority || 'low', session_id: n.session_id,
+                start_datetime: n.start_datetime || null, end_datetime: n.end_datetime || null,
+                visibility_start: n.visibility_start || null, visibility_end: n.visibility_end || null,
+            };
         }
     } catch { S.assignmentNotes = {}; }
 }
@@ -119,7 +121,40 @@ function openNoteModal(contact) {
     modal.className = 'note-modal priority-' + n.priority;
     document.getElementById('note-priority-badge').textContent = priorityLabels[n.priority] || 'Low';
     document.getElementById('note-content').textContent = n.notes || '(Tidak ada catatan)';
+    // Show deadline info if available
+    let deadlineHtml = '';
+    if (n.start_datetime || n.end_datetime) {
+        deadlineHtml += '<div style="margin-top:8px;padding-top:8px;border-top:1px dashed rgba(255,255,255,.2);font-size:12px;">';
+        if (n.start_datetime) deadlineHtml += '<div><i class="bi bi-calendar-event me-1"></i>Mulai: ' + formatDateTimeFull(n.start_datetime) + '</div>';
+        if (n.end_datetime) deadlineHtml += '<div><i class="bi bi-calendar-check me-1"></i>Deadline: ' + formatDateTimeFull(n.end_datetime) + '</div>';
+        if (n.visibility_start && n.visibility_end) {
+            deadlineHtml += '<div><i class="bi bi-eye me-1"></i>Visibilitas: ' + n.visibility_start + ' - ' + n.visibility_end + '</div>';
+        }
+        deadlineHtml += '</div>';
+    }
+    const deadlineArea = document.getElementById('note-deadline-info');
+    if (deadlineArea) deadlineArea.innerHTML = deadlineHtml;
+    else {
+        // Create deadline area dynamically if not present
+        const existing = modal.querySelector('.note-deadline-dynamic');
+        if (existing) existing.remove();
+        if (deadlineHtml) {
+            const d = document.createElement('div');
+            d.className = 'note-deadline-dynamic';
+            d.innerHTML = deadlineHtml;
+            modal.querySelector('.note-modal-body')?.appendChild(d) || modal.appendChild(d);
+        }
+    }
     overlay.classList.add('show');
+}
+
+function formatDateTimeFull(dtStr) {
+    if (!dtStr) return '-';
+    try {
+        const d = new Date(dtStr);
+        return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) + ' ' +
+               d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+    } catch { return dtStr; }
 }
 
 function closeNoteModal() {
@@ -349,6 +384,22 @@ async function openChat(contact) {
         (d.messages || []).forEach(m => {
             S.messages.set(m.message_id || m.id, m);
         });
+        // Show assignment deadline banner for workers
+        const bannerEl = document.getElementById('assignment-banner');
+        if (bannerEl) {
+            if (d.assignment && (d.assignment.start_datetime || d.assignment.end_datetime)) {
+                let bannerHtml = '<i class="bi bi-clock-history me-1"></i>';
+                if (d.assignment.start_datetime) bannerHtml += '<span>Mulai: ' + formatDateTimeFull(d.assignment.start_datetime) + '</span>';
+                if (d.assignment.end_datetime) bannerHtml += '<span class="ms-2">Deadline: <b>' + formatDateTimeFull(d.assignment.end_datetime) + '</b></span>';
+                if (d.assignment.visibility_start && d.assignment.visibility_end) {
+                    bannerHtml += '<span class="ms-2"><i class="bi bi-eye me-1"></i>' + d.assignment.visibility_start + ' - ' + d.assignment.visibility_end + '</span>';
+                }
+                bannerEl.innerHTML = bannerHtml;
+                bannerEl.classList.remove('d-none');
+            } else {
+                bannerEl.classList.add('d-none');
+            }
+        }
     } catch (e) { console.error('Load messages error:', e); }
 
     renderMessages();
@@ -449,9 +500,16 @@ function renderMessages() {
         }
 
         const check = dir === 'out' ? `<i class="bi bi-check2-all msg-check"></i>` : '';
+        const isHidden = m.is_hidden === true || m.is_hidden === 1;
+        const hiddenClass = isHidden ? ' msg-hidden' : '';
+        const isNonWorker = S.user && S.user.role !== 'worker';
+        const hideBtn = isNonWorker
+            ? `<button class="msg-hide-btn" data-msgid="${escHtml(msgId)}" data-hidden="${isHidden ? '1' : '0'}" onclick="toggleHideMsg(this)" title="${isHidden ? 'Tampilkan kembali' : 'Sembunyikan dari worker'}"><i class="bi ${isHidden ? 'bi-eye-slash-fill' : 'bi-eye'}"></i></button>`
+            : '';
+        const hideBadge = (isHidden && isNonWorker) ? '<span class="msg-hidden-badge"><i class="bi bi-eye-slash me-1"></i>Disembunyikan</span>' : '';
         html += `<div class="msg-row ${dir}">`;
-        html += `<div class="msg-bubble${isPending ? ' pending' : ''}">${body}`;
-        html += `<div class="msg-footer"><span class="msg-time">${time}</span>${check}</div>`;
+        html += `<div class="msg-bubble${isPending ? ' pending' : ''}${hiddenClass}">${hideBtn}${body}`;
+        html += `<div class="msg-footer"><span class="msg-time">${time}</span>${hideBadge}${check}</div>`;
         html += `</div></div>`;
     }
 
@@ -461,6 +519,54 @@ function renderMessages() {
 function scrollToBottom() {
     const c = document.getElementById('chat-messages');
     requestAnimationFrame(() => { c.scrollTop = c.scrollHeight; });
+}
+
+// ─── Hide/Unhide Messages (Admin & Member) ────────────────────
+async function toggleHideMsg(btn) {
+    const msgId = btn.dataset.msgid;
+    const isHidden = btn.dataset.hidden === '1';
+    const endpoint = isHidden ? '/api/chat/unhide' : '/api/chat/hide';
+    const body = isHidden
+        ? { message_ids: [msgId] }
+        : { message_ids: [msgId], session_id: S.activeSession };
+    try {
+        const r = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        const d = await r.json();
+        if (d.success) {
+            // Update in-memory message state
+            const msg = S.messages.get(msgId);
+            if (msg) msg.is_hidden = !isHidden;
+            // Re-render the bubble inline
+            const bubble = btn.closest('.msg-bubble');
+            if (bubble) {
+                if (!isHidden) {
+                    bubble.classList.add('msg-hidden');
+                    btn.dataset.hidden = '1';
+                    btn.title = 'Tampilkan kembali';
+                    btn.innerHTML = '<i class="bi bi-eye-slash-fill"></i>';
+                    // Add badge
+                    const footer = bubble.querySelector('.msg-footer');
+                    if (footer && !footer.querySelector('.msg-hidden-badge')) {
+                        const badge = document.createElement('span');
+                        badge.className = 'msg-hidden-badge';
+                        badge.innerHTML = '<i class="bi bi-eye-slash me-1"></i>Disembunyikan';
+                        footer.insertBefore(badge, footer.querySelector('.msg-check') || null);
+                    }
+                } else {
+                    bubble.classList.remove('msg-hidden');
+                    btn.dataset.hidden = '0';
+                    btn.title = 'Sembunyikan dari worker';
+                    btn.innerHTML = '<i class="bi bi-eye"></i>';
+                    const badge = bubble.querySelector('.msg-hidden-badge');
+                    if (badge) badge.remove();
+                }
+            }
+        }
+    } catch (e) { console.error('Toggle hide error:', e); }
 }
 
 // ─── Send Message ─────────────────────────────────────────────
