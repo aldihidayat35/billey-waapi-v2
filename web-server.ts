@@ -131,6 +131,10 @@ app.get('/manifest.json', (req, res) => {
 	try {
 		const s = appSettingDb.get()
 		const faviconUrl = s.favicon ? `/uploads/settings/${path.basename(s.favicon)}` : '/assets/media/logos/favicon.ico'
+		// For PWA, use the custom favicon for all icon sizes
+		// The browser will resize as needed; using PNG favicon gives best results
+		const pwaIconUrl = s.favicon ? `/uploads/settings/${path.basename(s.favicon)}` : '/assets/media/logos/pwa-192.png'
+		const pwaIcon512Url = s.favicon ? `/uploads/settings/${path.basename(s.favicon)}` : '/assets/media/logos/pwa-512.png'
 		const manifest = {
 			name: s.app_name || 'Billey WA - WhatsApp Multi Session',
 			short_name: s.app_name || 'Billey WA',
@@ -142,9 +146,9 @@ app.get('/manifest.json', (req, res) => {
 			theme_color: '#008069',
 			background_color: '#ffffff',
 			icons: [
-				{ src: faviconUrl, sizes: '64x64', type: 'image/x-icon' },
-				{ src: '/assets/media/logos/pwa-192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
-				{ src: '/assets/media/logos/pwa-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
+				{ src: faviconUrl, sizes: '64x64', type: 'image/png' },
+				{ src: pwaIconUrl, sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
+				{ src: pwaIcon512Url, sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
 			]
 		}
 		res.setHeader('Content-Type', 'application/manifest+json')
@@ -679,7 +683,7 @@ app.get('/api/member/sessions', authMiddleware, (req, res) => {
 		const user = req.user!
 		const assignedIds = getWaSessionsForUser(user.id, user.role)
 		const allLive = sessionManager.getAllSessions()
-		const sessions = assignedIds.map(id => {
+		let sessions = assignedIds.map(id => {
 			const live = allLive.find(s => s.id === id)
 			return {
 				id,
@@ -689,6 +693,13 @@ app.get('/api/member/sessions', authMiddleware, (req, res) => {
 				phoneVisible: user.phone_visible !== 0,
 			}
 		})
+
+		// Admin: only return sessions that are actually connected (active)
+		// Worker/Member: return all assigned sessions regardless of connection state
+		if (user.role === 'adminwa' || user.role === 'admin') {
+			sessions = sessions.filter(s => s.isConnected)
+		}
+
 		res.json({ success: true, sessions })
 	} catch (error: any) {
 		res.status(500).json({ success: false, error: error.message })

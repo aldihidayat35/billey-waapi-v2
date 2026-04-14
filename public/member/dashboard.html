@@ -591,6 +591,92 @@
             .tpl-panel { border-radius: 16px; margin-bottom: 20px; max-height: 60vh; }
             .tpl-overlay { align-items: center; }
         }
+
+        /* ── PWA Install Bottom Sheet ── */
+        .pwa-backdrop {
+            position: fixed; inset: 0; z-index: 90000;
+            background: rgba(0,0,0,0); /* start transparent */
+            pointer-events: none;
+            transition: background 0.35s ease;
+        }
+        .pwa-backdrop.visible {
+            background: rgba(0,0,0,0.45);
+            pointer-events: auto;
+        }
+        .pwa-sheet {
+            position: fixed; bottom: 0; left: 0; right: 0; z-index: 90001;
+            background: #fff;
+            border-radius: 20px 20px 0 0;
+            padding: 0 0 env(safe-area-inset-bottom, 16px);
+            box-shadow: 0 -8px 40px rgba(0,0,0,0.18);
+            transform: translateY(110%);
+            transition: transform 0.42s cubic-bezier(0.32, 0.72, 0, 1);
+            will-change: transform;
+            max-width: 520px;
+            margin: 0 auto;
+        }
+        .pwa-sheet.open {
+            transform: translateY(0);
+        }
+        /* drag handle */
+        .pwa-handle {
+            width: 40px; height: 4px; border-radius: 2px;
+            background: #e0e0e0;
+            margin: 10px auto 0;
+        }
+        .pwa-body {
+            display: flex; flex-direction: column; align-items: center;
+            padding: 16px 28px 24px; gap: 12px; text-align: center;
+        }
+        .pwa-icon-wrap {
+            width: 68px; height: 68px; border-radius: 16px;
+            overflow: hidden; flex-shrink: 0;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+            background: #f5f5f5;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .pwa-icon-wrap img {
+            width: 100%; height: 100%; object-fit: cover;
+        }
+        .pwa-icon-wrap .pwa-icon-fallback {
+            font-size: 34px; color: var(--wa-header);
+        }
+        .pwa-title {
+            font-size: 16px; font-weight: 700;
+            color: #111; margin: 0;
+        }
+        .pwa-desc {
+            font-size: 13.5px; color: #667781; line-height: 1.5;
+            margin: 0; max-width: 300px;
+        }
+        .pwa-actions {
+            display: flex; gap: 10px; width: 100%; margin-top: 4px;
+        }
+        .pwa-btn-install {
+            flex: 1; background: var(--wa-header);
+            color: #fff; border: none; border-radius: 12px;
+            font-size: 15px; font-weight: 700;
+            padding: 14px 20px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            transition: background .2s, transform .1s;
+            letter-spacing: 0.01em;
+        }
+        .pwa-btn-install:active { transform: scale(.97); }
+        .pwa-btn-install:hover { background: var(--wa-header-dark); }
+        .pwa-btn-later {
+            background: var(--wa-hover); color: var(--wa-text2);
+            border: none; border-radius: 12px;
+            font-size: 14px; font-weight: 600;
+            padding: 14px 18px; cursor: pointer;
+            transition: background .2s;
+            white-space: nowrap;
+        }
+        .pwa-btn-later:hover { background: #e4e6e9; }
+        .pwa-hint {
+            font-size: 11.5px; color: #b0bec5;
+            margin-top: -4px;
+            display: flex; align-items: center; gap: 4px;
+        }
     </style>
 </head>
 <body>
@@ -600,6 +686,13 @@
     <div class="wa-topbar">
         <i class="bi bi-whatsapp wa-logo"></i>
         <span class="wa-title" id="topbar-name">WhatsApp Chat</span>
+        <!-- Admin-only quick nav buttons (shown after role check in chat.js) -->
+        <button class="wa-btn" id="btn-admin-dashboard" title="Dashboard Admin" style="display:none" onclick="location.href='/'">
+            <i class="bi bi-house-door-fill"></i>
+        </button>
+        <button class="wa-btn" id="btn-admin-penugasan" title="Penugasan Worker" style="display:none" onclick="location.href='/penugasan.html'">
+            <i class="bi bi-person-check-fill"></i>
+        </button>
         <button class="wa-btn" id="btn-refresh" title="Refresh">
             <i class="bi bi-arrow-clockwise"></i>
         </button>
@@ -832,6 +925,218 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }, 500);
 });
+</script>
+
+<!-- ====================================================
+     PWA Install Bottom Sheet
+     Shows when: logged in + not already installed as PWA
+===================================================== -->
+<div class="pwa-backdrop" id="pwa-backdrop"></div>
+<div class="pwa-sheet" id="pwa-sheet" role="dialog" aria-modal="true" aria-label="Install aplikasi">
+    <div class="pwa-handle"></div>
+    <div class="pwa-body">
+        <div class="pwa-icon-wrap" id="pwa-icon-wrap">
+            <!-- Filled dynamically with favicon or fallback icon -->
+            <i class="bi bi-whatsapp pwa-icon-fallback" id="pwa-icon-fallback"></i>
+        </div>
+        <p class="pwa-title" id="pwa-app-name">Billey WA</p>
+        <p class="pwa-desc">Install aplikasi untuk pengalaman yang lebih baik — akses cepat, notifikasi real-time, dan tampilan fullscreen.</p>
+        <div class="pwa-actions">
+            <button class="pwa-btn-later" id="pwa-btn-later">
+                Nanti
+            </button>
+            <button class="pwa-btn-install" id="pwa-btn-install-sheet">
+                <i class="bi bi-download"></i> Install Sekarang
+            </button>
+        </div>
+        <span class="pwa-hint"><i class="bi bi-shield-check"></i> Gratis, tanpa menggunakan storage ekstra</span>
+    </div>
+</div>
+
+<script>
+// ── PWA Install Bottom Sheet ──────────────────────────────
+(function() {
+    const DISMISSED_KEY = 'pwa_bs_dismissed_at';
+    const BACKOFF_HOURS = 24; // re-show after 24h if dismissed
+
+    let deferredPrompt = null;
+    let sheetOpen = false;
+
+    const backdrop = document.getElementById('pwa-backdrop');
+    const sheet    = document.getElementById('pwa-sheet');
+    const btnInstall = document.getElementById('pwa-btn-install-sheet');
+    const btnLater   = document.getElementById('pwa-btn-later');
+    const iconWrap   = document.getElementById('pwa-icon-wrap');
+    const iconFallback = document.getElementById('pwa-icon-fallback');
+    const appNameEl  = document.getElementById('pwa-app-name');
+
+    // ── PWA detection ──────────────────────────────────────
+    function isPwaInstalled() {
+        return window.matchMedia('(display-mode: standalone)').matches
+            || window.matchMedia('(display-mode: fullscreen)').matches
+            || window.navigator.standalone === true
+            || document.referrer.includes('android-app://');
+    }
+
+    function wasDismissedRecently() {
+        const ts = localStorage.getItem(DISMISSED_KEY);
+        if (!ts) return false;
+        const hours = (Date.now() - Number(ts)) / 3600000;
+        return hours < BACKOFF_HOURS;
+    }
+
+    // ── Open / Close ───────────────────────────────────────
+    function openSheet() {
+        if (sheetOpen) return;
+        sheetOpen = true;
+        backdrop.classList.add('visible');
+        // Slight delay so CSS transition fires after display
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => sheet.classList.add('open'));
+        });
+    }
+
+    function closeSheet() {
+        if (!sheetOpen) return;
+        sheet.classList.remove('open');
+        backdrop.classList.remove('visible');
+        sheetOpen = false;
+    }
+
+    // ── Dismiss (store timestamp) ──────────────────────────
+    function dismiss() {
+        localStorage.setItem(DISMISSED_KEY, Date.now().toString());
+        closeSheet();
+    }
+
+    // ── Load dynamic branding into sheet ──────────────────
+    function applyBranding() {
+        const s = window.APP_SETTINGS;
+        if (!s) return;
+        if (s.app_name) appNameEl.textContent = s.app_name;
+        const iconUrl = s.favicon_url || s.logo_url;
+        if (iconUrl) {
+            const img = document.createElement('img');
+            img.src = iconUrl;
+            img.alt = s.app_name || 'App Icon';
+            img.onerror = () => { /* keep fallback icon */ };
+            img.onload = () => {
+                iconFallback.style.display = 'none';
+                iconWrap.appendChild(img);
+            };
+            // Pre-load ahead of time
+            const t = new Image();
+            t.src = iconUrl;
+        }
+    }
+
+    // ── Core init ─────────────────────────────────────────
+    function init() {
+        // Don't show if already installed
+        if (isPwaInstalled()) return;
+        // Don't show if dismissed recently
+        if (wasDismissedRecently()) return;
+        // Don't show if no install prompt available AND not on iOS
+        // (iOS doesn't fire beforeinstallprompt but can still install via Safari share sheet)
+        const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+
+        // Apply branding when settings are ready
+        if (window.APP_SETTINGS) {
+            applyBranding();
+        } else {
+            document.addEventListener('components-loaded', applyBranding);
+            // Also handle if app-init.js already ran
+            setTimeout(applyBranding, 600);
+        }
+
+        if (deferredPrompt || isIos) {
+            // Show 1.2s after page load so user can orient themselves first
+            setTimeout(openSheet, 1200);
+        }
+        // For non-iOS browsers, wait for beforeinstallprompt
+        // (already stored in deferredPrompt via event listener below)
+    }
+
+    // ── Capture install prompt ────────────────────────────
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        // If init already ran and decided to show → open now
+        if (!isPwaInstalled() && !wasDismissedRecently() && !sheetOpen) {
+            setTimeout(openSheet, 1200);
+        }
+    });
+
+    // ── Hide if installed mid-session ─────────────────────
+    window.addEventListener('appinstalled', () => {
+        deferredPrompt = null;
+        closeSheet();
+        console.log('✅ PWA installeret');
+    });
+
+    // ── Backdrop click → dismiss ──────────────────────────
+    backdrop.addEventListener('click', dismiss);
+
+    // ── Later button ──────────────────────────────────────
+    btnLater.addEventListener('click', dismiss);
+
+    // ── Install button ───────────────────────────────────
+    btnInstall.addEventListener('click', async () => {
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            deferredPrompt = null;
+            if (outcome === 'accepted') {
+                closeSheet();
+            } else {
+                dismiss();
+            }
+        } else {
+            // iOS: show instructions in a subtle way
+            const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+            if (isIos) {
+                btnInstall.innerHTML = '<i class="bi bi-share"></i> Tap Share → Add to Home Screen';
+                btnInstall.style.fontSize = '12px';
+                setTimeout(() => {
+                    btnInstall.innerHTML = '<i class="bi bi-download"></i> Install Sekarang';
+                    btnInstall.style.fontSize = '';
+                    dismiss();
+                }, 4000);
+            } else {
+                dismiss();
+            }
+        }
+    });
+
+    // Swipe down to dismiss
+    let touchStartY = 0;
+    sheet.addEventListener('touchstart', (e) => {
+        touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+    sheet.addEventListener('touchmove', (e) => {
+        const dy = e.touches[0].clientY - touchStartY;
+        if (dy > 0) {
+            sheet.style.transform = `translateY(${dy}px)`;
+        }
+    }, { passive: true });
+    sheet.addEventListener('touchend', (e) => {
+        const dy = e.changedTouches[0].clientY - touchStartY;
+        sheet.style.transform = '';
+        sheet.style.transition = '';
+        if (dy > 80) {
+            dismiss();
+        }
+    }, { passive: true });
+
+    // ── Trigger after user is verified as logged-in ───────
+    // chat.js sets S.user — we wait for it
+    const checkUser = setInterval(() => {
+        if (typeof S !== 'undefined' && S.user) {
+            clearInterval(checkUser);
+            init();
+        }
+    }, 300);
+})();
 </script>
 </body>
 </html>

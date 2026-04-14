@@ -1,16 +1,248 @@
 <!--begin::Sidebar - kt_app_sidebar-->
-<div id="kt_app_sidebar" class="app-sidebar flex-column" data-kt-drawer="true" data-kt-drawer-name="app-sidebar" data-kt-drawer-activate="{default: true, lg: false}" data-kt-drawer-overlay="true" data-kt-drawer-width="225px" data-kt-drawer-direction="start" data-kt-drawer-toggle="#kt_app_sidebar_mobile_toggle">
-    <!--begin::Logo - kt_app_sidebar_logo-->
-    <div class="app-sidebar-logo px-6" id="kt_app_sidebar_logo">
-        <a href="/">
-            <img id="sidebar-logo-default" alt="Logo" src="/assets/media/logos/default-dark.svg" class="h-25px app-sidebar-logo-default" />
-            <img id="sidebar-logo-minimize" alt="Logo" src="/assets/media/logos/default-small.svg" class="h-20px app-sidebar-logo-minimize" />
+<style>
+/* ─── Custom Sidebar Override ────────────────────────────────── */
+#kt_app_sidebar {
+    background: linear-gradient(180deg, #0f1a2e 0%, #1a2744 50%, #0f1a2e 100%) !important;
+    border-right: none !important;
+    box-shadow: 4px 0 24px rgba(0,0,0,0.25) !important;
+}
+
+/* Logo area */
+.app-sidebar-logo {
+    border-bottom: 1px solid rgba(255,255,255,0.07) !important;
+    height: 70px !important;
+    display: flex !important;
+    align-items: center !important;
+}
+
+/* Toggle button */
+#kt_app_sidebar_toggle {
+    background: #1e3a5c !important;
+    border: 2px solid rgba(255,255,255,0.1) !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3) !important;
+    color: #a8c4e0 !important;
+}
+#kt_app_sidebar_toggle:hover {
+    background: #2563a8 !important;
+    color: #fff !important;
+}
+
+/* ─── User Info Card ─────────────────────────────────────────── */
+#sidebar-user-info {
+    margin: 0 12px 4px !important;
+    padding: 12px 14px !important;
+    background: rgba(255,255,255,0.06) !important;
+    border: 1px solid rgba(255,255,255,0.09) !important;
+    border-radius: 14px !important;
+    backdrop-filter: blur(8px) !important;
+}
+#sidebar-user-avatar {
+    background: linear-gradient(135deg, #2563eb, #7c3aed) !important;
+    color: #fff !important;
+    font-weight: 700 !important;
+    font-size: 15px !important;
+    border-radius: 10px !important;
+    width: 40px !important;
+    height: 40px !important;
+    position: relative;
+}
+#sidebar-user-avatar::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    right: -2px;
+    width: 10px;
+    height: 10px;
+    background: #22c55e;
+    border-radius: 50%;
+    border: 2px solid #1a2744;
+}
+#sidebar-user-name {
+    color: #f0f4ff !important;
+    font-weight: 600 !important;
+    font-size: 13.5px !important;
+    line-height: 1.3 !important;
+}
+#sidebar-user-role {
+    font-size: 11px !important;
+    font-weight: 500 !important;
+    color: #7da8cc !important;
+    letter-spacing: 0.02em !important;
+}
+#sidebar-logout-btn {
+    background: rgba(239,68,68,0.12) !important;
+    border: 1px solid rgba(239,68,68,0.2) !important;
+    border-radius: 8px !important;
+    color: #f87171 !important;
+    width: 32px !important;
+    height: 32px !important;
+    transition: all .2s !important;
+}
+#sidebar-logout-btn:hover {
+    background: rgba(239,68,68,0.25) !important;
+    color: #fca5a5 !important;
+}
+
+/* ─── Menu Section Header ────────────────────────────────────── */
+.sb-section-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 18px 16px 6px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.3);
+}
+.sb-section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: rgba(255,255,255,0.07);
+}
+
+/* ─── Menu Items ─────────────────────────────────────────────── */
+.sb-menu {
+    padding: 0 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.sb-item {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 9px 12px;
+    border-radius: 10px;
+    text-decoration: none;
+    color: rgba(255,255,255,0.6);
+    font-size: 13.5px;
+    font-weight: 500;
+    transition: all .18s ease;
+    position: relative;
+    cursor: pointer;
+}
+.sb-item:hover {
+    background: rgba(255,255,255,0.07);
+    color: rgba(255,255,255,0.9);
+    text-decoration: none;
+}
+.sb-item.active {
+    background: linear-gradient(135deg, rgba(37,99,235,0.35), rgba(124,58,237,0.25));
+    color: #fff;
+    box-shadow: inset 0 0 0 1px rgba(99,143,255,0.25);
+}
+.sb-item.active::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 20%;
+    bottom: 20%;
+    width: 3px;
+    background: linear-gradient(180deg, #3b82f6, #8b5cf6);
+    border-radius: 0 3px 3px 0;
+}
+.sb-item .sb-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 15px;
+    background: rgba(255,255,255,0.07);
+    transition: all .18s;
+}
+.sb-item:hover .sb-icon,
+.sb-item.active .sb-icon {
+    background: rgba(59,130,246,0.25);
+    color: #93c5fd;
+}
+.sb-item.active .sb-icon {
+    background: linear-gradient(135deg, rgba(37,99,235,0.5), rgba(124,58,237,0.4));
+    color: #bfdbfe;
+    box-shadow: 0 2px 8px rgba(37,99,235,0.3);
+}
+.sb-item .sb-label {
+    flex: 1;
+    line-height: 1;
+}
+.sb-item .sb-badge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 20px;
+    background: rgba(59,130,246,0.25);
+    color: #93c5fd;
+    border: 1px solid rgba(59,130,246,0.3);
+}
+.sb-item .sb-badge-green {
+    background: rgba(34,197,94,0.2);
+    color: #86efac;
+    border-color: rgba(34,197,94,0.3);
+}
+.sb-item .sb-badge-orange {
+    background: rgba(234,88,12,0.2);
+    color: #fdba74;
+    border-color: rgba(234,88,12,0.3);
+}
+
+/* ─── Scroll wrapper ─────────────────────────────────────────── */
+#kt_app_sidebar_menu_wrapper {
+    padding: 0 0 20px !important;
+}
+
+/* ─── Minimized sidebar icons ────────────────────────────────── */
+[data-kt-app-sidebar-minimize="on"] .sb-label,
+[data-kt-app-sidebar-minimize="on"] .sb-badge,
+[data-kt-app-sidebar-minimize="on"] .sb-section-label,
+[data-kt-app-sidebar-minimize="on"] #sidebar-user-name,
+[data-kt-app-sidebar-minimize="on"] #sidebar-user-role,
+[data-kt-app-sidebar-minimize="on"] #sidebar-logout-btn {
+    display: none !important;
+}
+[data-kt-app-sidebar-minimize="on"] .sb-item {
+    justify-content: center;
+    padding: 10px;
+}
+[data-kt-app-sidebar-minimize="on"] .sb-icon {
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
+}
+[data-kt-app-sidebar-minimize="on"] #sidebar-user-info {
+    justify-content: center !important;
+    padding: 8px !important;
+}
+</style>
+
+<div id="kt_app_sidebar" class="app-sidebar flex-column"
+    data-kt-drawer="true"
+    data-kt-drawer-name="app-sidebar"
+    data-kt-drawer-activate="{default: true, lg: false}"
+    data-kt-drawer-overlay="true"
+    data-kt-drawer-width="255px"
+    data-kt-drawer-direction="start"
+    data-kt-drawer-toggle="#kt_app_sidebar_mobile_toggle">
+
+    <!--begin::Logo-->
+    <div class="app-sidebar-logo px-5" id="kt_app_sidebar_logo" style="position:relative;">
+        <a href="/" style="display:flex;align-items:center;gap:10px;text-decoration:none;">
+            <img id="sidebar-logo-default" alt="Logo" src="/assets/media/logos/default-dark.svg" class="h-28px app-sidebar-logo-default" style="filter:brightness(0) invert(1);opacity:.9;" />
+            <img id="sidebar-logo-minimize" alt="Logo" src="/assets/media/logos/default-small.svg" class="h-22px app-sidebar-logo-minimize" style="filter:brightness(0) invert(1);opacity:.9;" />
         </a>
-        
-        <!--begin::Sidebar toggle - kt_app_sidebar_toggle-->
-        <div id="kt_app_sidebar_toggle" class="app-sidebar-toggle btn btn-icon btn-shadow btn-sm btn-color-muted btn-active-color-primary body-bg h-30px w-30px position-absolute top-50 start-100 translate-middle rotate" data-kt-toggle="true" data-kt-toggle-state="active" data-kt-toggle-target="body" data-kt-toggle-name="app-sidebar-minimize">
+
+        <!--begin::Sidebar toggle-->
+        <div id="kt_app_sidebar_toggle"
+            class="btn btn-icon btn-shadow btn-sm h-30px w-30px position-absolute top-50 start-100 translate-middle rotate"
+            data-kt-toggle="true"
+            data-kt-toggle-state="active"
+            data-kt-toggle-target="body"
+            data-kt-toggle-name="app-sidebar-minimize">
             <span class="svg-icon svg-icon-2 rotate-180">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
                     <path opacity="0.5" d="M14.2657 11.4343L18.45 7.25C18.8642 6.83579 18.8642 6.16421 18.45 5.75C18.0358 5.33579 17.3642 5.33579 16.95 5.75L11.4071 11.2929C11.0166 11.6834 11.0166 12.3166 11.4071 12.7071L16.95 18.25C17.3642 18.6642 18.0358 18.6642 18.45 18.25C18.8642 17.8358 18.8642 17.1642 18.45 16.75L14.2657 12.5657C13.9533 12.2533 13.9533 11.7467 14.2657 11.4343Z" fill="currentColor"/>
                     <path d="M8.2657 11.4343L12.45 7.25C12.8642 6.83579 12.8642 6.16421 12.45 5.75C12.0358 5.33579 11.3642 5.33579 10.95 5.75L5.40712 11.2929C5.01659 11.6834 5.01659 12.3166 5.40712 12.7071L10.95 18.25C11.3642 18.6642 12.0358 18.6642 12.45 18.25C12.8642 17.8358 12.8642 17.1642 12.45 16.75L8.2657 12.5657C7.95328 12.2533 7.95328 11.7467 8.2657 11.4343Z" fill="currentColor"/>
                 </svg>
@@ -19,206 +251,148 @@
         <!--end::Sidebar toggle-->
     </div>
     <!--end::Logo-->
-    
-    <!--begin::User Info-->
-    <div class="app-sidebar-user d-flex flex-stack py-4 px-6 border-bottom border-gray-300" id="sidebar-user-info" style="display: none !important;">
-        <div class="d-flex align-items-center">
-            <div class="symbol symbol-40px me-3">
-                <div class="symbol-label bg-light-success text-success fw-bold fs-5" id="sidebar-user-avatar">?</div>
+
+    <!--begin::User Info Card-->
+    <div class="app-sidebar-user d-flex align-items-center flex-stack" id="sidebar-user-info" style="display:none!important;">
+        <div class="d-flex align-items-center gap-3">
+            <div class="symbol symbol-40px" style="position:relative;">
+                <div class="symbol-label fw-bold fs-5" id="sidebar-user-avatar">?</div>
             </div>
             <div>
-                <div class="fw-bold text-gray-800 fs-6" id="sidebar-user-name">Guest</div>
-                <div class="text-muted fs-7" id="sidebar-user-role">-</div>
+                <div id="sidebar-user-name" class="fw-semibold" style="font-size:13.5px;">Guest</div>
+                <div id="sidebar-user-role" style="font-size:11px;">-</div>
             </div>
         </div>
-        <a href="/auth/logout" class="btn btn-icon btn-sm btn-light-danger" title="Logout" id="sidebar-logout-btn">
-            <i class="bi bi-box-arrow-right"></i>
+        <a href="/auth/logout" class="btn btn-icon btn-sm" id="sidebar-logout-btn" title="Logout">
+            <i class="bi bi-box-arrow-right" style="font-size:14px;"></i>
         </a>
     </div>
-    <!--end::User Info-->
-    
-    <!--begin::sidebar menu - kt_app_sidebar_menu-->
+    <!--end::User Info Card-->
+
+    <!--begin::Sidebar Menu-->
     <div class="app-sidebar-menu overflow-hidden flex-column-fluid">
-        <div id="kt_app_sidebar_menu_wrapper" class="app-sidebar-wrapper hover-scroll-overlay-y my-5" data-kt-scroll="true" data-kt-scroll-activate="true" data-kt-scroll-height="auto" data-kt-scroll-dependencies="#kt_app_sidebar_logo, #kt_app_sidebar_footer" data-kt-scroll-wrappers="#kt_app_sidebar_menu" data-kt-scroll-offset="5px">
-            <div class="menu menu-column menu-rounded menu-sub-indention px-3" id="kt_app_sidebar_menu" data-kt-menu="true">
-                
-                <div class="menu-item">
-                    <a class="menu-link" href="/" data-page="dashboard">
-                        <span class="menu-icon">
-                            <span class="svg-icon svg-icon-2">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="9" height="9" rx="2" fill="currentColor"/><rect opacity="0.3" x="13" y="2" width="9" height="9" rx="2" fill="currentColor"/><rect opacity="0.3" x="13" y="13" width="9" height="9" rx="2" fill="currentColor"/><rect opacity="0.3" x="2" y="13" width="9" height="9" rx="2" fill="currentColor"/></svg>
-                            </span>
-                        </span>
-                        <span class="menu-title">Dashboard</span>
-                    </a>
-                </div>
-                
-                <!-- ========== ADMIN ONLY SECTION ========== -->
-                <div class="admin-only-menu" style="display: none;">
-                    <div class="menu-item pt-5">
-                        <div class="menu-content"><span class="menu-heading fw-bold text-uppercase fs-7">🔐 Admin</span></div>
-                    </div>
-                    
-                    <div class="menu-item">
-                        <a class="menu-link" href="/users.html" data-page="users">
-                            <span class="menu-icon"><span class="svg-icon svg-icon-2"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M6.28548 15.0861C7.34369 13.1814 9.35142 12 11.5304 12H12.4696C14.6486 12 16.6563 13.1814 17.7145 15.0861L19.3493 18.0287C20.0899 19.3618 19.1259 21 17.601 21H6.39903C4.87406 21 3.91012 19.3618 4.65071 18.0287L6.28548 15.0861Z" fill="currentColor"/><rect opacity="0.3" x="8" y="3" width="8" height="8" rx="4" fill="currentColor"/></svg></span></span>
-                            <span class="menu-title">Manajemen User</span>
-                        </a>
-                    </div>
-                    
-                    <div class="menu-item">
-                        <a class="menu-link" href="/penugasan.html" data-page="penugasan">
-                            <span class="menu-icon"><span class="svg-icon svg-icon-2"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M6.28548 15.0861C7.34369 13.1814 9.35142 12 11.5304 12H12.4696C14.6486 12 16.6563 13.1814 17.7145 15.0861L19.3493 18.0287C20.0899 19.3618 19.1259 21 17.601 21H6.39903C4.87406 21 3.91012 19.3618 4.65071 18.0287L6.28548 15.0861Z" fill="currentColor"/><rect opacity="0.3" x="8" y="3" width="8" height="8" rx="4" fill="currentColor"/><path opacity="0.3" d="M18 7.5C18 8.32843 17.3284 9 16.5 9C15.6716 9 15 8.32843 15 7.5C15 6.67157 15.6716 6 16.5 6C17.3284 6 18 6.67157 18 7.5Z" fill="currentColor"/><path d="M18.5 10.5H14.5C13.9477 10.5 13.5 10.9477 13.5 11.5V14.5C13.5 15.0523 13.9477 15.5 14.5 15.5H18.5C19.0523 15.5 19.5 15.0523 19.5 14.5V11.5C19.5 10.9477 19.0523 10.5 18.5 10.5Z" fill="currentColor"/></svg></span></span>
-                            <span class="menu-title">Penugasan Worker</span>
-                        </a>
-                    </div>
+        <div id="kt_app_sidebar_menu_wrapper"
+            class="app-sidebar-wrapper hover-scroll-overlay-y my-2"
+            data-kt-scroll="true"
+            data-kt-scroll-activate="true"
+            data-kt-scroll-height="auto"
+            data-kt-scroll-dependencies="#kt_app_sidebar_logo, #kt_app_sidebar_footer"
+            data-kt-scroll-wrappers="#kt_app_sidebar_menu"
+            data-kt-scroll-offset="5px">
 
-                    <div class="menu-item">
-                        <a class="menu-link" href="/log-penugasan.html" data-page="log-penugasan">
-                            <span class="menu-icon"><span class="svg-icon svg-icon-2"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path opacity="0.3" d="M4 7H20V19C20 19.5523 19.5523 20 19 20H5C4.44772 20 4 19.5523 4 19V7Z" fill="currentColor"/><path d="M3 5C3 4.44772 3.44772 4 4 4H20C20.5523 4 21 4.44772 21 5V7H3V5Z" fill="currentColor"/><rect x="7" y="10" width="4" height="2" rx="1" fill="currentColor"/><rect x="7" y="14" width="6" height="2" rx="1" fill="currentColor"/></svg></span></span>
-                            <span class="menu-title">Log Penugasan</span>
-                        </a>
-                    </div>
+            <div id="kt_app_sidebar_menu" data-kt-menu="true">
 
-                    <div class="menu-item">
-                        <a class="menu-link" href="/app-settings.html" data-page="app-settings">
-                            <span class="menu-icon"><span class="svg-icon svg-icon-2"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path opacity="0.3" d="M22.1 11.5V12.6C22.1 13.2 21.7 13.6 21.2 13.7L19.9 13.9C19.7 14.7 19.4 15.5 18.9 16.2L19.7 17.2999C20 17.6999 20 18.3999 19.6 18.7999L18.8 19.6C18.4 20 17.8 20 17.4 19.7L16.4 18.9C15.7 19.4 14.9 19.7 14.1 19.9L13.9 21.2C13.8 21.7 13.3 22.1 12.8 22.1H11.6C11 22.1 10.6 21.7 10.5 21.2L10.3 19.9C9.5 19.7 8.7 19.4 8 18.9L7 19.7C6.6 20 5.9 20 5.6 19.6L4.8 18.8C4.4 18.4 4.4 17.8 4.7 17.4L5.5 16.4C5 15.7 4.7 14.9 4.5 14.1L3.2 13.9C2.7 13.8 2.3 13.3 2.3 12.8V11.6C2.3 11 2.7 10.6 3.2 10.5L4.5 10.3C4.7 9.5 5 8.7 5.5 8L4.7 7C4.4 6.6 4.4 5.9 4.8 5.6L5.6 4.8C6 4.4 6.6 4.4 7 4.7L8 5.5C8.7 5 9.5 4.7 10.3 4.5L10.5 3.2C10.6 2.7 11.1 2.3 11.6 2.3H12.8C13.4 2.3 13.8 2.7 13.9 3.2L14.1 4.5C14.9 4.7 15.7 5 16.4 5.5L17.4 4.7C17.8 4.4 18.5 4.4 18.8 4.8L19.6 5.6C20 6 20 6.6 19.7 7L18.9 8C19.4 8.7 19.7 9.5 19.9 10.3L21.2 10.5C21.7 10.6 22.1 11.1 22.1 11.5Z" fill="currentColor"/><path d="M12.2 15.6C13.9882 15.6 15.4 14.1882 15.4 12.4C15.4 10.6118 13.9882 9.2 12.2 9.2C10.4118 9.2 9 10.6118 9 12.4C9 14.1882 10.4118 15.6 12.2 15.6Z" fill="currentColor"/></svg></span></span>
-                            <span class="menu-title">Pengaturan Aplikasi</span>
-                        </a>
-                    </div>
+                <!-- ── MAIN ─────────────────────────────────── -->
+                <div class="sb-section-label">Main</div>
+                <div class="sb-menu">
+                    <a class="sb-item" href="/" data-page="dashboard">
+                        <span class="sb-icon"><i class="bi bi-speedometer2"></i></span>
+                        <span class="sb-label">Dashboard</span>
+                    </a>
+                </div>
 
-                    <div class="menu-item">
-                        <a class="menu-link" href="/notification-tester.html" data-page="notification-tester">
-                            <span class="menu-icon"><span class="svg-icon svg-icon-2"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M11.2929 2.70711C11.6834 2.31658 12.3166 2.31658 12.7071 2.70711L15.2929 5.29289C15.6834 5.68342 15.6834 6.31658 15.2929 6.70711L12.7071 9.29289C12.3166 9.68342 11.6834 9.68342 11.2929 9.29289L8.70711 6.70711C8.31658 6.31658 8.31658 5.68342 8.70711 5.29289L11.2929 2.70711Z" fill="currentColor"/><path d="M11.2929 14.7071C11.6834 14.3166 12.3166 14.3166 12.7071 14.7071L15.2929 17.2929C15.6834 17.6834 15.6834 18.3166 15.2929 18.7071L12.7071 21.2929C12.3166 21.6834 11.6834 21.6834 11.2929 21.2929L8.70711 18.7071C8.31658 18.3166 8.31658 17.6834 8.70711 17.2929L11.2929 14.7071Z" fill="currentColor"/><path opacity="0.3" d="M5.29289 8.70711C5.68342 8.31658 6.31658 8.31658 6.70711 8.70711L9.29289 11.2929C9.68342 11.6834 9.68342 12.3166 9.29289 12.7071L6.70711 15.2929C6.31658 15.6834 5.68342 15.6834 5.29289 15.2929L2.70711 12.7071C2.31658 12.3166 2.31658 11.6834 2.70711 11.2929L5.29289 8.70711Z" fill="currentColor"/><path opacity="0.3" d="M17.2929 8.70711C17.6834 8.31658 18.3166 8.31658 18.7071 8.70711L21.2929 11.2929C21.6834 11.6834 21.6834 12.3166 21.2929 12.7071L18.7071 15.2929C18.3166 15.6834 17.6834 15.6834 17.2929 15.2929L14.7071 12.7071C14.3166 12.3166 14.3166 11.6834 14.7071 11.2929L17.2929 8.70711Z" fill="currentColor"/></svg></span></span>
-                            <span class="menu-title">Notification Tester</span>
+                <!-- ── ADMIN SECTION ─────────────────────────── -->
+                <div class="admin-only-menu" style="display:none;">
+                    <div class="sb-section-label">Admin</div>
+                    <div class="sb-menu">
+                        <a class="sb-item" href="/users.html" data-page="users">
+                            <span class="sb-icon"><i class="bi bi-people-fill"></i></span>
+                            <span class="sb-label">Manajemen User</span>
+                        </a>
+                        <a class="sb-item" href="/penugasan.html" data-page="penugasan">
+                            <span class="sb-icon"><i class="bi bi-person-check-fill"></i></span>
+                            <span class="sb-label">Penugasan Worker</span>
+                        </a>
+                        <a class="sb-item" href="/log-penugasan.html" data-page="log-penugasan">
+                            <span class="sb-icon"><i class="bi bi-journal-text"></i></span>
+                            <span class="sb-label">Log Penugasan</span>
+                        </a>
+                        <a class="sb-item" href="/app-settings.html" data-page="app-settings">
+                            <span class="sb-icon"><i class="bi bi-gear-fill"></i></span>
+                            <span class="sb-label">Pengaturan Aplikasi</span>
+                        </a>
+                        <a class="sb-item" href="/notification-tester.html" data-page="notification-tester">
+                            <span class="sb-icon"><i class="bi bi-bell-fill"></i></span>
+                            <span class="sb-label">Notification Tester</span>
                         </a>
                     </div>
                 </div>
-                
-                <div class="menu-item pt-5">
-                    <div class="menu-content"><span class="menu-heading fw-bold text-uppercase fs-7">WhatsApp</span></div>
-                </div>
-                
-                <div class="menu-item">
-                    <a class="menu-link" href="manage-sessions.html">
-                        <span class="menu-icon"><span class="svg-icon svg-icon-2"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path opacity="0.3" d="M21.25 18.525L13.05 21.825C12.35 22.125 11.65 22.125 10.95 21.825L2.75 18.525C1.75 18.125 1.75 16.725 2.75 16.325L4.04999 15.825L10.25 18.325C10.85 18.525 11.45 18.625 12.05 18.625C12.65 18.625 13.25 18.525 13.85 18.325L20.05 15.825L21.35 16.325C22.35 16.725 22.35 18.125 21.25 18.525ZM13.05 16.425L21.25 13.125C22.25 12.725 22.25 11.325 21.25 10.925L13.05 7.62502C12.35 7.32502 11.65 7.32502 10.95 7.62502L2.75 10.925C1.75 11.325 1.75 12.725 2.75 13.125L10.95 16.425C11.65 16.725 12.45 16.725 13.05 16.425Z" fill="currentColor"/><path d="M11.05 11.025L2.84998 7.725C1.84998 7.325 1.84998 5.925 2.84998 5.525L11.05 2.225C11.75 1.925 12.45 1.925 13.15 2.225L21.35 5.525C22.35 5.925 22.35 7.325 21.35 7.725L13.05 11.025C12.45 11.325 11.65 11.325 11.05 11.025Z" fill="currentColor"/></svg></span></span>
-                        <span class="menu-title">Kelola Session</span>
+
+                <!-- ── WHATSAPP ───────────────────────────────── -->
+                <div class="sb-section-label">WhatsApp</div>
+                <div class="sb-menu">
+                    <a class="sb-item" href="manage-sessions.html" data-page="manage-sessions">
+                        <span class="sb-icon"><i class="bi bi-phone-fill"></i></span>
+                        <span class="sb-label">Kelola Session</span>
+                    </a>
+                    <a class="sb-item" href="send-message.html" data-page="send-message">
+                        <span class="sb-icon"><i class="bi bi-send-fill"></i></span>
+                        <span class="sb-label">Send Message</span>
+                    </a>
+                    <a class="sb-item" href="inbox.html" data-page="inbox">
+                        <span class="sb-icon"><i class="bi bi-chat-dots-fill"></i></span>
+                        <span class="sb-label">Chat Box</span>
+                    </a>
+                    <a class="sb-item" href="broadcast.html" data-page="broadcast">
+                        <span class="sb-icon"><i class="bi bi-megaphone-fill"></i></span>
+                        <span class="sb-label">Broadcast</span>
+                    </a>
+                    <a class="sb-item" href="templates.html" data-page="templates">
+                        <span class="sb-icon"><i class="bi bi-lightning-charge-fill"></i></span>
+                        <span class="sb-label">Chat Templates</span>
+                    </a>
+                    <a class="sb-item" href="groups.html" data-page="groups">
+                        <span class="sb-icon"><i class="bi bi-people-fill"></i></span>
+                        <span class="sb-label">Group Management</span>
+                    </a>
+                    <a class="sb-item" href="log-activity.html" data-page="log-activity">
+                        <span class="sb-icon"><i class="bi bi-activity"></i></span>
+                        <span class="sb-label">Activity Logs</span>
+                    </a>
+                    <a class="sb-item" href="database.html" data-page="database">
+                        <span class="sb-icon"><i class="bi bi-database-fill"></i></span>
+                        <span class="sb-label">Database</span>
+                    </a>
+                    <a class="sb-item" href="kelola-export.html" data-page="kelola-export">
+                        <span class="sb-icon"><i class="bi bi-folder-check"></i></span>
+                        <span class="sb-label">Kelola Export Grup</span>
+                    </a>
+                    <a class="sb-item" href="auto-reply.html" data-page="auto-reply">
+                        <span class="sb-icon"><i class="bi bi-reply-fill"></i></span>
+                        <span class="sb-label">Auto Reply</span>
+                    </a>
+                    <a class="sb-item" href="auto-forward.html" data-page="auto-forward">
+                        <span class="sb-icon"><i class="bi bi-forward-fill"></i></span>
+                        <span class="sb-label">Auto Forward</span>
                     </a>
                 </div>
-                
-                <div class="menu-item">
-                    <a class="menu-link" href="send-message.html">
-                        <span class="menu-icon"><span class="svg-icon svg-icon-2"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path opacity="0.3" d="M20 3H4C2.89543 3 2 3.89543 2 5V16C2 17.1046 2.89543 18 4 18H4.5C5.05228 18 5.5 18.4477 5.5 19V21.5052C5.5 22.1441 6.21212 22.5253 6.74376 22.1708L11.4885 19.0077C12.4741 18.3506 13.6321 18 14.8167 18H20C21.1046 18 22 17.1046 22 16V5C22 3.89543 21.1046 3 20 3Z" fill="currentColor"/><rect x="6" y="12" width="7" height="2" rx="1" fill="currentColor"/><rect x="6" y="7" width="12" height="2" rx="1" fill="currentColor"/></svg></span></span>
-                        <span class="menu-title">Send Message</span>
-                    </a>
-                </div>
-                
-                <div class="menu-item">
-                    <a class="menu-link" href="inbox.html">
-                        <span class="menu-icon"><span class="svg-icon svg-icon-2"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path opacity="0.3" d="M21 22H3C2.4 22 2 21.6 2 21V5C2 4.4 2.4 4 3 4H21C21.6 4 22 4.4 22 5V21C22 21.6 21.6 22 21 22Z" fill="currentColor"/><path d="M22 7.59998V6.39998C22 5.89998 21.6 5.59998 21.1 5.59998H2.9C2.4 5.59998 2 5.99998 2 6.39998V7.59998L11.2 11.5C11.7 11.7 12.4 11.7 12.8 11.5L22 7.59998Z" fill="currentColor"/></svg></span></span>
-                        <span class="menu-title">Chat Box</span>
-                    </a>
-                </div>
-                
-                <div class="menu-item">
-                    <a class="menu-link" href="broadcast.html">
-                        <span class="menu-icon"><span class="svg-icon svg-icon-2"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M16.0077 19.2901L12.9293 17.5311C12.3487 17.1993 11.6407 17.1796 11.0428 17.4787L6.89443 19.5528C6.56462 19.7177 6.17115 19.6374 5.93284 19.3535C5.71594 19.0925 5.69749 18.7215 5.88606 18.4394L8.05305 15.1897C8.41127 14.6533 8.45379 13.9673 8.16627 13.3923L6.00001 9.00004L12.0001 6.00004L17.2893 10.2575C17.6337 10.5338 17.7139 11.0185 17.4775 11.3884L14.7129 15.7151C14.4016 16.1995 14.4068 16.8178 14.7263 17.2969L16.5765 20.0703C16.7761 20.3699 16.7546 20.7695 16.5217 21.0438C16.2698 21.3401 15.8268 21.4017 15.5025 21.1866L15.4191 21.1256L16.0077 19.2901Z" fill="currentColor"/><path opacity="0.3" d="M12.0001 6.00004L17.2893 10.2575C17.6337 10.5338 17.7139 11.0185 17.4775 11.3884L14.7129 15.7151C14.4016 16.1995 14.4068 16.8178 14.7263 17.2969L16.5765 20.0703C16.7761 20.3699 16.7546 20.7695 16.5217 21.0438C16.2698 21.3401 15.8268 21.4017 15.5025 21.1866L12.929 19.5311C12.3487 17.1993 11.6407 17.1796 11.0428 17.4787L6.89443 19.5528C6.56462 19.7177 6.17115 19.6374 5.93284 19.3535C5.71594 19.0925 5.69749 18.7215 5.88606 18.4394L8.05305 15.1897C8.41127 14.6533 8.45379 13.9673 8.16627 13.3923L6.00001 9.00004L12.0001 6.00004Z" fill="currentColor"/><path d="M18.5 8C19.8807 8 21 6.88071 21 5.5C21 4.11929 19.8807 3 18.5 3C17.1193 3 16 4.11929 16 5.5C16 6.88071 17.1193 8 18.5 8Z" fill="currentColor"/></svg></span></span>
-                        <span class="menu-title">Broadcast</span>
-                    </a>
-                </div>
-                
-                <div class="menu-item">
-                    <a class="menu-link" href="templates.html">
-                        <span class="menu-icon"><span class="svg-icon svg-icon-2"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path opacity="0.3" d="M21.4 8.35303L19.241 10.511L13.485 4.755L15.643 2.59595C16.0248 2.21423 16.5426 1.99988 17.0825 1.99988C17.6224 1.99988 18.1402 2.21423 18.522 2.59595L21.4 5.47394C21.7817 5.85575 21.9962 6.37362 21.9962 6.91349C21.9962 7.45335 21.7817 7.97122 21.4 8.35303ZM3.68699 21.932L9.88699 19.865L4.13099 14.109L2.06399 20.309C1.98815 20.5354 1.97703 20.7787 2.03189 21.0111C2.08674 21.2436 2.2054 21.4561 2.37449 21.6248C2.54359 21.7934 2.75641 21.9115 2.989 21.9658C3.22158 22.0201 3.4## 22.0084 3.68699 21.932Z" fill="currentColor"/><path d="M5.574 21.3L3.692 21.928C3.46591 22.0032 3.22334 22.0141 2.99144 21.9594C2.75954 21.9046 2.54744 21.7864 2.3789 21.6179C2.21036 21.4495 2.09202 21.2375 2.03711 21.0056C1.9822 20.7737 1.99289 20.5312 2.06799 20.3051L2.696 18.422L5.574 21.3ZM4.13499 14.105L9.891 19.861L19.245 10.507L13.489 4.75098L4.13499 14.105Z" fill="currentColor"/></svg></span></span>
-                        <span class="menu-title">Chat Templates</span>
-                    </a>
-                </div>
-                
-                <div class="menu-item">
-                    <a class="menu-link" href="groups.html">
-                        <span class="menu-icon"><span class="svg-icon svg-icon-2"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M16.0173 9H15.3945C14.2833 9 13.263 9.61425 12.7431 10.5963L12.154 11.7091C12.0645 11.8781 12.1072 12.0868 12.2559 12.2071L12.6402 12.5183C13.2631 13.0225 13.7556 13.6691 14.0764 14.4035L14.2321 14.7601C14.2957 14.9058 14.4396 15 14.5987 15H18.6747C19.7297 15 20.4057 13.8774 19.912 12.945L18.6686 10.5963C18.1487 9.61425 17.1285 9 16.0173 9Z" fill="currentColor"/><rect opacity="0.3" x="14" y="4" width="4" height="4" rx="2" fill="currentColor"/><path d="M4.65486 14H11.3451C11.6769 14 11.9451 14.2682 11.9451 14.6C11.9451 14.6974 11.9221 14.7934 11.8784 14.8802L10.8571 16.9227C10.4236 17.7896 9.63209 18.4071 8.70193 18.5963L8.42152 18.6534C8.14436 18.7099 7.85564 18.7099 7.57848 18.6534L7.29807 18.5963C6.36791 18.4071 5.57636 17.7896 5.14286 16.9227L4.12157 14.8802C3.97676 14.5926 4.09516 14.2357 4.38278 14.0909C4.46968 14.0472 4.56576 14.0242 4.66317 14.0242L4.65486 14Z" fill="currentColor"/><rect opacity="0.3" x="6" y="9" width="4" height="4" rx="2" fill="currentColor"/></svg></span></span>
-                        <span class="menu-title">Group Management</span>
-                    </a>
-                </div>
-                
-                <div class="menu-item">
-                    <a class="menu-link" href="log-activity.html">
-                        <span class="menu-icon"><span class="svg-icon svg-icon-2"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path opacity="0.3" d="M19 22H5C4.4 22 4 21.6 4 21V3C4 2.4 4.4 2 5 2H14L20 8V21C20 21.6 19.6 22 19 22ZM15 17C15 16.4 14.6 16 14 16H8C7.4 16 7 16.4 7 17C7 17.6 7.4 18 8 18H14C14.6 18 15 17.6 15 17ZM17 12C17 11.4 16.6 11 16 11H8C7.4 11 7 11.4 7 12C7 12.6 7.4 13 8 13H16C16.6 13 17 12.6 17 12ZM17 7C17 6.4 16.6 6 16 6H8C7.4 6 7 6.4 7 7C7 7.6 7.4 8 8 8H16C16.6 8 17 7.6 17 7Z" fill="currentColor"/></svg></span></span>
-                        <span class="menu-title">Activity Logs</span>
-                    </a>
-                </div>
-                
-                <div class="menu-item">
-                    <a class="menu-link" href="database.html">
-                        <span class="menu-icon"><span class="svg-icon svg-icon-2"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M6 2C4.89543 2 4 2.89543 4 4V20C4 21.1046 4.89543 22 6 22H18C19.1046 22 20 21.1046 20 20V8L14 2H6Z" fill="currentColor" opacity="0.3"/><path d="M20 8H14V2L20 8Z" fill="currentColor"/><path d="M8 12H16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M8 16H13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span></span>
-                        <span class="menu-title">Database</span>
-                    </a>
-                </div>
-                
-                <div class="menu-item">
-                    <a class="menu-link" href="kelola-export.html">
-                        <span class="menu-icon"><span class="svg-icon svg-icon-2"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path opacity="0.3" d="M10 4H21C21.6 4 22 4.4 22 5V7H10V4Z" fill="currentColor"/><path d="M10.4 3.60001L9.2 7H3C2.4 7 2 6.6 2 6V4C2 3.4 2.4 3 3 3H9.2C9.7 3 10.2 3.2 10.4 3.60001ZM21 9H3C2.4 9 2 9.4 2 10V20C2 20.6 2.4 21 3 21H21C21.6 21 22 20.6 22 20V10C22 9.4 21.6 9 21 9ZM11.3 17.7C11.1 17.9 10.8 18 10.5 18C10.2 18 9.9 17.9 9.7 17.7L7.3 15.3C6.9 14.9 6.9 14.3 7.3 13.9C7.7 13.5 8.3 13.5 8.7 13.9L10.5 15.7L15.3 10.9C15.7 10.5 16.3 10.5 16.7 10.9C17.1 11.3 17.1 11.9 16.7 12.3L11.3 17.7Z" fill="currentColor"/></svg></span></span>
-                        <span class="menu-title">Kelola Export Grup</span>
-                    </a>
-                </div>
-                
-                <div class="menu-item">
-                    <a class="menu-link" href="auto-reply.html">
-                        <span class="menu-icon">
-                            <span class="svg-icon svg-icon-2">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                                    <path opacity="0.3" d="M8 8C8 7.4 8.4 7 9 7H16V3C16 2.4 15.6 2 15 2H3C2.4 2 2 2.4 2 3V13C2 13.6 2.4 14 3 14H5V16.6L8 14H8V8Z" fill="currentColor"/>
-                                    <path d="M22 8V18C22 18.6 21.6 19 21 19H19V21.6L16 19H9C8.4 19 8 18.6 8 18V8C8 7.4 8.4 7 9 7H21C21.6 7 22 7.4 22 8ZM19 11C19 10.4 18.6 10 18 10H12C11.4 10 11 10.4 11 11C11 11.6 11.4 12 12 12H18C18.6 12 19 11.6 19 11ZM17 15C17 14.4 16.6 14 16 14H12C11.4 14 11 14.4 11 15C11 15.6 11.4 16 12 16H16C16.6 16 17 15.6 17 15Z" fill="currentColor"/>
-                                </svg>
-                            </span>
-                        </span>
-                        <span class="menu-title">Auto Reply</span>
-                    </a>
-                </div>
-                
-                <div class="menu-item">
-                    <a class="menu-link" href="auto-forward.html">
-                        <span class="menu-icon">
-                            <span class="svg-icon svg-icon-2">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                                    <path d="M14.4 11H3C2.4 11 2 11.4 2 12C2 12.6 2.4 13 3 13H14.4V11Z" fill="currentColor"/>
-                                    <path opacity="0.3" d="M14.4 20V4L21.7 11.3C22.1 11.7 22.1 12.3 21.7 12.7L14.4 20Z" fill="currentColor"/>
-                                </svg>
-                            </span>
-                        </span>
-                        <span class="menu-title">Auto Forward</span>
-                    </a>
-                </div>
-                
-                <!-- ========== MEMBER PORTAL ========== -->
-                <div class="admin-only-menu" style="display: none;">
-                    <div class="menu-item pt-5">
-                        <div class="menu-content"><span class="menu-heading fw-bold text-uppercase fs-7">👤 Member</span></div>
-                    </div>
-                    
-                    <div class="menu-item">
-                        <a class="menu-link" href="/member/dashboard.html" data-page="member-portal" target="_blank">
-                            <span class="menu-icon"><span class="svg-icon svg-icon-2"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path opacity="0.3" d="M20 3H4C2.89543 3 2 3.89543 2 5V16C2 17.1046 2.89543 18 4 18H4.5C5.05228 18 5.5 18.4477 5.5 19V21.5052C5.5 22.1441 6.21212 22.5253 6.74376 22.1708L11.4885 19.0077C12.4741 18.3506 13.6321 18 14.8167 18H20C21.1046 18 22 17.1046 22 16V5C22 3.89543 21.1046 3 20 3Z" fill="currentColor"/><rect x="6" y="12" width="7" height="2" rx="1" fill="currentColor"/><rect x="6" y="7" width="12" height="2" rx="1" fill="currentColor"/></svg></span></span>
-                            <span class="menu-title">Portal Member</span>
-                            <span class="badge badge-light-primary fs-8 ms-2">Chat</span>
+
+                <!-- ── MEMBER PORTAL ─────────────────────────── -->
+                <div class="admin-only-menu" style="display:none;">
+                    <div class="sb-section-label">Member</div>
+                    <div class="sb-menu">
+                        <a class="sb-item" href="/member/dashboard.html" data-page="member-portal" target="_blank">
+                            <span class="sb-icon"><i class="bi bi-whatsapp"></i></span>
+                            <span class="sb-label">Portal Member</span>
+                            <span class="sb-badge sb-badge-green">Chat</span>
                         </a>
                     </div>
                 </div>
-                
-                <div class="menu-item pt-5">
-                    <div class="menu-content"><span class="menu-heading fw-bold text-uppercase fs-7">Resources</span></div>
-                </div>
-                
-                <div class="menu-item">
-                    <a class="menu-link" href="api-docs.html" data-page="api-docs">
-                        <span class="menu-icon"><span class="svg-icon svg-icon-2"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path opacity="0.3" d="M19 3.40002C18.4 3.40002 18 3.80002 18 4.40002V8.40002H14V4.40002C14 3.80002 13.6 3.40002 13 3.40002C12.4 3.40002 12 3.80002 12 4.40002V8.40002H8V4.40002C8 3.80002 7.6 3.40002 7 3.40002C6.4 3.40002 6 3.80002 6 4.40002V8.40002H2V4.40002C2 3.80002 1.6 3.40002 1 3.40002C0.4 3.40002 0 3.80002 0 4.40002V19.4C0 20 0.4 20.4 1 20.4H19C19.6 20.4 20 20 20 19.4V4.40002C20 3.80002 19.6 3.40002 19 3.40002ZM18 10.4V13.4H14V10.4H18ZM12 10.4V13.4H8V10.4H12ZM12 15.4V18.4H8V15.4H12ZM6 10.4V13.4H2V10.4H6ZM2 15.4H6V18.4H2V15.4ZM14 18.4V15.4H18V18.4H14Z" fill="currentColor"/><path d="M19 0.400024H1C0.4 0.400024 0 0.800024 0 1.40002V4.40002C0 5.00002 0.4 5.40002 1 5.40002H19C19.6 5.40002 20 5.00002 20 4.40002V1.40002C20 0.800024 19.6 0.400024 19 0.400024Z" fill="currentColor"/></svg></span></span>
-                        <span class="menu-title">Dokumentasi API</span>
+
+                <!-- ── RESOURCES ─────────────────────────────── -->
+                <div class="sb-section-label">Resources</div>
+                <div class="sb-menu" style="margin-bottom:16px;">
+                    <a class="sb-item" href="api-docs.html" data-page="api-docs">
+                        <span class="sb-icon"><i class="bi bi-book-fill"></i></span>
+                        <span class="sb-label">Dokumentasi API</span>
                     </a>
                 </div>
+
             </div>
         </div>
     </div>
-    <!--end::sidebar menu-->
+    <!--end::Sidebar Menu-->
+
 </div>
 <!--end::Sidebar-->
 
@@ -226,195 +400,185 @@
 // Sidebar initialization - Load user info and show/hide menus based on role
 (function() {
     let currentUser = null;
-    
+
     async function loadUserInfo() {
         try {
-            // Verify with server (dengan retry mechanism)
-            const res = await fetch('/api/auth/me', {
-                credentials: 'include' // Ensure cookies are sent
-            });
-            
+            const res = await fetch('/api/auth/me', { credentials: 'include' });
             if (res.ok) {
                 const data = await res.json();
                 if (data.success && data.user) {
                     currentUser = data.user;
-                    // Sync to localStorage
                     localStorage.setItem('wa_user', JSON.stringify(currentUser));
                     updateSidebarUI();
                     return;
                 }
             } else if (res.status === 401) {
-                // Session expired or not logged in
-                console.log('Session expired or unauthorized');
                 localStorage.removeItem('wa_user');
                 currentUser = null;
-                
-                // Only redirect if not already on login page
                 if (!window.location.pathname.includes('/auth/login')) {
                     window.location.href = '/auth/login?error=' + encodeURIComponent('Sesi Anda telah berakhir. Silakan login kembali.');
                 }
-            } else {
-                console.error('Failed to fetch user info:', res.status);
             }
         } catch (error) {
             console.error('Error loading user info:', error);
-            // Don't redirect on network errors, user might be offline temporarily
         }
     }
-    
+
     function updateSidebarUI() {
         if (!currentUser) return;
-        
-        // Show user info section
+
+        // Show user info
         const userInfoSection = document.getElementById('sidebar-user-info');
         if (userInfoSection) {
-            userInfoSection.style.display = 'flex';
             userInfoSection.style.setProperty('display', 'flex', 'important');
         }
-        
-        // Update user info
-        const initials = currentUser.name ? currentUser.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : '?';
-        const avatarEl = document.getElementById('sidebar-user-avatar');
-        const nameEl = document.getElementById('sidebar-user-name');
-        const roleEl = document.getElementById('sidebar-user-role');
-        
+
+        const initials = currentUser.name
+            ? currentUser.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
+            : '?';
+
+        const avatarEl  = document.getElementById('sidebar-user-avatar');
+        const nameEl    = document.getElementById('sidebar-user-name');
+        const roleEl    = document.getElementById('sidebar-user-role');
+
         if (avatarEl) avatarEl.textContent = initials;
-        if (nameEl) nameEl.textContent = currentUser.name || 'User';
-        if (roleEl) roleEl.textContent = currentUser.role === 'adminwa' ? '👑 Admin' : currentUser.role === 'worker' ? '🔧 Worker' : '👤 Member';
-        
-        // Show/hide admin menu in sidebar
-        const adminMenus = document.querySelectorAll('.admin-only-menu');
-        adminMenus.forEach(menu => {
+        if (nameEl)   nameEl.textContent   = currentUser.name || 'User';
+        if (roleEl) {
+            const roleMap = {
+                adminwa: '👑 Administrator',
+                worker:  '🔧 Worker',
+                memberwa:'👤 Member'
+            };
+            roleEl.textContent = roleMap[currentUser.role] || currentUser.role;
+        }
+
+        // Show/hide admin menus
+        document.querySelectorAll('.admin-only-menu').forEach(menu => {
             menu.style.display = currentUser.role === 'adminwa' ? 'block' : 'none';
         });
-        
-        // Also update header
+
         updateHeaderUI();
-        
-        // Highlight active menu
         highlightActiveMenu();
     }
-    
+
     function updateHeaderUI() {
         if (!currentUser) return;
-        
-        const initials = currentUser.name ? currentUser.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : '?';
-        
-        // Update header avatar
-        const headerAvatar = document.getElementById('header-user-avatar');
-        const headerMenuAvatar = document.getElementById('header-menu-avatar');
-        const headerMenuName = document.getElementById('header-menu-name');
-        const headerMenuEmail = document.getElementById('header-menu-email');
-        
-        if (headerAvatar) headerAvatar.textContent = initials;
-        if (headerMenuAvatar) headerMenuAvatar.textContent = initials;
-        if (headerMenuName) headerMenuName.textContent = currentUser.name || 'User';
-        if (headerMenuEmail) headerMenuEmail.textContent = currentUser.email || '-';
-        
-        // Show/hide admin menu in header
-        const adminHeaderMenus = document.querySelectorAll('.admin-only-header-menu');
-        adminHeaderMenus.forEach(menu => {
+        const initials = currentUser.name
+            ? currentUser.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
+            : '?';
+
+        const ids = {
+            'header-user-avatar': initials,
+            'header-menu-avatar': initials,
+            'header-menu-name':   currentUser.name || 'User',
+            'header-menu-email':  currentUser.email || '-'
+        };
+        for (const [id, val] of Object.entries(ids)) {
+            const el = document.getElementById(id);
+            if (el) el.textContent = val;
+        }
+
+        document.querySelectorAll('.admin-only-header-menu').forEach(menu => {
             menu.style.display = currentUser.role === 'adminwa' ? 'block' : 'none';
         });
-        
-        // Setup change password handler
+
         setupChangePasswordHandler();
     }
-    
+
     function setupChangePasswordHandler() {
-        const btnSavePassword = document.getElementById('btnSavePassword');
-        if (btnSavePassword && !btnSavePassword.hasAttribute('data-handler-attached')) {
-            btnSavePassword.setAttribute('data-handler-attached', 'true');
-            btnSavePassword.addEventListener('click', async function() {
-                const form = document.getElementById('changePasswordForm');
-                const currentPassword = form.querySelector('[name="currentPassword"]').value;
-                const newPassword = form.querySelector('[name="newPassword"]').value;
-                const confirmPassword = form.querySelector('[name="confirmPassword"]').value;
-                
-                if (!currentPassword || !newPassword || !confirmPassword) {
-                    alert('Semua field wajib diisi');
-                    return;
+        const btn = document.getElementById('btnSavePassword');
+        if (!btn || btn.hasAttribute('data-handler-attached')) return;
+        btn.setAttribute('data-handler-attached', 'true');
+        btn.addEventListener('click', async function () {
+            const form = document.getElementById('changePasswordForm');
+            const cur  = form.querySelector('[name="currentPassword"]').value;
+            const nw   = form.querySelector('[name="newPassword"]').value;
+            const conf = form.querySelector('[name="confirmPassword"]').value;
+            if (!cur || !nw || !conf)   return alert('Semua field wajib diisi');
+            if (nw !== conf)             return alert('Konfirmasi password tidak cocok');
+            if (nw.length < 6)           return alert('Password minimal 6 karakter');
+            try {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Menyimpan...';
+                const res  = await fetch('/api/auth/change-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ currentPassword: cur, newPassword: nw })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert('Password berhasil diubah!');
+                    form.reset();
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('changePasswordModal'));
+                    if (modal) modal.hide();
+                } else {
+                    alert(data.error || 'Gagal mengubah password');
                 }
-                
-                if (newPassword !== confirmPassword) {
-                    alert('Konfirmasi password tidak cocok');
-                    return;
-                }
-                
-                if (newPassword.length < 6) {
-                    alert('Password minimal 6 karakter');
-                    return;
-                }
-                
-                try {
-                    btnSavePassword.disabled = true;
-                    btnSavePassword.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Menyimpan...';
-                    
-                    const res = await fetch('/api/auth/change-password', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ currentPassword, newPassword })
-                    });
-                    
-                    const data = await res.json();
-                    
-                    if (data.success) {
-                        alert('Password berhasil diubah!');
-                        form.reset();
-                        const modal = bootstrap.Modal.getInstance(document.getElementById('changePasswordModal'));
-                        if (modal) modal.hide();
-                    } else {
-                        alert(data.error || 'Gagal mengubah password');
-                    }
-                } catch (error) {
-                    alert('Error: ' + error.message);
-                } finally {
-                    btnSavePassword.disabled = false;
-                    btnSavePassword.innerHTML = 'Simpan';
-                }
-            });
-        }
-    }
-    
-    function highlightActiveMenu() {
-        const currentPath = window.location.pathname;
-        const menuLinks = document.querySelectorAll('#kt_app_sidebar_menu .menu-link');
-        
-        menuLinks.forEach(link => {
-            link.classList.remove('active');
-            const href = link.getAttribute('href');
-            if (href) {
-                const normalizedHref = href.replace('.html', '').replace(/^\//, '');
-                const normalizedPath = currentPath.replace('.html', '').replace(/^\//, '');
-                
-                if (normalizedPath === normalizedHref || 
-                    (normalizedPath === '' && (normalizedHref === '' || normalizedHref === 'index')) ||
-                    (normalizedPath === 'index' && normalizedHref === '')) {
-                    link.classList.add('active');
-                    
-                    // Expand parent accordion if exists
-                    const accordion = link.closest('.menu-accordion');
-                    if (accordion) {
-                        accordion.classList.add('show', 'here');
-                    }
-                }
+            } catch (e) {
+                alert('Error: ' + e.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Simpan';
             }
         });
     }
-    
+
+    function highlightActiveMenu() {
+        const currentPath = window.location.pathname;
+        document.querySelectorAll('.sb-item').forEach(link => {
+            link.classList.remove('active');
+            const href = link.getAttribute('href');
+            if (!href) return;
+            const normHref = href.replace('.html','').replace(/^\//,'');
+            const normPath = currentPath.replace('.html','').replace(/^\//,'');
+            if (normPath === normHref ||
+                (normPath === '' && (normHref === '' || normHref === 'index')) ||
+                (normPath === 'index' && normHref === '')) {
+                link.classList.add('active');
+            }
+        });
+    }
+
     // Initialize
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', loadUserInfo);
     } else {
         loadUserInfo();
     }
-    
+
     // Expose for other scripts
     window.sidebarUser = {
-        getUser: () => currentUser,
-        reload: loadUserInfo,
-        isAdmin: () => currentUser && currentUser.role === 'adminwa'
+        getUser:  () => currentUser,
+        reload:   loadUserInfo,
+        isAdmin:  () => currentUser && currentUser.role === 'adminwa'
     };
+
+    // ─── Sidebar Metronic Component Re-init ──────────────────────
+    function reinitSidebarComponents() {
+        const sidebar = document.getElementById('kt_app_sidebar');
+        if (!sidebar || sidebar.dataset.initialized === 'true') return;
+        sidebar.dataset.initialized = 'true';
+
+        const scrollWrapper = document.getElementById('kt_app_sidebar_menu_wrapper');
+        if (scrollWrapper) {
+            scrollWrapper.style.overflowY = 'auto';
+            scrollWrapper.style.overflowX = 'hidden';
+            scrollWrapper.style.height    = '100%';
+            scrollWrapper.style.maxHeight = '100%';
+            scrollWrapper.style.webkitOverflowScrolling = 'touch';
+        }
+
+        try { if (typeof KTMenu    !== 'undefined') { KTMenu.init(); KTMenu.createInstances(); } } catch(e) {}
+        try { if (typeof KTDrawer  !== 'undefined') KTDrawer.createInstances();  } catch(e) {}
+        try { if (typeof KTScroll  !== 'undefined') KTScroll.createInstances();  } catch(e) {}
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => setTimeout(reinitSidebarComponents, 50));
+    } else {
+        reinitSidebarComponents();
+        setTimeout(reinitSidebarComponents, 100);
+    }
 })();
 </script>
 

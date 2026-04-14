@@ -142,13 +142,22 @@ const NotificationManager = {
             const registration = await navigator.serviceWorker.ready;
 
             // Handle foreground messages from FCM
-            // Socket.IO already handles in-app UI (toast/sound), so FCM foreground
-            // only updates badge to avoid duplicate toasts
+            // When tab is VISIBLE: Socket.IO already handles UI (toast/sound), so skip
+            // When tab is HIDDEN (background tab): show system notification via browser API
             this.messaging.onMessage((payload) => {
-                console.log('🔔 FCM foreground message (suppressed, Socket.IO handles UI):', payload.data?.type);
-                // Don't show toast/sound — Socket.IO notification handler already does that
-                // Just ensure badge is up to date
+                console.log('🔔 FCM foreground message:', payload.data?.type);
                 this._updateBadge();
+
+                // If the page is hidden (e.g. another tab is active, or minimized),
+                // show a browser notification since Socket.IO toast won't be visible
+                if (document.hidden) {
+                    this._showBrowserNotification({
+                        type: payload.data?.type || 'default',
+                        title: payload.data?.title || payload.notification?.title || 'Notifikasi Baru',
+                        body: payload.data?.body || payload.notification?.body || '',
+                        data: payload.data || {}
+                    });
+                }
             });
 
             // Request permission & get token
@@ -430,14 +439,19 @@ const NotificationManager = {
         if (!('Notification' in window) || Notification.permission !== 'granted') return;
 
         try {
-            const icon = '/assets/media/logos/favicon.ico';
-            const tag = `${data.type || 'default'}-${data.data?.sessionId || ''}-${data.data?.contactJid || ''}`;
+            // Use dynamic icon from app settings if available
+            const icon = (window.APP_SETTINGS && window.APP_SETTINGS.favicon_url)
+                ? window.APP_SETTINGS.favicon_url
+                : '/assets/media/logos/pwa-192.png';
+
+            // Unique tag per notification — prevents silent replacement of previous notifications
+            const tag = `${data.type || 'default'}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 
             const notif = new Notification(data.title || 'Notifikasi Baru', {
                 body: data.body || '',
                 icon: icon,
                 badge: icon,
-                tag: tag, // Same tag prevents duplicate notifications
+                tag: tag,
                 requireInteraction: data.type === 'incoming_message',
                 silent: false
             });

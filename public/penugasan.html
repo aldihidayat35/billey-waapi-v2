@@ -9,100 +9,290 @@
     <link href="assets/plugins/global/plugins.bundle.css" rel="stylesheet" type="text/css" />
     <link href="assets/css/style.bundle.css" rel="stylesheet" type="text/css" />
     <style>
-        .worker-card { transition: all .2s; }
-        .worker-card:hover { transform: translateY(-3px); box-shadow: 0 8px 25px rgba(0,0,0,.1); }
+        /* ─── Worker Cards ─────────────────────────────── */
+        .worker-card {
+            transition: all .25s cubic-bezier(.4,0,.2,1);
+            border: 1.5px solid #f1f1f4;
+            overflow: hidden;
+        }
+        .worker-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 16px 40px rgba(0,0,0,.10);
+            border-color: #d1d3e0;
+        }
+        .worker-card .card-header-bg {
+            height: 6px;
+            background: linear-gradient(90deg, #7239ea, #a855f7);
+        }
+        .worker-card.inactive .card-header-bg {
+            background: linear-gradient(90deg, #b5b5c3, #d1d5db);
+        }
         .worker-avatar {
-            width: 50px; height: 50px;
-            background: linear-gradient(135deg, #f6b100, #ff9800);
-            border-radius: 12px;
+            width: 56px; height: 56px;
+            border-radius: 14px;
             display: flex; align-items: center; justify-content: center;
-            color: white; font-weight: 700; font-size: 18px; flex-shrink: 0;
+            color: #fff; font-weight: 700; font-size: 20px;
+            flex-shrink: 0;
+            box-shadow: 0 4px 14px rgba(0,0,0,.18);
         }
+        .avatar-gradient-0 { background: linear-gradient(135deg, #7239ea, #a855f7); }
+        .avatar-gradient-1 { background: linear-gradient(135deg, #f1416c, #f77f94); }
+        .avatar-gradient-2 { background: linear-gradient(135deg, #009ef7, #66c8ff); }
+        .avatar-gradient-3 { background: linear-gradient(135deg, #50cd89, #8decb4); }
+        .avatar-gradient-4 { background: linear-gradient(135deg, #ffc700, #f59e0b); }
+        .avatar-gradient-5 { background: linear-gradient(135deg, #f1416c, #7239ea); }
+
+        .worker-stat {
+            display: flex; align-items: center; gap: 6px;
+            background: #f9f9fb; border-radius: 8px; padding: 7px 12px;
+            flex: 1; min-width: 0;
+        }
+        .worker-stat .stat-icon { font-size: 16px; flex-shrink: 0; }
+        .worker-stat .stat-val { font-weight: 700; font-size: 15px; color: #1e1e2d; line-height: 1; }
+        .worker-stat .stat-lbl { font-size: 11px; color: #a1a5b7; line-height: 1; }
+
+        /* ─── Summary Stats ─────────────────────────── */
+        .page-stat-card {
+            background: #fff;
+            border: 1.5px solid #f1f1f4;
+            border-radius: 12px;
+            padding: 18px 22px;
+            display: flex; align-items: center; gap: 14px;
+            transition: box-shadow .2s;
+        }
+        .page-stat-card:hover { box-shadow: 0 6px 20px rgba(0,0,0,.07); }
+        .page-stat-icon {
+            width: 48px; height: 48px; border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 22px; flex-shrink: 0;
+        }
+        .page-stat-val { font-size: 22px; font-weight: 700; color: #1e1e2d; line-height: 1.1; }
+        .page-stat-lbl { font-size: 12px; color: #a1a5b7; margin-top: 2px; }
+
+        /* ─── Session Buttons ────────────────────────── */
         .session-btn {
-            padding: 6px 16px; border-radius: 20px;
-            border: 2px solid #e4e6ef; background: #fff;
-            font-size: 13px; font-weight: 500; cursor: pointer; transition: all .15s; white-space: nowrap;
+            padding: 7px 18px; border-radius: 20px;
+            border: 1.5px solid #e4e6ef; background: #fff;
+            font-size: 13px; font-weight: 500; cursor: pointer;
+            transition: all .15s; white-space: nowrap;
+            color: #5e6278;
         }
-        .session-btn:hover { border-color: #7239ea; color: #7239ea; }
-        .session-btn.active { border-color: #7239ea; background: #7239ea; color: #fff; }
+        .session-btn:hover { border-color: #7239ea; color: #7239ea; background: #f5f0ff; }
+        .session-btn.active {
+            border-color: #7239ea; background: #7239ea; color: #fff;
+            box-shadow: 0 4px 12px rgba(114,57,234,.35);
+        }
+
+        /* ─── Contact List ───────────────────────────── */
+        .contact-list-wrap { max-height: 340px; overflow-y: auto; }
         .contact-item {
             display: flex; align-items: center; padding: 10px 14px;
-            border-radius: 8px; cursor: pointer; transition: background .12s; border: 2px solid transparent;
+            border-radius: 8px; cursor: pointer; transition: background .12s;
+            border: 1.5px solid transparent; margin-bottom: 2px;
         }
         .contact-item:hover { background: #f5f8fa; }
         .contact-item.selected { background: #e8fff3; border-color: #50cd89; }
         .contact-avatar {
-            width: 36px; height: 36px; border-radius: 50%; background: #e4e6ef;
+            width: 38px; height: 38px; border-radius: 50%;
+            background: #e4e6ef;
             display: flex; align-items: center; justify-content: center;
             font-size: 12px; font-weight: 600; color: #7e8299; flex-shrink: 0;
         }
         .contact-item.selected .contact-avatar { background: #50cd89; color: #fff; }
-        .contact-list-wrap { max-height: 380px; overflow-y: auto; }
+
+        /* ─── Chip (selected contacts preview) ───────── */
         .chip {
             display: inline-flex; align-items: center;
             background: #7239ea; color: #fff;
-            padding: 3px 10px; border-radius: 14px; font-size: 12px; margin: 2px 4px 2px 0;
+            padding: 4px 12px; border-radius: 20px;
+            font-size: 12px; font-weight: 500; margin: 2px 4px 2px 0;
+            gap: 6px;
         }
-        .chip .remove { margin-left: 6px; cursor: pointer; opacity: .75; }
+        .chip .remove { cursor: pointer; opacity: .75; line-height: 1; }
         .chip .remove:hover { opacity: 1; }
-        .priority-btn { transition: all .15s; }
-        .priority-btn.active { color: #fff !important; }
-        .priority-btn.active[data-priority="low"] { background-color: #50cd89 !important; border-color: #50cd89 !important; }
-        .priority-btn.active[data-priority="medium"] { background-color: #ffc700 !important; border-color: #ffc700 !important; color: #3f4254 !important; }
-        .priority-btn.active[data-priority="critical"] { background-color: #f1416c !important; border-color: #f1416c !important; }
+
+        /* ─── Contact Note Rows ──────────────────────── */
         .contact-note-row {
-            background: #f9f9fb; border: 1px solid #e8e8ef; border-radius: 8px;
-            padding: 10px 12px; margin-bottom: 6px; transition: border-color .15s;
+            background: #fff;
+            border: 1.5px solid #eef0f7;
+            border-radius: 14px;
+            margin-bottom: 10px;
+            overflow: hidden;
+            transition: box-shadow .2s, border-color .2s;
+            box-shadow: 0 1px 4px rgba(0,0,0,.04);
         }
-        .contact-note-row:hover { border-color: #c4c4d4; }
-        .contact-note-row .cnr-top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-        .contact-note-row .cnr-phone { font-weight: 600; font-size: 13px; flex: 1; min-width: 0; }
-        .contact-note-row .cnr-session { font-size: 11px; color: #a1a5b7; }
-        .contact-note-row .cnr-remove {
-            background: none; border: none; color: #b5b5c3; cursor: pointer; font-size: 16px; padding: 0 2px; line-height: 1;
+        .contact-note-row:hover { border-color: #c9c9e3; box-shadow: 0 4px 16px rgba(114,57,234,.09); }
+
+        /* CNR Header */
+        .cnr-header {
+            display: flex; align-items: center; gap: 10px;
+            padding: 11px 14px 11px 12px;
+            background: linear-gradient(90deg, #f8f5ff 0%, #fff 100%);
+            border-bottom: 1px solid #eef0f7;
         }
-        .contact-note-row .cnr-remove:hover { color: #f1416c; }
-        .contact-note-row .cnr-body { display: flex; gap: 8px; align-items: flex-start; }
-        .contact-note-row .cnr-priority { display: flex; gap: 3px; flex-shrink: 0; padding-top: 2px; }
-        .contact-note-row .cnr-priority .pbtn {
-            width: 26px; height: 22px; border-radius: 4px; border: 1.5px solid #e0e0e0;
-            background: #fff; cursor: pointer; font-size: 10px; display: flex; align-items: center;
-            justify-content: center; transition: all .12s; padding: 0;
+        .cnr-phone-avatar {
+            width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
+            background: linear-gradient(135deg, #7239ea, #a855f7);
+            display: flex; align-items: center; justify-content: center;
+            color: #fff; font-size: 11px; font-weight: 700; letter-spacing: .5px;
         }
-        .contact-note-row .cnr-priority .pbtn:hover { border-color: #bbb; }
-        .contact-note-row .cnr-priority .pbtn.active-low { background: #50cd89; border-color: #50cd89; color: #fff; }
-        .contact-note-row .cnr-priority .pbtn.active-medium { background: #ffc700; border-color: #ffc700; color: #3f4254; }
-        .contact-note-row .cnr-priority .pbtn.active-critical { background: #f1416c; border-color: #f1416c; color: #fff; }
-        .contact-note-row .cnr-notes {
-            flex: 1; min-width: 0; border: 1px solid #e4e6ef; border-radius: 6px;
-            padding: 4px 8px; font-size: 12px; resize: none; min-height: 32px; max-height: 80px;
-            font-family: inherit; line-height: 1.4;
+        .cnr-phone-info { flex: 1; min-width: 0; }
+        .cnr-phone {
+            font-weight: 700; font-size: 13.5px; color: #1e1e2d;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
-        .contact-note-row .cnr-notes:focus { border-color: #7239ea; outline: none; }
-        /* Time Range Settings */
-        .cnr-time-section {
-            margin-top: 8px; padding-top: 8px; border-top: 1px dashed #e4e6ef;
-        }
-        .cnr-time-row {
-            display: flex; align-items: center; gap: 6px; margin-bottom: 4px; flex-wrap: wrap;
-        }
-        .cnr-time-row label {
-            font-size: 11px; color: #a1a5b7; font-weight: 600; min-width: 90px; flex-shrink: 0;
-        }
-        .cnr-time-row input[type="datetime-local"],
-        .cnr-time-row input[type="time"] {
-            border: 1px solid #e4e6ef; border-radius: 5px; padding: 3px 6px;
-            font-size: 11px; font-family: inherit; color: #5e6278; flex: 1; min-width: 0; max-width: 180px;
-        }
-        .cnr-time-row input:focus { border-color: #7239ea; outline: none; }
-        .cnr-time-row .cbx-label {
+        .cnr-session-tag {
             display: inline-flex; align-items: center; gap: 4px;
-            font-size: 11px; color: #7e8299; cursor: pointer; user-select: none;
+            font-size: 10.5px; color: #7239ea; background: #f3ecff;
+            padding: 1px 8px; border-radius: 20px; font-weight: 600;
+            margin-top: 2px; border: 1px solid #e2d6ff;
         }
-        .cnr-time-row .cbx-label input { margin: 0; cursor: pointer; }
+        .cnr-remove {
+            width: 28px; height: 28px; border-radius: 8px;
+            background: none; border: 1.5px solid #f0f0f5;
+            color: #c0c0d0; cursor: pointer; font-size: 15px;
+            display: flex; align-items: center; justify-content: center;
+            transition: all .15s; flex-shrink: 0;
+        }
+        .cnr-remove:hover { background: #fff1f4; border-color: #f1416c; color: #f1416c; }
+
+        /* CNR Body */
+        .cnr-body { padding: 12px 14px; }
+
+        /* Priority Pills */
+        .cnr-priority-group { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+        .cnr-priority-group .pbtn {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 5px 13px; border-radius: 20px; border: 1.5px solid #e4e6ef;
+            background: #f9f9fb; cursor: pointer; font-size: 12px; font-weight: 600;
+            color: #7e8299; transition: all .15s; white-space: nowrap;
+        }
+        .cnr-priority-group .pbtn:hover { border-color: #bbb; background: #fff; }
+        .cnr-priority-group .pbtn i { font-size: 11px; }
+        .cnr-priority-group .pbtn.active-low {
+            background: #e8fff3; border-color: #50cd89; color: #2da76b; }
+        .cnr-priority-group .pbtn.active-medium {
+            background: #fff8dd; border-color: #ffc700; color: #a07800; }
+        .cnr-priority-group .pbtn.active-critical {
+            background: #fff0f4; border-color: #f1416c; color: #c71448; }
+
+        /* Notes Textarea */
+        .cnr-notes {
+            width: 100%; border: 1.5px solid #e4e6ef; border-radius: 9px;
+            padding: 9px 12px; font-size: 13px; resize: none;
+            min-height: 42px; max-height: 100px; font-family: inherit; line-height: 1.5;
+            background: #fafbff; color: #1e1e2d; transition: border-color .15s, box-shadow .15s;
+        }
+        .cnr-notes::placeholder { color: #c0c5d0; }
+        .cnr-notes:focus { border-color: #7239ea; outline: none; background: #fff; box-shadow: 0 0 0 3px rgba(114,57,234,.1); }
+
+        /* ─── Time Section ───────────────────────────── */
+        .cnr-time-section {
+            margin: 0; padding: 11px 14px 12px;
+            background: #fafbff;
+            border-top: 1px dashed #eef0f7;
+        }
+        .cnr-time-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        @media (max-width: 480px) {
+            .cnr-time-grid { grid-template-columns: 1fr; }
+        }
+        .cnr-time-field {
+            display: flex; flex-direction: column; gap: 4px;
+        }
+        .cnr-time-field label {
+            font-size: 11px; color: #a1a5b7; font-weight: 600;
+            display: flex; align-items: center; gap: 4px;
+        }
+        .cnr-time-field input[type="datetime-local"],
+        .cnr-time-field input[type="time"] {
+            width: 100%; border: 1.5px solid #e4e6ef; border-radius: 7px;
+            padding: 6px 10px; font-size: 12.5px; font-family: inherit;
+            color: #3f4254; background: #fff;
+            transition: border-color .15s; -webkit-appearance: none;
+        }
+        .cnr-time-field input:focus { border-color: #7239ea; outline: none; }
+        .cnr-time-field input:disabled { background: #f5f5f8; color: #b5b5c3; cursor: not-allowed; }
+
+        /* Visibility Row */
+        .cnr-vis-row {
+            grid-column: 1 / -1;
+            display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+        }
+        .cnr-vis-row label.vis-label {
+            font-size: 11px; color: #a1a5b7; font-weight: 600;
+            display: flex; align-items: center; gap: 4px; min-width: 100px;
+        }
+        .cnr-vis-inputs {
+            display: flex; align-items: center; gap: 6px; flex: 1; flex-wrap: wrap;
+        }
+        .cnr-vis-inputs input[type="time"] {
+            flex: 1; min-width: 100px; max-width: 140px;
+            border: 1.5px solid #e4e6ef; border-radius: 7px;
+            padding: 6px 10px; font-size: 12.5px; font-family: inherit;
+            color: #3f4254; background: #fff;
+        }
+        .cnr-vis-inputs input[type="time"]:focus { border-color: #7239ea; outline: none; }
+        .cnr-vis-inputs input[type="time"]:disabled { background: #f5f5f8; color: #b5b5c3; cursor: not-allowed; }
+        .cnr-vis-sep { font-size: 11px; color: #b5b5c3; flex-shrink: 0; }
+        .cnr-unlimited-toggle {
+            display: inline-flex; align-items: center; gap: 5px;
+            font-size: 11.5px; color: #7e8299; cursor: pointer; user-select: none;
+            background: #f5f0ff; border: 1px solid #e2d6ff;
+            padding: 4px 10px; border-radius: 20px; transition: all .12s; flex-shrink: 0;
+        }
+        .cnr-unlimited-toggle input { display: none; }
+        .cnr-unlimited-toggle.checked { background: #7239ea; border-color: #7239ea; color: #fff; }
+        .cnr-unlimited-toggle .toggle-dot {
+            width: 14px; height: 14px; border-radius: 50%;
+            border: 2px solid #a855f7; background: #fff; flex-shrink: 0;
+            transition: all .15s; display: flex; align-items: center; justify-content: center;
+        }
+        .cnr-unlimited-toggle.checked .toggle-dot { border-color: rgba(255,255,255,.6); background: rgba(255,255,255,.9); }
+        .cnr-unlimited-toggle.checked .toggle-dot::after { content:''; width:6px;height:6px;border-radius:50%;background:#7239ea; }
+
+        /* ─── Modal Overrides ────────────────────────── */
+        .modal-header-custom {
+            background: linear-gradient(135deg, #7239ea 0%, #a855f7 100%);
+            border-radius: 12px 12px 0 0; padding: 20px 24px; position: relative;
+        }
+        .modal-header-custom .modal-title { color: #fff; font-size: 18px; font-weight: 700; }
+        .modal-header-custom .modal-subtitle { color: rgba(255,255,255,.75); font-size: 13px; margin-top: 2px; }
+        .modal-header-custom .btn-close-white {
+            position: absolute; top: 16px; right: 20px;
+            background: rgba(255,255,255,.2); border: none; border-radius: 50%;
+            width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; color: #fff; font-size: 16px; transition: background .15s;
+        }
+        .modal-header-custom .btn-close-white:hover { background: rgba(255,255,255,.35); }
+
+        /* ─── Empty / Loading States ─────────────────── */
+        .empty-workers {
+            padding: 80px 20px; text-align: center;
+        }
+        .empty-workers-icon {
+            width: 100px; height: 100px; border-radius: 50%;
+            background: linear-gradient(135deg, rgba(114,57,234,.1), rgba(168,85,247,.1));
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto 24px; font-size: 44px; color: #7239ea;
+        }
+
+        /* ─── Toolbar actions ────────────────────────── */
+        .toolbar-refresh-btn {
+            transition: all .15s;
+        }
+        .toolbar-refresh-btn:hover i { transform: rotate(180deg); }
+        .toolbar-refresh-btn i { transition: transform .4s; display: inline-block; }
     </style>
 </head>
-<body id="kt_app_body" data-kt-app-layout="dark-sidebar" data-kt-app-header-fixed="true" data-kt-app-sidebar-enabled="true" data-kt-app-sidebar-fixed="true" data-kt-app-sidebar-hoverable="true" data-kt-app-sidebar-push-header="true" data-kt-app-sidebar-push-toolbar="true" data-kt-app-sidebar-push-footer="true" data-kt-app-toolbar-enabled="true" class="app-default">
+<body id="kt_app_body" data-kt-app-layout="dark-sidebar" data-kt-app-header-fixed="true"
+      data-kt-app-sidebar-enabled="true" data-kt-app-sidebar-fixed="true"
+      data-kt-app-sidebar-hoverable="true" data-kt-app-sidebar-push-header="true"
+      data-kt-app-sidebar-push-toolbar="true" data-kt-app-sidebar-push-footer="true"
+      data-kt-app-toolbar-enabled="true" class="app-default">
 
     <div class="d-flex flex-column flex-root app-root" id="kt_app_root">
         <div class="app-page flex-column flex-column-fluid" id="kt_app_page">
@@ -115,35 +305,106 @@
                 <div class="app-main flex-column flex-row-fluid" id="kt_app_main">
                     <div class="d-flex flex-column flex-column-fluid">
 
-                        <div id="kt_app_toolbar" class="app-toolbar py-3 py-lg-6">
-                            <div id="kt_app_toolbar_container" class="app-container container-xxl d-flex flex-stack">
+                        <!-- ─── Toolbar ──────────────────────────────────── -->
+                        <div id="kt_app_toolbar" class="app-toolbar py-3 py-lg-5">
+                            <div id="kt_app_toolbar_container" class="app-container container-xxl d-flex flex-stack flex-wrap gap-3">
                                 <div class="page-title d-flex flex-column justify-content-center flex-wrap me-3">
                                     <h1 class="page-heading d-flex text-dark fw-bold fs-3 flex-column justify-content-center my-0">
-                                        Penugasan Worker
+                                        <span class="d-flex align-items-center gap-3">
+                                            <span class="symbol symbol-35px">
+                                                <span class="symbol-label bg-light-primary">
+                                                    <i class="bi bi-person-check-fill fs-4 text-primary"></i>
+                                                </span>
+                                            </span>
+                                            Penugasan Worker
+                                        </span>
                                     </h1>
                                     <ul class="breadcrumb breadcrumb-separatorless fw-semibold fs-7 my-0 pt-1">
-                                        <li class="breadcrumb-item text-muted"><a href="index.html" class="text-muted text-hover-primary">Home</a></li>
+                                        <li class="breadcrumb-item text-muted">
+                                            <a href="index.html" class="text-muted text-hover-primary">Dashboard</a>
+                                        </li>
                                         <li class="breadcrumb-item"><span class="bullet bg-gray-400 w-5px h-2px"></span></li>
                                         <li class="breadcrumb-item text-muted">Penugasan Worker</li>
                                     </ul>
                                 </div>
+                                <div class="d-flex align-items-center gap-2">
+                                    <button class="btn btn-sm btn-light toolbar-refresh-btn" onclick="loadWorkers()" title="Refresh">
+                                        <i class="bi bi-arrow-clockwise fs-5"></i>
+                                        <span class="ms-1 d-none d-sm-inline">Refresh</span>
+                                    </button>
+                                    <a href="users.html" class="btn btn-sm btn-light-primary">
+                                        <i class="bi bi-person-plus me-1"></i>Tambah Worker
+                                    </a>
+                                </div>
                             </div>
                         </div>
 
+                        <!-- ─── Content ──────────────────────────────────── -->
                         <div id="kt_app_content" class="app-content flex-column-fluid">
                             <div id="kt_app_content_container" class="app-container container-xxl">
 
-                                <div class="row g-5 g-xl-8" id="workers-list"></div>
-
-                                <div id="loading-state" class="text-center py-20">
-                                    <div class="spinner-border text-primary mb-4" style="width:3rem;height:3rem;"></div>
-                                    <div class="text-muted fs-5">Memuat data worker...</div>
+                                <!-- Summary Stats Row -->
+                                <div class="row g-4 mb-6" id="stats-row" style="display:none!important;">
+                                    <div class="col-6 col-sm-3">
+                                        <div class="page-stat-card">
+                                            <div class="page-stat-icon bg-light-primary"><i class="bi bi-people-fill text-primary"></i></div>
+                                            <div>
+                                                <div class="page-stat-val" id="stat-total-workers">0</div>
+                                                <div class="page-stat-lbl">Total Worker</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-sm-3">
+                                        <div class="page-stat-card">
+                                            <div class="page-stat-icon bg-light-success"><i class="bi bi-person-check-fill text-success"></i></div>
+                                            <div>
+                                                <div class="page-stat-val" id="stat-active-workers">0</div>
+                                                <div class="page-stat-lbl">Aktif</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-sm-3">
+                                        <div class="page-stat-card">
+                                            <div class="page-stat-icon bg-light-warning"><i class="bi bi-chat-dots-fill text-warning"></i></div>
+                                            <div>
+                                                <div class="page-stat-val" id="stat-total-assignments">0</div>
+                                                <div class="page-stat-lbl">Total Penugasan</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-sm-3">
+                                        <div class="page-stat-card">
+                                            <div class="page-stat-icon bg-light-danger"><i class="bi bi-person-dash-fill text-danger"></i></div>
+                                            <div>
+                                                <div class="page-stat-val" id="stat-inactive-workers">0</div>
+                                                <div class="page-stat-lbl">Non-Aktif</div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
 
-                                <div id="empty-state" class="text-center py-20" style="display:none;">
-                                    <i class="bi bi-person-x fs-5x text-muted d-block mb-4"></i>
-                                    <h3 class="text-muted">Belum ada Worker</h3>
-                                    <p class="text-gray-600">Tambahkan user dengan role "Worker" di halaman <a href="/users.html" class="text-primary">Manajemen User</a></p>
+                                <!-- Workers Grid -->
+                                <div class="row g-5 g-xl-6" id="workers-list"></div>
+
+                                <!-- Loading State -->
+                                <div id="loading-state" class="text-center py-20">
+                                    <div class="mb-5">
+                                        <span class="spinner-border text-primary" style="width:3.5rem;height:3.5rem;"></span>
+                                    </div>
+                                    <div class="text-gray-600 fs-5 fw-semibold">Memuat data worker...</div>
+                                    <div class="text-muted fs-7 mt-1">Mohon tunggu sebentar</div>
+                                </div>
+
+                                <!-- Empty State -->
+                                <div id="empty-state" class="empty-workers" style="display:none;">
+                                    <div class="empty-workers-icon">
+                                        <i class="bi bi-person-x-fill"></i>
+                                    </div>
+                                    <h3 class="fw-bold text-dark mb-2">Belum Ada Worker</h3>
+                                    <p class="text-muted fs-6 mb-6">Tambahkan user dengan role "Worker" untuk mulai melakukan penugasan.</p>
+                                    <a href="users.html" class="btn btn-primary">
+                                        <i class="bi bi-person-plus me-2"></i>Tambah Worker Sekarang
+                                    </a>
                                 </div>
 
                             </div>
@@ -152,56 +413,104 @@
                     </div>
                     <div id="footer-container"></div>
                 </div>
-
             </div>
         </div>
     </div>
 
-    <!-- Assignment Modal -->
+    <!-- ─── Assignment Modal ─────────────────────────────────── -->
     <div class="modal fade" id="assignModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-lg modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header border-0 pb-0">
-                    <div>
-                        <h3 class="modal-title fw-bold" id="assign-modal-title">Penugasan</h3>
-                        <p class="text-muted fs-7 mb-0" id="assign-modal-subtitle">Pilih session dan nomor chat</p>
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content" style="border-radius:14px; border:none; overflow:hidden;">
+
+                <!-- Custom Header -->
+                <div class="modal-header-custom">
+                    <div class="d-flex align-items-center gap-3">
+                        <div style="width:42px;height:42px;border-radius:10px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                            <i class="bi bi-person-check-fill fs-4 text-white"></i>
+                        </div>
+                        <div>
+                            <div class="modal-title" id="assign-modal-title">Penugasan</div>
+                            <div class="modal-subtitle" id="assign-modal-subtitle">Pilih session dan nomor chat</div>
+                        </div>
                     </div>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close-white" data-bs-dismiss="modal" aria-label="Close">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
                 </div>
-                <div class="modal-body pt-4">
-                    <div class="mb-4">
-                        <label class="form-label fw-semibold text-dark fs-6">Session WhatsApp</label>
+
+                <div class="modal-body px-6 py-5">
+
+                    <!-- Step 1: Session -->
+                    <div class="mb-5">
+                        <div class="d-flex align-items-center gap-2 mb-3">
+                            <div class="badge badge-circle badge-primary w-25px h-25px fs-8">1</div>
+                            <span class="fw-bold text-dark fs-6">Pilih Session WhatsApp</span>
+                        </div>
                         <div class="d-flex flex-wrap gap-2" id="session-selector">
-                            <span class="text-muted fs-7">Memuat session...</span>
+                            <span class="text-muted fs-7 d-flex align-items-center gap-2">
+                                <span class="spinner-border spinner-border-sm text-primary"></span> Memuat session...
+                            </span>
                         </div>
                     </div>
-                    <div class="position-relative mb-3">
-                        <i class="bi bi-search position-absolute top-50 translate-middle-y ms-4 text-muted"></i>
-                        <input type="text" class="form-control form-control-solid ps-12" id="contact-search" placeholder="Cari nomor...">
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <span class="text-muted fs-7" id="contact-count-label">Pilih session terlebih dahulu</span>
-                        <div id="select-all-row" style="display:none;">
-                            <button class="btn btn-sm btn-light-primary me-1" onclick="selectAllContacts()">Pilih Semua</button>
-                            <button class="btn btn-sm btn-light-danger" onclick="deselectAllContacts()">Hapus Semua</button>
+
+                    <div class="separator separator-dashed mb-5"></div>
+
+                    <!-- Step 2: Contacts -->
+                    <div class="mb-4">
+                        <div class="d-flex align-items-center gap-2 mb-3">
+                            <div class="badge badge-circle badge-primary w-25px h-25px fs-8">2</div>
+                            <span class="fw-bold text-dark fs-6">Pilih Kontak</span>
                         </div>
-                    </div>
-                    <div class="contact-list-wrap border rounded" id="contact-list">
-                        <div class="text-center text-muted py-8">Pilih session terlebih dahulu</div>
-                    </div>
-                    <div id="selection-summary" class="mt-3" style="display:none;">
+                        <div class="position-relative mb-3">
+                            <i class="bi bi-search position-absolute top-50 translate-middle-y ms-4 text-muted"></i>
+                            <input type="text" class="form-control form-control-solid ps-11" id="contact-search" placeholder="Cari nomor atau nama...">
+                        </div>
                         <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span class="fw-bold fs-7 text-primary"><i class="bi bi-check2-circle me-1"></i>Dipilih: <span id="selected-count">0</span> nomor</span>
+                            <span class="text-muted fs-7 d-flex align-items-center gap-1" id="contact-count-label">
+                                <i class="bi bi-info-circle text-muted"></i> Pilih session terlebih dahulu
+                            </span>
+                            <div id="select-all-row" style="display:none;" class="d-flex gap-2">
+                                <button class="btn btn-sm btn-light-success py-1 px-3" onclick="selectAllContacts()">
+                                    <i class="bi bi-check-all me-1"></i>Pilih Semua
+                                </button>
+                                <button class="btn btn-sm btn-light-danger py-1 px-3" onclick="deselectAllContacts()">
+                                    <i class="bi bi-x-lg me-1"></i>Hapus Semua
+                                </button>
+                            </div>
+                        </div>
+                        <div class="contact-list-wrap border border-dashed rounded-3 bg-light" id="contact-list">
+                            <div class="text-center text-muted py-8">
+                                <i class="bi bi-arrow-up-circle fs-2x text-muted d-block mb-2"></i>
+                                Pilih session terlebih dahulu
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 3: Summary + Notes -->
+                    <div id="selection-summary" class="mt-2" style="display:none;">
+                        <div class="separator separator-dashed mb-4"></div>
+                        <div class="d-flex align-items-center gap-2 mb-3">
+                            <div class="badge badge-circle badge-success w-25px h-25px fs-8">3</div>
+                            <span class="fw-bold text-dark fs-6">Konfigurasi Penugasan</span>
+                            <span class="ms-auto badge badge-light-primary fs-7">
+                                <i class="bi bi-check2-circle me-1"></i>
+                                <span id="selected-count">0</span> kontak dipilih
+                            </span>
                         </div>
                         <div id="selected-contact-list"></div>
                     </div>
+
                 </div>
-                <div class="modal-footer border-0 pt-0">
-                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
+
+                <div class="modal-footer border-top bg-light px-6 py-4">
+                    <button type="button" class="btn btn-light me-auto" data-bs-dismiss="modal">
+                        <i class="bi bi-x me-1"></i>Batal
+                    </button>
                     <button type="button" class="btn btn-primary" id="btn-save-assignment" onclick="saveAssignment()">
-                        <i class="bi bi-check2 me-1"></i>Simpan Penugasan
+                        <i class="bi bi-check2-circle me-2"></i>Simpan Penugasan
                     </button>
                 </div>
+
             </div>
         </div>
     </div>
@@ -215,8 +524,13 @@
         let assignModal = null, currentWorkerId = null;
         let sessions = [], activeSession = null, contacts = [];
         let selectedContacts = {};
-        // Per-contact notes map: key = 'sessionId|contact', value = {notes, priority}
         let contactNotesMap = {};
+        let _allWorkers = [];
+
+        const AVATAR_GRADIENTS = [
+            'avatar-gradient-0','avatar-gradient-1','avatar-gradient-2',
+            'avatar-gradient-3','avatar-gradient-4','avatar-gradient-5'
+        ];
 
         function loadHTMLWithScripts(containerId, html) {
             const container = document.getElementById(containerId);
@@ -264,6 +578,9 @@
         }
 
         async function loadWorkers() {
+            document.getElementById('loading-state').style.display = 'block';
+            document.getElementById('workers-list').innerHTML = '';
+            document.getElementById('empty-state').style.display = 'none';
             try {
                 const r = await fetch('/api/workers');
                 let d;
@@ -271,13 +588,13 @@
                     d = await r.json();
                 } catch {
                     const text = await r.text().catch(() => '(no body)');
-                    throw new Error('HTTP ' + r.status + ': server returned non-JSON — ' + text.substring(0, 200));
+                    throw new Error('HTTP ' + r.status + ': ' + text.substring(0, 200));
                 }
                 document.getElementById('loading-state').style.display = 'none';
                 if (!d.success) {
                     document.getElementById('workers-list').innerHTML =
-                        '<div class="col-12"><div class="alert alert-danger d-flex align-items-center">' +
-                        '<i class="bi bi-exclamation-circle me-3 fs-3"></i>' +
+                        '<div class="col-12"><div class="alert alert-danger d-flex align-items-center gap-3 border-0 shadow-sm">' +
+                        '<i class="bi bi-exclamation-octagon-fill fs-2 text-danger"></i>' +
                         '<div><strong>Gagal memuat worker</strong><br><small>' + esc(d.error || 'Unknown error') + '</small></div></div></div>';
                     return;
                 }
@@ -285,46 +602,95 @@
                     document.getElementById('empty-state').style.display = 'block';
                     return;
                 }
-                document.getElementById('workers-list').innerHTML = d.workers.map(w => {
-                    const initials = w.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
-                    const statusBadge = w.status === 'aktif'
-                        ? '<span class="badge badge-light-success">Aktif</span>'
-                        : '<span class="badge badge-light-danger">Non-Aktif</span>';
-                    return '<div class="col-md-6 col-xl-4">' +
-                        '<div class="card card-flush worker-card h-100">' +
-                        '<div class="card-body d-flex flex-column pt-6 pb-5 px-6">' +
-                        '<div class="d-flex align-items-center mb-4">' +
-                        '<div class="worker-avatar me-4">' + esc(initials) + '</div>' +
-                        '<div class="flex-grow-1 min-w-0">' +
-                        '<div class="fw-bold fs-5 text-dark text-truncate">' + esc(w.name) + '</div>' +
-                        '<div class="text-muted fs-7 text-truncate">' + esc(w.email) + '</div></div>' +
-                        statusBadge + '</div>' +
-                        '<div class="d-flex justify-content-between align-items-center mt-auto pt-3 border-top">' +
-                        '<span class="badge badge-light-primary fs-7"><i class="bi bi-chat-dots me-1"></i>' + w.assignment_count + ' penugasan</span>' +
-                        '<button class="btn btn-sm btn-primary" onclick="openAssign(' + w.id + ', \'' + esc(w.name) + '\')">' +
-                        '<i class="bi bi-person-check me-1"></i>Penugasan</button></div>' +
-                        '</div></div></div>';
-                }).join('');
+                _allWorkers = d.workers;
+                updateStats(d.workers);
+                renderWorkerCards(d.workers);
             } catch (e) {
                 document.getElementById('loading-state').style.display = 'none';
                 document.getElementById('workers-list').innerHTML =
-                    '<div class="col-12"><div class="alert alert-danger d-flex align-items-center">' +
-                    '<i class="bi bi-exclamation-circle me-3 fs-3"></i>' +
-                    '<div><strong>Gagal memuat data worker</strong><br>' +
-                    '<small class="text-danger">' + esc(e.message) + '</small><br>' +
-                    '<small class="text-muted mt-1 d-block">Pastikan server sudah di-restart setelah perubahan kode terbaru.</small></div></div></div>';
+                    '<div class="col-12"><div class="alert alert-danger d-flex align-items-center gap-3 border-0 shadow-sm">' +
+                    '<i class="bi bi-exclamation-octagon-fill fs-2 text-danger"></i>' +
+                    '<div><strong>Gagal memuat data worker</strong><br><small class="text-danger">' + esc(e.message) + '</small>' +
+                    '<br><small class="text-muted">Pastikan server sudah di-restart setelah perubahan terbaru.</small></div></div></div>';
             }
+        }
+
+        function updateStats(workers) {
+            const active = workers.filter(w => w.status === 'aktif').length;
+            const totalAssignments = workers.reduce((s, w) => s + (w.assignment_count || 0), 0);
+            document.getElementById('stat-total-workers').textContent = workers.length;
+            document.getElementById('stat-active-workers').textContent = active;
+            document.getElementById('stat-inactive-workers').textContent = workers.length - active;
+            document.getElementById('stat-total-assignments').textContent = totalAssignments;
+            document.getElementById('stats-row').style.cssText = 'display:flex!important;flex-wrap:wrap;';
+        }
+
+        function renderWorkerCards(workers) {
+            document.getElementById('workers-list').innerHTML = workers.map((w, idx) => {
+                const initials = w.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+                const gradClass = AVATAR_GRADIENTS[idx % AVATAR_GRADIENTS.length];
+                const isActive = w.status === 'aktif';
+                const statusBadge = isActive
+                    ? '<span class="badge badge-light-success"><i class="bi bi-circle-fill me-1" style="font-size:8px"></i>Aktif</span>'
+                    : '<span class="badge badge-light-danger"><i class="bi bi-circle-fill me-1" style="font-size:8px"></i>Non-Aktif</span>';
+                const assignCount = w.assignment_count || 0;
+
+                return `
+                <div class="col-sm-6 col-xl-4">
+                    <div class="card card-flush worker-card h-100 ${isActive ? '' : 'inactive'}">
+                        <div class="card-header-bg"></div>
+                        <div class="card-body pt-5 pb-5 px-6">
+                            <!-- Header -->
+                            <div class="d-flex align-items-start mb-5">
+                                <div class="worker-avatar ${gradClass} me-4">${esc(initials)}</div>
+                                <div class="flex-grow-1 min-w-0">
+                                    <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+                                        <span class="fw-bold fs-5 text-dark text-truncate" style="max-width:170px;">${esc(w.name)}</span>
+                                        ${statusBadge}
+                                    </div>
+                                    <div class="text-muted fs-7 text-truncate">${esc(w.email)}</div>
+                                </div>
+                            </div>
+
+                            <!-- Stats Row -->
+                            <div class="d-flex gap-3 mb-5">
+                                <div class="worker-stat">
+                                    <i class="bi bi-chat-dots-fill stat-icon text-primary"></i>
+                                    <div>
+                                        <div class="stat-val">${assignCount}</div>
+                                        <div class="stat-lbl">Penugasan</div>
+                                    </div>
+                                </div>
+                                <div class="worker-stat">
+                                    <i class="bi bi-person-badge stat-icon text-info"></i>
+                                    <div>
+                                        <div class="stat-val">Worker</div>
+                                        <div class="stat-lbl">Role</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Action -->
+                            <button class="btn btn-primary w-100 btn-sm" onclick="openAssign(${w.id}, '${esc(w.name)}')">
+                                <i class="bi bi-person-check me-2"></i>Kelola Penugasan
+                            </button>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
         }
 
         async function openAssign(workerId, workerName) {
             currentWorkerId = workerId;
             selectedContacts = {}; contacts = []; activeSession = null;
             contactNotesMap = {};
-            document.getElementById('assign-modal-title').textContent = 'Penugasan: ' + workerName;
-            document.getElementById('assign-modal-subtitle').textContent = 'Pilih session dan nomor chat yang ditugaskan';
+            document.getElementById('assign-modal-title').textContent = workerName;
+            document.getElementById('assign-modal-subtitle').textContent = 'Kelola penugasan sesi & kontak';
             document.getElementById('contact-search').value = '';
-            document.getElementById('contact-list').innerHTML = '<div class="text-center text-muted py-8">Pilih session terlebih dahulu</div>';
-            document.getElementById('contact-count-label').textContent = 'Pilih session terlebih dahulu';
+            document.getElementById('contact-list').innerHTML =
+                '<div class="text-center text-muted py-8"><i class="bi bi-arrow-up-circle fs-2x text-muted d-block mb-2"></i>Pilih session terlebih dahulu</div>';
+            document.getElementById('contact-count-label').innerHTML =
+                '<i class="bi bi-info-circle text-muted"></i> Pilih session terlebih dahulu';
             document.getElementById('select-all-row').style.display = 'none';
             try {
                 const r = await fetch('/api/workers/' + workerId + '/assignments');
@@ -347,27 +713,33 @@
 
         function renderSessionButtons() {
             const c = document.getElementById('session-selector');
-            if (!sessions.length) { c.innerHTML = '<span class="text-muted fs-7">Tidak ada session tersedia</span>'; return; }
+            if (!sessions.length) {
+                c.innerHTML = '<div class="alert alert-warning py-2 px-4 mb-0 fs-7"><i class="bi bi-exclamation-triangle me-2"></i>Tidak ada session tersedia</div>';
+                return;
+            }
             c.innerHTML = sessions.map(s =>
-                '<button class="session-btn ' + (activeSession === s.id ? 'active' : '') + '" onclick="selectSession(\'' + esc(s.id) + '\')">' + esc(s.name || s.id) + '</button>'
+                `<button class="session-btn ${activeSession === s.id ? 'active' : ''}" onclick="selectSession('${esc(s.id)}')">${esc(s.name || s.id)}</button>`
             ).join('');
         }
 
         async function selectSession(sessionId) {
             activeSession = sessionId;
             renderSessionButtons();
-            document.getElementById('contact-list').innerHTML = '<div class="text-center py-6"><div class="spinner-border spinner-border-sm text-primary me-2"></div> Memuat kontak...</div>';
+            document.getElementById('contact-list').innerHTML =
+                '<div class="text-center py-8"><span class="spinner-border spinner-border-sm text-primary me-2"></span>Memuat kontak...</div>';
             document.getElementById('select-all-row').style.display = 'none';
             try {
                 const r = await fetch('/api/sessions/' + encodeURIComponent(sessionId) + '/contacts');
                 const d = await r.json();
                 contacts = d.contacts || [];
-                document.getElementById('contact-count-label').textContent = contacts.length + ' kontak tersedia';
-                document.getElementById('select-all-row').style.display = contacts.length ? 'block' : 'none';
+                document.getElementById('contact-count-label').innerHTML =
+                    `<i class="bi bi-people text-primary"></i> <strong>${contacts.length}</strong> kontak tersedia`;
+                document.getElementById('select-all-row').style.display = contacts.length ? 'flex' : 'none';
                 renderContacts();
             } catch {
                 contacts = [];
-                document.getElementById('contact-list').innerHTML = '<div class="text-center text-danger py-6">Gagal memuat kontak</div>';
+                document.getElementById('contact-list').innerHTML =
+                    '<div class="text-center text-danger py-6"><i class="bi bi-wifi-off d-block fs-2x mb-2"></i>Gagal memuat kontak</div>';
             }
         }
 
@@ -376,16 +748,22 @@
             const list = document.getElementById('contact-list');
             let items = contacts;
             if (filter) { const f = filter.toLowerCase(); items = items.filter(c => c.contact.toLowerCase().includes(f)); }
-            if (!items.length) { list.innerHTML = '<div class="text-center text-muted py-6">Tidak ada kontak ditemukan</div>'; return; }
+            if (!items.length) {
+                list.innerHTML = '<div class="text-center text-muted py-6"><i class="bi bi-search d-block fs-2x mb-2"></i>Tidak ada kontak ditemukan</div>';
+                return;
+            }
             const sel = selectedContacts[activeSession] || new Set();
             list.innerHTML = items.map(c => {
                 const phone = cleanPhone(c.contact);
                 const isSel = sel.has(c.contact);
-                return '<div class="contact-item ' + (isSel ? 'selected' : '') + '" onclick="toggleContact(\'' + esc(c.contact) + '\')">' +
-                    '<div class="contact-avatar me-3">' + phone.slice(-2) + '</div>' +
-                    '<div class="flex-grow-1"><div class="fw-semibold fs-7">' + esc(phone) + '</div>' +
-                    '<div class="text-muted" style="font-size:11px">' + (c.message_count || 0) + ' pesan</div></div>' +
-                    '<i class="bi ' + (isSel ? 'bi-check-circle-fill text-success' : 'bi-circle text-muted') + ' fs-5"></i></div>';
+                return `<div class="contact-item ${isSel ? 'selected' : ''}" onclick="toggleContact('${esc(c.contact)}')">
+                    <div class="contact-avatar me-3">${phone.slice(-2)}</div>
+                    <div class="flex-grow-1">
+                        <div class="fw-semibold fs-7">${esc(phone)}</div>
+                        <div class="text-muted" style="font-size:11px">${c.message_count || 0} pesan</div>
+                    </div>
+                    <i class="bi ${isSel ? 'bi-check-circle-fill text-success' : 'bi-circle text-muted'} fs-5"></i>
+                </div>`;
             }).join('');
         }
 
@@ -414,7 +792,7 @@
         }
 
         function updateSummary() {
-            // Save current field values before re-render
+            // Save current field values
             document.querySelectorAll('.cnr-notes[data-key]').forEach(el => {
                 const key = el.dataset.key;
                 if (contactNotesMap[key]) contactNotesMap[key].notes = el.value;
@@ -440,45 +818,79 @@
                 for (const contact of set) {
                     total++;
                     const key = sid + '|' + contact;
-                    if (!contactNotesMap[key]) contactNotesMap[key] = { notes: '', priority: 'low', start_datetime: '', end_datetime: '', visibility_start: '', visibility_end: '', no_visibility_limit: true };
+                    if (!contactNotesMap[key]) contactNotesMap[key] = {
+                        notes: '', priority: 'low', start_datetime: '', end_datetime: '',
+                        visibility_start: '', visibility_end: '', no_visibility_limit: true
+                    };
                     const nd = contactNotesMap[key];
                     const phone = cleanPhone(contact);
                     const sName = (sessions.find(s => s.id === sid) || {}).name || sid;
                     const noVisLimit = nd.no_visibility_limit;
-                    rows += '<div class="contact-note-row" data-key="' + esc(key) + '">' +
-                        '<div class="cnr-top">' +
-                            '<span class="cnr-phone">' + esc(phone) + '</span>' +
-                            '<span class="cnr-session">' + esc(sName) + '</span>' +
-                            '<button class="cnr-remove" onclick="removeContact(\'' + esc(sid) + '\',\'' + esc(contact) + '\')" title="Hapus">&times;</button>' +
-                        '</div>' +
-                        '<div class="cnr-body">' +
-                            '<div class="cnr-priority">' +
-                                '<button class="pbtn ' + (nd.priority === 'low' ? 'active-low' : '') + '" data-p="low" data-key="' + esc(key) + '" onclick="setPriority(this)" title="Low"><i class="bi bi-flag"></i></button>' +
-                                '<button class="pbtn ' + (nd.priority === 'medium' ? 'active-medium' : '') + '" data-p="medium" data-key="' + esc(key) + '" onclick="setPriority(this)" title="Medium"><i class="bi bi-flag-fill"></i></button>' +
-                                '<button class="pbtn ' + (nd.priority === 'critical' ? 'active-critical' : '') + '" data-p="critical" data-key="' + esc(key) + '" onclick="setPriority(this)" title="Critical"><i class="bi bi-exclamation-triangle-fill"></i></button>' +
-                            '</div>' +
-                            '<textarea class="cnr-notes" data-key="' + esc(key) + '" rows="1" placeholder="Catatan...">' + esc(nd.notes) + '</textarea>' +
-                        '</div>' +
-                        '<div class="cnr-time-section">' +
-                            '<div class="cnr-time-row">' +
-                                '<label><i class="bi bi-calendar-event me-1"></i>Mulai tugas</label>' +
-                                '<input type="datetime-local" class="cnr-start-dt" data-key="' + esc(key) + '" value="' + esc(nd.start_datetime || '') + '">' +
-                            '</div>' +
-                            '<div class="cnr-time-row">' +
-                                '<label><i class="bi bi-calendar-check me-1"></i>Selesai tugas</label>' +
-                                '<input type="datetime-local" class="cnr-end-dt" data-key="' + esc(key) + '" value="' + esc(nd.end_datetime || '') + '">' +
-                            '</div>' +
-                            '<div class="cnr-time-row">' +
-                                '<label><i class="bi bi-eye me-1"></i>Visibilitas chat</label>' +
-                                '<input type="time" class="cnr-vis-start" data-key="' + esc(key) + '" value="' + esc(nd.visibility_start || '') + '"' + (noVisLimit ? ' disabled' : '') + '>' +
-                                '<span style="font-size:11px;color:#bbb">s/d</span>' +
-                                '<input type="time" class="cnr-vis-end" data-key="' + esc(key) + '" value="' + esc(nd.visibility_end || '') + '"' + (noVisLimit ? ' disabled' : '') + '>' +
-                                '<label class="cbx-label ms-1"><input type="checkbox" class="cnr-vis-unlimited" data-key="' + esc(key) + '"' + (noVisLimit ? ' checked' : '') + ' onchange="toggleVisLimit(this)"> Tanpa batas</label>' +
-                            '</div>' +
-                        '</div>' +
-                    '</div>';
+
+                    const priorityColors = { low: '#50cd89', medium: '#ffc700', critical: '#f1416c' };
+                    const priorityIcons = { low: 'bi-flag', medium: 'bi-flag-fill', critical: 'bi-exclamation-triangle-fill' };
+                    const priorityLabels = { low: 'Low', medium: 'Medium', critical: 'Critical' };
+
+                    const phoneInitials = phone.slice(-4, -2) || phone.slice(0,2);
+                    rows += `<div class="contact-note-row" data-key="${esc(key)}">
+                        <!-- Header -->
+                        <div class="cnr-header">
+                            <div class="cnr-phone-avatar">${phoneInitials}</div>
+                            <div class="cnr-phone-info">
+                                <div class="cnr-phone">${esc(phone)}</div>
+                                <div class="cnr-session-tag"><i class="bi bi-phone"></i>${esc(sName)}</div>
+                            </div>
+                            <button class="cnr-remove" onclick="removeContact('${esc(sid)}','${esc(contact)}')" title="Hapus kontak ini">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                        </div>
+
+                        <!-- Body: Priority + Notes -->
+                        <div class="cnr-body">
+                            <div class="cnr-priority-group">
+                                <button class="pbtn ${nd.priority === 'low' ? 'active-low' : ''}" data-p="low" data-key="${esc(key)}" onclick="setPriority(this)">
+                                    <i class="bi bi-flag"></i> Low
+                                </button>
+                                <button class="pbtn ${nd.priority === 'medium' ? 'active-medium' : ''}" data-p="medium" data-key="${esc(key)}" onclick="setPriority(this)">
+                                    <i class="bi bi-flag-fill"></i> Medium
+                                </button>
+                                <button class="pbtn ${nd.priority === 'critical' ? 'active-critical' : ''}" data-p="critical" data-key="${esc(key)}" onclick="setPriority(this)">
+                                    <i class="bi bi-exclamation-triangle-fill"></i> Critical
+                                </button>
+                            </div>
+                            <textarea class="cnr-notes" data-key="${esc(key)}" rows="2" placeholder="Tulis catatan untuk worker (opsional)...">${esc(nd.notes)}</textarea>
+                        </div>
+
+                        <!-- Time Section -->
+                        <div class="cnr-time-section">
+                            <div class="cnr-time-grid">
+                                <div class="cnr-time-field">
+                                    <label><i class="bi bi-calendar-event text-primary"></i> Mulai tugas</label>
+                                    <input type="datetime-local" class="cnr-start-dt" data-key="${esc(key)}" value="${esc(nd.start_datetime || '')}">
+                                </div>
+                                <div class="cnr-time-field">
+                                    <label><i class="bi bi-calendar-check text-success"></i> Selesai tugas</label>
+                                    <input type="datetime-local" class="cnr-end-dt" data-key="${esc(key)}" value="${esc(nd.end_datetime || '')}">
+                                </div>
+                                <div class="cnr-vis-row">
+                                    <label class="vis-label"><i class="bi bi-eye text-warning"></i> Visibilitas</label>
+                                    <div class="cnr-vis-inputs">
+                                        <input type="time" class="cnr-vis-start" data-key="${esc(key)}" value="${esc(nd.visibility_start || '')}" ${noVisLimit ? 'disabled' : ''} placeholder="Mulai">
+                                        <span class="cnr-vis-sep">—</span>
+                                        <input type="time" class="cnr-vis-end" data-key="${esc(key)}" value="${esc(nd.visibility_end || '')}" ${noVisLimit ? 'disabled' : ''} placeholder="Selesai">
+                                        <label class="cnr-unlimited-toggle ${noVisLimit ? 'checked' : ''}" onclick="handleUnlimitedToggle(this, event)">
+                                            <input type="checkbox" class="cnr-vis-unlimited" data-key="${esc(key)}" ${noVisLimit ? 'checked' : ''} onchange="toggleVisLimit(this)">
+                                            <span class="toggle-dot"></span>
+                                            Tanpa batas
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>`;
                 }
             }
+
             document.getElementById('selected-count').textContent = total;
             document.getElementById('selected-contact-list').innerHTML = rows;
             document.getElementById('selection-summary').style.display = total > 0 ? 'block' : 'none';
@@ -488,6 +900,15 @@
                 el.addEventListener('input', () => { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; });
                 el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px';
             });
+        }
+
+        function handleUnlimitedToggle(label, e) {
+            // Prevent double-fire from checkbox's own change event
+            if (e.target.tagName === 'INPUT') return;
+            const cbx = label.querySelector('.cnr-vis-unlimited');
+            cbx.checked = !cbx.checked;
+            cbx.dispatchEvent(new Event('change'));
+            label.classList.toggle('checked', cbx.checked);
         }
 
         function toggleVisLimit(cbx) {
@@ -505,8 +926,7 @@
             const p = btn.dataset.p;
             if (!contactNotesMap[key]) contactNotesMap[key] = { notes: '', priority: 'low' };
             contactNotesMap[key].priority = p;
-            // Update sibling buttons
-            const row = btn.closest('.cnr-priority');
+            const row = btn.closest('.cnr-priority-group');
             row.querySelectorAll('.pbtn').forEach(b => b.className = 'pbtn' + (b.dataset.p === p ? ' active-' + p : ''));
         }
 
@@ -520,7 +940,6 @@
 
         async function saveAssignment() {
             if (!currentWorkerId) return;
-            // Collect latest field values
             document.querySelectorAll('.cnr-notes[data-key]').forEach(el => {
                 const key = el.dataset.key;
                 if (contactNotesMap[key]) contactNotesMap[key].notes = el.value.trim();
@@ -552,7 +971,7 @@
             }
             const btn = document.getElementById('btn-save-assignment');
             btn.disabled = true;
-            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Menyimpan...';
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Menyimpan...';
             try {
                 const r = await fetch('/api/workers/' + currentWorkerId + '/assignments', {
                     method: 'PUT', headers: { 'Content-Type': 'application/json' },
@@ -560,15 +979,33 @@
                 });
                 const d = await r.json();
                 if (d.success) {
-                    assignModal.hide(); loadWorkers();
-                    Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Penugasan berhasil disimpan', timer: 2000, showConfirmButton: false });
-                } else { Swal.fire('Error', d.error || 'Gagal menyimpan', 'error'); }
-            } catch (e) { Swal.fire('Error', e.message, 'error'); }
-            finally { btn.disabled = false; btn.innerHTML = '<i class="bi bi-check2 me-1"></i>Simpan Penugasan'; }
+                    assignModal.hide();
+                    loadWorkers();
+                    Swal.fire({
+                        toast: true, position: 'top-end', icon: 'success',
+                        title: 'Penugasan berhasil disimpan!', timer: 2500, showConfirmButton: false,
+                        showClass: { popup: 'animate__animated animate__fadeInRight' }
+                    });
+                } else {
+                    Swal.fire({ icon: 'error', title: 'Gagal menyimpan', text: d.error || 'Terjadi kesalahan' });
+                }
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: 'Error', text: e.message });
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-check2-circle me-2"></i>Simpan Penugasan';
+            }
         }
 
-        function cleanPhone(jid) { return (jid || '').replace(/@s\.whatsapp\.net$/i, '').replace(/@.*$/, '').replace(/[^0-9]/g, ''); }
-        function esc(str) { if (str == null) return ''; const d = document.createElement('div'); d.textContent = String(str); return d.innerHTML; }
+        function cleanPhone(jid) {
+            return (jid || '').replace(/@s\.whatsapp\.net$/i, '').replace(/@.*$/, '').replace(/[^0-9]/g, '');
+        }
+        function esc(str) {
+            if (str == null) return '';
+            const d = document.createElement('div');
+            d.textContent = String(str);
+            return d.innerHTML;
+        }
     </script>
 </body>
 </html>

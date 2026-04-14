@@ -35,6 +35,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!d.success) { window.location.href = '/auth/login'; return; }
         S.user = d.user;
         document.getElementById('topbar-name').textContent = d.user.name;
+
+        // Show admin-only navigation buttons in topbar
+        if (d.user.role === 'adminwa' || d.user.role === 'admin') {
+            const btnDash = document.getElementById('btn-admin-dashboard');
+            const btnTugas = document.getElementById('btn-admin-penugasan');
+            if (btnDash) btnDash.style.display = '';
+            if (btnTugas) btnTugas.style.display = '';
+        }
     } catch { window.location.href = '/auth/login'; return; }
 
     // 2. Connect socket
@@ -85,13 +93,16 @@ async function loadSessions() {
 
     renderSessionTabs();
 
-    // Auto-select: restore saved session or pick first
+    // Auto-select: restore saved session or pick first (connected for admin)
     const savedSession = sessionStorage.getItem('member_activeSession');
     if (!S.activeSession) {
-        if (savedSession && S.sessions.find(s => s.id === savedSession)) {
+        const isAdmin = S.user && (S.user.role === 'adminwa' || S.user.role === 'admin');
+        // Admin: prefer saved connected session, else first connected; others: prefer saved, else first
+        const validSessions = isAdmin ? S.sessions.filter(s => s.isConnected) : S.sessions;
+        if (savedSession && validSessions.find(s => s.id === savedSession)) {
             selectSession(savedSession);
-        } else {
-            selectSession(S.sessions[0].id);
+        } else if (validSessions.length > 0) {
+            selectSession(validSessions[0].id);
         }
     }
 }
@@ -209,7 +220,11 @@ function wireReportModal() {
 
 function renderSessionTabs() {
     const container = document.getElementById('session-tabs');
-    container.innerHTML = S.sessions.map(s => {
+    // Admin: only show connected (aktif) sessions; worker/member: show all assigned
+    const isAdmin = S.user && (S.user.role === 'adminwa' || S.user.role === 'admin');
+    const visibleSessions = isAdmin ? S.sessions.filter(s => s.isConnected) : S.sessions;
+
+    container.innerHTML = visibleSessions.map(s => {
         const active = s.id === S.activeSession ? 'active' : '';
         const dotCls = s.isConnected ? 'online' : 'offline';
         const label = s.name || s.id;

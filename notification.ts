@@ -233,33 +233,45 @@ export class NotificationService {
             socketSent = true
         }
 
-        // 2. FCM: always try to send push notification (system-level notif for background/closed browser)
+        // 2. FCM: ALWAYS try to send push notification
+        // Ensures notifications arrive even when tab is background/closed/PWA
         if (fcmInitialized) {
             const tokens = fcmTokenDb.getForUser(userId)
             if (tokens.length > 0) {
                 try {
+                    // Dynamic icon from app settings
+                    let iconUrl = '/assets/media/logos/pwa-192.png'
+                    try {
+                        const s = db.prepare('SELECT favicon FROM app_settings LIMIT 1').get() as any
+                        if (s?.favicon) iconUrl = `/uploads/settings/${s.favicon.split('/').pop()}`
+                    } catch {}
+
                     const tokenStrings = tokens.map(t => t.token)
+                    // UNIQUE tag per message — prevents silent notification replacement
+                    // Bug fix: old tag was session+contact based, causing 2nd+ messages to silently overwrite
+                    const uniqueTag = `${payload.type}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+
                     const message: admin.messaging.MulticastMessage = {
                         tokens: tokenStrings,
-                        // Use data-only message to let client/SW control display
-                        // This prevents FCM from auto-showing notification when page is focused
                         data: {
                             type: payload.type,
                             title: payload.title,
                             body: payload.body,
+                            tag: uniqueTag,
+                            icon: iconUrl,
                             ...(payload.data || {})
                         },
                         webpush: {
                             notification: {
                                 title: payload.title,
                                 body: payload.body,
-                                icon: '/assets/media/logos/favicon.ico',
-                                badge: '/assets/media/logos/favicon.ico',
-                                tag: `${payload.type}-${payload.data?.sessionId || ''}-${payload.data?.contactJid || ''}`,
+                                icon: iconUrl,
+                                badge: iconUrl,
+                                tag: uniqueTag,
                                 requireInteraction: payload.type === 'incoming_message'
                             },
                             fcmOptions: {
-                                link: payload.data?.url || '/'
+                                link: payload.data?.url || '/member/dashboard.html'
                             }
                         }
                     }

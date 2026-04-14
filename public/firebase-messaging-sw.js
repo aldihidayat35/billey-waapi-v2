@@ -3,7 +3,7 @@
 // Handles: offline caching, app install, background push notifications
 // ============================================
 
-const CACHE_NAME = 'billey-wa-v1';
+const CACHE_NAME = 'billey-wa-v2';
 const PRECACHE_URLS = [
     '/member/dashboard.html',
     '/member/chat.js',
@@ -90,14 +90,19 @@ messaging.onBackgroundMessage((payload) => {
     const notificationTitle = payload.notification?.title || payload.data?.title || 'Notifikasi Baru';
     const notificationBody = payload.notification?.body || payload.data?.body || '';
     const messageType = payload.data?.type || 'default';
-    const sessionId = payload.data?.sessionId || '';
-    const contactJid = payload.data?.contactJid || '';
+
+    // Use unique tag from backend (prevents silent replacement of previous notifications)
+    // Fallback: generate unique tag if not provided
+    const tag = payload.data?.tag || `${messageType}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+
+    // Use dynamic icon from backend if provided
+    const iconUrl = payload.data?.icon || '/assets/media/logos/pwa-192.png';
 
     const notificationOptions = {
         body: notificationBody,
-        icon: '/assets/media/logos/favicon.ico',
-        badge: '/assets/media/logos/favicon.ico',
-        tag: `${messageType}-${sessionId}-${contactJid}`,
+        icon: iconUrl,
+        badge: iconUrl,
+        tag: tag,
         data: payload.data || {},
         requireInteraction: messageType === 'incoming_message',
         actions: [
