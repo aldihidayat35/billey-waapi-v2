@@ -20,31 +20,53 @@
     
     <!-- Auth Check -->
     <script>
-        // Check authentication before loading page
         (async function() {
             try {
                 const res = await fetch('/api/auth/me');
-                if (!res.ok) {
-                    // Not authenticated, redirect to login
-                    window.location.href = '/auth/login?error=' + encodeURIComponent('Silakan login terlebih dahulu');
-                    return;
-                }
+                if (!res.ok) { window.location.href = '/auth/login?error=' + encodeURIComponent('Silakan login terlebih dahulu'); return; }
                 const data = await res.json();
-                if (!data.success || !data.user) {
-                    window.location.href = '/auth/login?error=' + encodeURIComponent('Silakan login terlebih dahulu');
-                    return;
-                }
-                // Check if user is admin
-                if (data.user.role !== 'adminwa') {
-                    window.location.href = '/member/dashboard.html';
-                    return;
-                }
+                if (!data.success || !data.user) { window.location.href = '/auth/login?error=' + encodeURIComponent('Silakan login terlebih dahulu'); return; }
+                if (data.user.role !== 'adminwa') { window.location.href = '/member/dashboard.html'; return; }
             } catch (error) {
-                console.error('Auth check error:', error);
                 window.location.href = '/auth/login?error=' + encodeURIComponent('Terjadi kesalahan. Silakan login kembali');
             }
         })();
     </script>
+
+    <style>
+        /* ── Chart Card Enhancements ──────────────────────────────── */
+        .chart-filter-btn {
+            font-size: 11px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            border: 1px solid #e4e6ef;
+            background: transparent;
+            color: #7e8299;
+            cursor: pointer;
+            transition: all .15s ease;
+            font-weight: 500;
+        }
+        .chart-filter-btn.active,
+        .chart-filter-btn:hover {
+            background: #009ef7;
+            border-color: #009ef7;
+            color: #fff;
+        }
+        .chart-filter-group { display: flex; gap: 4px; }
+
+        /* Peak hours badge colors */
+        .peak-badge { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
+
+        /* Skeleton loaders */
+        .chart-skeleton {
+            background: linear-gradient(90deg, #f5f5f5 25%, #ebebeb 50%, #f5f5f5 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.4s infinite;
+            border-radius: 8px;
+            height: 300px;
+        }
+        @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+    </style>
 </head>
 
 <body id="kt_app_body" data-kt-app-layout="dark-sidebar" data-kt-app-header-fixed="true" data-kt-app-sidebar-enabled="true" data-kt-app-sidebar-fixed="true" data-kt-app-sidebar-hoverable="true" data-kt-app-sidebar-push-header="true" data-kt-app-sidebar-push-toolbar="true" data-kt-app-sidebar-push-footer="true" data-kt-app-toolbar-enabled="true" class="app-default">
@@ -72,12 +94,8 @@
                                         Dashboard
                                     </h1>
                                     <ul class="breadcrumb breadcrumb-separatorless fw-semibold fs-7 my-0 pt-1">
-                                        <li class="breadcrumb-item text-muted">
-                                            <span class="text-muted text-hover-primary">Home</span>
-                                        </li>
-                                        <li class="breadcrumb-item">
-                                            <span class="bullet bg-gray-400 w-5px h-2px"></span>
-                                        </li>
+                                        <li class="breadcrumb-item text-muted"><span class="text-muted text-hover-primary">Home</span></li>
+                                        <li class="breadcrumb-item"><span class="bullet bg-gray-400 w-5px h-2px"></span></li>
                                         <li class="breadcrumb-item text-muted">Dashboard</li>
                                     </ul>
                                 </div>
@@ -87,13 +105,14 @@
                         <!-- Content -->
                         <div id="kt_app_content" class="app-content flex-column-fluid">
                             <div id="kt_app_content_container" class="app-container container-fluid">
-                                
-                                <!-- Statistics Row -->
-                                <div class="row g-5 g-xl-8 mb-5 mb-xl-8">
-                                    
+
+                                <!-- ── ROW 1: Stat Cards ──────────────────────────────── -->
+                                <div class="row g-5 g-xl-8 mb-5">
+
                                     <!-- Total Sessions -->
-                                    <div class="col-xl-3">
-                                        <div class="card card-flush bgi-no-repeat bgi-size-contain bgi-position-x-end h-xl-100" style="background-color: #F1416C; background-image:url('assets/media/patterns/vector-1.png')">
+                                    <div class="col-xl-3 col-md-6">
+                                        <div class="card card-flush bgi-no-repeat bgi-size-contain bgi-position-x-end h-xl-100"
+                                             style="background-color:#F1416C;background-image:url('assets/media/patterns/vector-1.png')">
                                             <div class="card-header pt-5">
                                                 <div class="card-title d-flex flex-column">
                                                     <span class="fs-2hx fw-bold text-white me-2 lh-1 ls-n2" id="stat-total-sessions">0</span>
@@ -101,19 +120,17 @@
                                                 </div>
                                             </div>
                                             <div class="card-body d-flex align-items-end pt-0">
-                                                <div class="d-flex align-items-center flex-column mt-3 w-100">
-                                                    <div class="d-flex justify-content-between fw-bold fs-6 text-white opacity-75 w-100 mt-auto mb-2">
-                                                        <span>Semua Session</span>
-                                                        <span><i class="bi bi-collection"></i></span>
-                                                    </div>
+                                                <div class="d-flex justify-content-between fw-bold fs-6 text-white opacity-75 w-100 mb-2">
+                                                    <span>Semua Session</span><i class="bi bi-collection"></i>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
-                                    
+
                                     <!-- Connected Sessions -->
-                                    <div class="col-xl-3">
-                                        <div class="card card-flush bgi-no-repeat bgi-size-contain bgi-position-x-end h-xl-100" style="background-color: #50CD89; background-image:url('assets/media/patterns/vector-1.png')">
+                                    <div class="col-xl-3 col-md-6">
+                                        <div class="card card-flush bgi-no-repeat bgi-size-contain bgi-position-x-end h-xl-100"
+                                             style="background-color:#50CD89;background-image:url('assets/media/patterns/vector-1.png')">
                                             <div class="card-header pt-5">
                                                 <div class="card-title d-flex flex-column">
                                                     <span class="fs-2hx fw-bold text-white me-2 lh-1 ls-n2" id="stat-connected-sessions">0</span>
@@ -121,64 +138,113 @@
                                                 </div>
                                             </div>
                                             <div class="card-body d-flex align-items-end pt-0">
-                                                <div class="d-flex align-items-center flex-column mt-3 w-100">
-                                                    <div class="d-flex justify-content-between fw-bold fs-6 text-white opacity-75 w-100 mt-auto mb-2">
-                                                        <span>Session Aktif</span>
-                                                        <span><i class="bi bi-check-circle"></i></span>
-                                                    </div>
+                                                <div class="d-flex justify-content-between fw-bold fs-6 text-white opacity-75 w-100 mb-2">
+                                                    <span>Session Aktif</span><i class="bi bi-check-circle"></i>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
-                                    
-                                    <!-- Messages Sent Today -->
-                                    <div class="col-xl-3">
-                                        <div class="card card-flush bgi-no-repeat bgi-size-contain bgi-position-x-end h-xl-100" style="background-color: #7239EA; background-image:url('assets/media/patterns/vector-1.png')">
+
+                                    <!-- Messages Total -->
+                                    <div class="col-xl-3 col-md-6">
+                                        <div class="card card-flush bgi-no-repeat bgi-size-contain bgi-position-x-end h-xl-100"
+                                             style="background-color:#7239EA;background-image:url('assets/media/patterns/vector-1.png')">
                                             <div class="card-header pt-5">
                                                 <div class="card-title d-flex flex-column">
                                                     <span class="fs-2hx fw-bold text-white me-2 lh-1 ls-n2" id="stat-messages-sent">0</span>
-                                                    <span class="text-white opacity-75 pt-1 fw-semibold fs-6">Messages Sent</span>
+                                                    <span class="text-white opacity-75 pt-1 fw-semibold fs-6">Total Pesan</span>
                                                 </div>
                                             </div>
                                             <div class="card-body d-flex align-items-end pt-0">
-                                                <div class="d-flex align-items-center flex-column mt-3 w-100">
-                                                    <div class="d-flex justify-content-between fw-bold fs-6 text-white opacity-75 w-100 mt-auto mb-2">
-                                                        <span>Hari Ini</span>
-                                                        <span><i class="bi bi-send-check"></i></span>
-                                                    </div>
+                                                <div class="d-flex justify-content-between fw-bold fs-6 text-white opacity-75 w-100 mb-2">
+                                                    <span>Masuk + Keluar</span><i class="bi bi-chat-dots"></i>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
-                                    
-                                    <!-- Success Rate -->
-                                    <div class="col-xl-3">
-                                        <div class="card card-flush bgi-no-repeat bgi-size-contain bgi-position-x-end h-xl-100" style="background-color: #009EF7; background-image:url('assets/media/patterns/vector-1.png')">
+
+                                    <!-- Incoming Today -->
+                                    <div class="col-xl-3 col-md-6">
+                                        <div class="card card-flush bgi-no-repeat bgi-size-contain bgi-position-x-end h-xl-100"
+                                             style="background-color:#009EF7;background-image:url('assets/media/patterns/vector-1.png')">
                                             <div class="card-header pt-5">
                                                 <div class="card-title d-flex flex-column">
-                                                    <span class="fs-2hx fw-bold text-white me-2 lh-1 ls-n2" id="stat-success-rate">100%</span>
-                                                    <span class="text-white opacity-75 pt-1 fw-semibold fs-6">Success Rate</span>
+                                                    <span class="fs-2hx fw-bold text-white me-2 lh-1 ls-n2" id="stat-incoming-today">0</span>
+                                                    <span class="text-white opacity-75 pt-1 fw-semibold fs-6">Pesan Masuk Hari Ini</span>
                                                 </div>
                                             </div>
                                             <div class="card-body d-flex align-items-end pt-0">
-                                                <div class="d-flex align-items-center flex-column mt-3 w-100">
-                                                    <div class="d-flex justify-content-between fw-bold fs-6 text-white opacity-75 w-100 mt-auto mb-2">
-                                                        <span>Tingkat Keberhasilan</span>
-                                                        <span><i class="bi bi-graph-up"></i></span>
-                                                    </div>
+                                                <div class="d-flex justify-content-between fw-bold fs-6 text-white opacity-75 w-100 mb-2">
+                                                    <span>Incoming Today</span><i class="bi bi-arrow-down-circle"></i>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
-                                    
+
                                 </div>
-                                
-                                <!-- Content Row -->
-                                <div class="row g-5 g-xl-8">
+
+                                <!-- ── ROW 2: Line Chart + Peak Hours ─────────────────── -->
+                                <div class="row g-5 g-xl-8 mb-5">
+
+                                    <!-- Line Chart: Daily Messages -->
+                                    <div class="col-xl-8">
+                                        <div class="card card-xl-stretch">
+                                            <div class="card-header border-0 pt-5 align-items-center">
+                                                <h3 class="card-title align-items-start flex-column">
+                                                    <span class="card-label fw-bold fs-3 mb-1">
+                                                        <i class="bi bi-graph-up text-primary me-2"></i>Tren Pesan Harian
+                                                    </span>
+                                                    <span class="text-muted fw-semibold fs-7" id="chart-daily-subtitle">Pesan masuk &amp; keluar per hari</span>
+                                                </h3>
+                                                <div class="card-toolbar">
+                                                    <div class="chart-filter-group">
+                                                        <button class="chart-filter-btn active" data-days="7" onclick="switchDailyRange(this,7)">7H</button>
+                                                        <button class="chart-filter-btn" data-days="30" onclick="switchDailyRange(this,30)">30H</button>
+                                                        <button class="chart-filter-btn" data-days="90" onclick="switchDailyRange(this,90)">90H</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="card-body pt-3 pb-5">
+                                                <div id="chart-daily-messages" style="min-height:300px;">
+                                                    <div class="chart-skeleton"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Bar Chart: Peak Hours -->
+                                    <div class="col-xl-4">
+                                        <div class="card card-xl-stretch">
+                                            <div class="card-header border-0 pt-5 align-items-center">
+                                                <h3 class="card-title align-items-start flex-column">
+                                                    <span class="card-label fw-bold fs-3 mb-1">
+                                                        <i class="bi bi-clock-history text-warning me-2"></i>Jam Tersibuk
+                                                    </span>
+                                                    <span class="text-muted fw-semibold fs-7" id="chart-peak-subtitle">Peak hours chat</span>
+                                                </h3>
+                                                <div class="card-toolbar">
+                                                    <div class="chart-filter-group">
+                                                        <button class="chart-filter-btn active" data-days="7" onclick="switchPeakRange(this,7)">7H</button>
+                                                        <button class="chart-filter-btn" data-days="30" onclick="switchPeakRange(this,30)">30H</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="card-body pt-3 pb-5">
+                                                <div id="chart-peak-hours" style="min-height:300px;">
+                                                    <div class="chart-skeleton"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                </div>
+
+                                <!-- ── ROW 3: Active Sessions + Quick Actions ──────────── -->
+                                <div class="row g-5 g-xl-8 mb-5">
                                     
                                     <!-- Active Sessions -->
                                     <div class="col-xl-6">
-                                        <div class="card card-xl-stretch mb-xl-8">
+                                        <div class="card card-xl-stretch">
                                             <div class="card-header border-0 pt-5">
                                                 <h3 class="card-title align-items-start flex-column">
                                                     <span class="card-label fw-bold fs-3 mb-1">Active Sessions</span>
@@ -193,9 +259,7 @@
                                             <div class="card-body pt-5">
                                                 <div id="active-sessions-list">
                                                     <div class="text-center py-10">
-                                                        <div class="spinner-border text-primary" role="status">
-                                                            <span class="visually-hidden">Loading...</span>
-                                                        </div>
+                                                        <div class="spinner-border text-primary" role="status"></div>
                                                         <p class="text-muted mt-3">Memuat session...</p>
                                                     </div>
                                                 </div>
@@ -205,7 +269,7 @@
                                     
                                     <!-- Quick Actions -->
                                     <div class="col-xl-6">
-                                        <div class="card card-xl-stretch mb-5 mb-xl-8">
+                                        <div class="card card-xl-stretch">
                                             <div class="card-header border-0 pt-5">
                                                 <h3 class="card-title align-items-start flex-column">
                                                     <span class="card-label fw-bold fs-3 mb-1">Quick Actions</span>
@@ -213,12 +277,10 @@
                                                 </h3>
                                             </div>
                                             <div class="card-body pt-5">
-                                                <div class="d-flex flex-column gap-5">
-                                                    <a href="manage-sessions.html" class="d-flex align-items-center bg-light-primary rounded p-5 text-hover-primary">
-                                                        <div class="symbol symbol-50px me-5">
-                                                            <span class="symbol-label bg-white">
-                                                                <i class="bi bi-plus-circle fs-2x text-primary"></i>
-                                                            </span>
+                                                <div class="d-flex flex-column gap-4">
+                                                    <a href="manage-sessions.html" class="d-flex align-items-center bg-light-primary rounded p-4 text-hover-primary">
+                                                        <div class="symbol symbol-45px me-4">
+                                                            <span class="symbol-label bg-white"><i class="bi bi-plus-circle fs-2x text-primary"></i></span>
                                                         </div>
                                                         <div class="flex-grow-1">
                                                             <div class="fw-bold text-gray-800 fs-6">Kelola Session</div>
@@ -226,12 +288,9 @@
                                                         </div>
                                                         <i class="bi bi-arrow-right fs-2x text-primary"></i>
                                                     </a>
-                                                    
-                                                    <a href="send-message.html" class="d-flex align-items-center bg-light-success rounded p-5 text-hover-success">
-                                                        <div class="symbol symbol-50px me-5">
-                                                            <span class="symbol-label bg-white">
-                                                                <i class="bi bi-send fs-2x text-success"></i>
-                                                            </span>
+                                                    <a href="send-message.html" class="d-flex align-items-center bg-light-success rounded p-4 text-hover-success">
+                                                        <div class="symbol symbol-45px me-4">
+                                                            <span class="symbol-label bg-white"><i class="bi bi-send fs-2x text-success"></i></span>
                                                         </div>
                                                         <div class="flex-grow-1">
                                                             <div class="fw-bold text-gray-800 fs-6">Kirim Pesan</div>
@@ -239,12 +298,19 @@
                                                         </div>
                                                         <i class="bi bi-arrow-right fs-2x text-success"></i>
                                                     </a>
-                                                    
-                                                    <a href="log-activity.html" class="d-flex align-items-center bg-light-info rounded p-5 text-hover-info">
-                                                        <div class="symbol symbol-50px me-5">
-                                                            <span class="symbol-label bg-white">
-                                                                <i class="bi bi-clock-history fs-2x text-info"></i>
-                                                            </span>
+                                                    <a href="penugasan.html" class="d-flex align-items-center bg-light-warning rounded p-4 text-hover-warning">
+                                                        <div class="symbol symbol-45px me-4">
+                                                            <span class="symbol-label bg-white"><i class="bi bi-person-check fs-2x text-warning"></i></span>
+                                                        </div>
+                                                        <div class="flex-grow-1">
+                                                            <div class="fw-bold text-gray-800 fs-6">Penugasan Worker</div>
+                                                            <div class="text-muted fs-7">Kelola tugas dan performa worker</div>
+                                                        </div>
+                                                        <i class="bi bi-arrow-right fs-2x text-warning"></i>
+                                                    </a>
+                                                    <a href="log-activity.html" class="d-flex align-items-center bg-light-info rounded p-4 text-hover-info">
+                                                        <div class="symbol symbol-45px me-4">
+                                                            <span class="symbol-label bg-white"><i class="bi bi-clock-history fs-2x text-info"></i></span>
                                                         </div>
                                                         <div class="flex-grow-1">
                                                             <div class="fw-bold text-gray-800 fs-6">Activity Logs</div>
@@ -256,38 +322,9 @@
                                             </div>
                                         </div>
                                     </div>
-                                    
+
                                 </div>
-                                
-                                <!-- Recent Activity -->
-                                <div class="row g-5 g-xl-8">
-                                    <div class="col-xl-12">
-                                        <div class="card card-xl-stretch mb-xl-8">
-                                            <div class="card-header border-0 pt-5">
-                                                <h3 class="card-title align-items-start flex-column">
-                                                    <span class="card-label fw-bold fs-3 mb-1">Recent Activity</span>
-                                                    <span class="text-muted fw-semibold fs-7">10 aktivitas terbaru</span>
-                                                </h3>
-                                                <div class="card-toolbar">
-                                                    <a href="log-activity.html" class="btn btn-sm btn-light-info">
-                                                        <i class="bi bi-list"></i> Lihat Semua
-                                                    </a>
-                                                </div>
-                                            </div>
-                                            <div class="card-body pt-5">
-                                                <div id="recent-activity-list">
-                                                    <div class="text-center py-10">
-                                                        <div class="spinner-border text-primary" role="status">
-                                                            <span class="visually-hidden">Loading...</span>
-                                                        </div>
-                                                        <p class="text-muted mt-3">Memuat aktivitas...</p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
+
                             </div>
                         </div>
                         
@@ -306,8 +343,11 @@
     <!-- Metronic JS -->
     <script src="assets/plugins/global/plugins.bundle.js"></script>
     <script src="assets/js/scripts.bundle.js"></script>
+
+    <!-- ApexCharts -->
+    <script src="assets/plugins/custom/apexcharts/apexcharts.min.js"></script>
     
-    <!-- Header JS (user info, logout, change password) -->
+    <!-- Header JS -->
     <script src="js/header.js"></script>
     
     <!-- Dashboard JS -->

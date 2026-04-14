@@ -85,6 +85,15 @@
         .session-info-value {
             color: #181c32;
         }
+        .chart-filter-btn {
+            font-size: 11px; padding: 4px 10px; border-radius: 6px;
+            border: 1px solid #e4e6ef; background: transparent;
+            color: #7e8299; cursor: pointer; transition: all .15s ease; font-weight: 500;
+        }
+        .chart-filter-btn.active, .chart-filter-btn:hover {
+            background: #009ef7; border-color: #009ef7; color: #fff;
+        }
+        .chart-filter-group { display: flex; gap: 4px; }
     </style>
 </head>
 <body id="kt_app_body" data-kt-app-layout="dark-sidebar" data-kt-app-header-fixed="true" data-kt-app-sidebar-enabled="true" data-kt-app-sidebar-fixed="true" data-kt-app-sidebar-hoverable="true" data-kt-app-sidebar-push-header="true" data-kt-app-sidebar-push-toolbar="true" data-kt-app-sidebar-push-footer="true" data-kt-app-toolbar-enabled="true" class="app-default">
@@ -113,7 +122,7 @@
                             <div id="kt_app_toolbar_container" class="app-container container-xxl d-flex flex-stack">
                                 <div class="page-title d-flex flex-column justify-content-center flex-wrap me-3">
                                     <h1 class="page-heading d-flex text-dark fw-bold fs-3 flex-column justify-content-center my-0">
-                                        🔧 Kelola Session
+                                         Kelola Session
                                     </h1>
                                     <ul class="breadcrumb breadcrumb-separatorless fw-semibold fs-7 my-0 pt-1">
                                         <li class="breadcrumb-item text-muted">
@@ -130,7 +139,70 @@
                         <!--begin::Content-->
                         <div id="kt_app_content" class="app-content flex-column-fluid">
                             <div id="kt_app_content_container" class="app-container container-xxl">
-                                
+                                   <!-- ══ SESSION TREND CHART ═══════════════════════════ -->
+                                <div class="card mt-5 mt-xl-10" id="session-trend-card">
+                                    <div class="card-header border-0 pt-6 align-items-center">
+                                        <div>
+                                            <h3 class="card-title align-items-start flex-column mb-0">
+                                                <span class="card-label fw-bold fs-3">
+                                                    <i class="bi bi-graph-up text-primary me-2"></i>Tren Pesan per Session
+                                                </span>
+                                            </h3>
+                                            <span class="text-muted fw-semibold fs-7" id="session-trend-subtitle">Pilih session untuk melihat grafik</span>
+                                        </div>
+                                        <div class="card-toolbar ms-auto d-flex gap-3 align-items-center flex-wrap">
+                                            <!-- Session Selector -->
+                                            <select class="form-select form-select-sm form-select-solid w-180px" id="trend-session-select"
+                                                    onchange="onTrendSessionChange()">
+                                                <option value="">-- Pilih Session --</option>
+                                            </select>
+                                            <!-- Day Range -->
+                                            <div class="chart-filter-group">
+                                                <button class="chart-filter-btn active" onclick="switchTrendRange(this,7)">7H</button>
+                                                <button class="chart-filter-btn" onclick="switchTrendRange(this,30)">30H</button>
+                                                <button class="chart-filter-btn" onclick="switchTrendRange(this,90)">90H</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="card-body pt-4">
+                                        <div id="chart-session-trend" style="min-height:300px;">
+                                            <div class="d-flex align-items-center justify-content-center text-muted" style="height:300px;">
+                                                <div class="text-center">
+                                                    <i class="bi bi-bar-chart-line fs-5x mb-4 d-block"></i>
+                                                    <p class="fw-semibold">Pilih session untuk melihat tren pesan</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <!-- Stats row for selected session -->
+                                        <div class="row g-4 mt-3" id="session-stats-row" style="display:none!important;">
+                                            <div class="col-6 col-md-3">
+                                                <div class="bg-light-primary rounded p-4 text-center">
+                                                    <div class="fw-bold fs-2x text-primary" id="ss-total">0</div>
+                                                    <div class="text-muted fs-8">Total Pesan</div>
+                                                </div>
+                                            </div>
+                                            <div class="col-6 col-md-3">
+                                                <div class="bg-light-success rounded p-4 text-center">
+                                                    <div class="fw-bold fs-2x text-success" id="ss-incoming">0</div>
+                                                    <div class="text-muted fs-8">Masuk</div>
+                                                </div>
+                                            </div>
+                                            <div class="col-6 col-md-3">
+                                                <div class="bg-light-info rounded p-4 text-center">
+                                                    <div class="fw-bold fs-2x text-info" id="ss-outgoing">0</div>
+                                                    <div class="text-muted fs-8">Keluar</div>
+                                                </div>
+                                            </div>
+                                            <div class="col-6 col-md-3">
+                                                <div class="bg-light-warning rounded p-4 text-center">
+                                                    <div class="fw-bold fs-2x text-warning" id="ss-contacts">0</div>
+                                                    <div class="text-muted fs-8">Kontak Unik</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- ══ END SESSION TREND CHART ══════════════════════ -->
                                 <!--begin::Create Session Card-->
                                 <div class="card mb-5 mb-xl-10">
                                     <div class="card-header">
@@ -187,7 +259,9 @@
                                     </div>
                                 </div>
                                 <!--end::Sessions List-->
-                                
+
+                             
+
                             </div>
                         </div>
                         <!--end::Content-->
@@ -301,6 +375,104 @@
     
     <!-- Main App Script -->
     <script src="manage-sessions.js"></script>
+
+    <!-- ApexCharts for session trend chart -->
+    <script src="assets/plugins/custom/apexcharts/apexcharts.min.js"></script>
+
+    <!-- Session Trend Chart Logic -->
+    <script>
+    let _trendChart = null;
+    let _trendDays  = 7;
+
+    // Called by manage-sessions.js after rendering session cards
+    function populateTrendSessionSelect(sessions) {
+        const sel = document.getElementById('trend-session-select');
+        if (!sel || !sessions) return;
+        const prev = sel.value;
+        sel.innerHTML = '<option value="">-- Pilih Session --</option>';
+        sessions.forEach(s => {
+            const opt = document.createElement('option');
+            opt.value = s.id;
+            opt.textContent = s.id + (s.isConnected ? ' ✓' : ' ✗');
+            sel.appendChild(opt);
+        });
+        if (prev) sel.value = prev;
+        // Auto-load first connected session
+        if (!prev && sessions.length > 0) {
+            const first = sessions.find(s => s.isConnected) || sessions[0];
+            if (first) { sel.value = first.id; loadSessionTrendChart(first.id, _trendDays); }
+        }
+    }
+
+    async function loadSessionTrendChart(sessionId, days) {
+        if (!sessionId) return;
+        const el = document.getElementById('chart-session-trend');
+        el.innerHTML = '<div class="d-flex align-items-center justify-content-center" style="height:300px;"><span class="spinner-border text-primary"></span></div>';
+
+        try {
+            const res  = await fetch('/api/stats/messages/by-session?sessionId=' + encodeURIComponent(sessionId) + '&days=' + days);
+            const json = await res.json();
+            if (!json.success) { el.innerHTML = '<div class="text-center text-muted py-10">Gagal memuat data</div>'; return; }
+
+            const data     = json.data;
+            const stats    = json.stats || {};
+            const dates    = data.map(d => d.date);
+            const incoming = data.map(d => d.incoming);
+            const outgoing = data.map(d => d.outgoing);
+            const total    = data.reduce((s,d) => s + d.total, 0);
+
+            document.getElementById('session-trend-subtitle').textContent =
+                sessionId + ' • ' + days + ' hari • ' + total.toLocaleString('id') + ' pesan';
+
+            // Update stat boxes
+            document.getElementById('ss-total').textContent    = (stats.total_messages || 0).toLocaleString('id');
+            document.getElementById('ss-incoming').textContent = (stats.incoming || 0).toLocaleString('id');
+            document.getElementById('ss-outgoing').textContent = (stats.outgoing || 0).toLocaleString('id');
+            document.getElementById('ss-contacts').textContent = (stats.contacts || 0).toLocaleString('id');
+            document.getElementById('session-stats-row').style.cssText = 'display:flex!important;flex-wrap:wrap;';
+
+            el.innerHTML = '';
+            const opts = {
+                series: [
+                    { name: 'Masuk',  data: incoming },
+                    { name: 'Keluar', data: outgoing  },
+                ],
+                chart: { type: 'area', height: 300, fontFamily: 'Inter,sans-serif', toolbar: { show: false }, zoom: { enabled: false } },
+                dataLabels: { enabled: false },
+                stroke: { curve: 'smooth', width: 2 },
+                fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.05, stops: [0,90,100] } },
+                colors: ['#009ef7', '#50CD89'],
+                xaxis: { categories: dates, axisBorder: { show: false }, axisTicks: { show: false }, labels: { style: { colors: '#7e8299', fontSize: '11px' }, rotate: -25 } },
+                yaxis: { labels: { style: { colors: '#7e8299', fontSize: '11px' }, formatter: v => Math.round(v) }, min: 0 },
+                legend: { show: true, position: 'top', horizontalAlign: 'right', labels: { colors: '#3f4254' } },
+                grid: { borderColor: '#f0f0f0', strokeDashArray: 4 },
+                tooltip: { shared: true, intersect: false, y: { formatter: v => v + ' pesan' } },
+                markers: { size: 3, strokeWidth: 0, hover: { sizeOffset: 4 } },
+                noData: { text: 'Belum ada data untuk session ini', style: { color: '#7e8299' } },
+            };
+            if (_trendChart) _trendChart.destroy();
+            _trendChart = new ApexCharts(el, opts);
+            _trendChart.render();
+
+        } catch(e) {
+            console.error('Session trend chart error:', e);
+            el.innerHTML = '<div class="text-center text-muted py-10">Error memuat chart</div>';
+        }
+    }
+
+    function onTrendSessionChange() {
+        const sel = document.getElementById('trend-session-select');
+        if (sel?.value) loadSessionTrendChart(sel.value, _trendDays);
+    }
+
+    function switchTrendRange(btn, days) {
+        document.querySelectorAll('#session-trend-card .chart-filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        _trendDays = days;
+        const sel = document.getElementById('trend-session-select');
+        if (sel?.value) loadSessionTrendChart(sel.value, days);
+    }
+    </script>
 
     <!-- ============================================================ -->
     <!-- Session Detail Modal — Metronic 8                            -->

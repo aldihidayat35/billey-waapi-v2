@@ -45,14 +45,25 @@
 
         // 3. Update sidebar logos (set after DOM is ready / sidebar is loaded)
         function applyLogos() {
-            const logoDefault = document.getElementById('sidebar-logo-default');
+            const logoDefault  = document.getElementById('sidebar-logo-default');
             const logoMinimize = document.getElementById('sidebar-logo-minimize');
-            const logoMobile = document.getElementById('header-logo-mobile');
-            const loginLogo = document.getElementById('login-logo-img');
+            const logoMobile   = document.getElementById('header-logo-mobile');
+            const loginLogo    = document.getElementById('login-logo-img');
             const loginAppName = document.getElementById('login-app-name');
+            const sidebarAppName = document.getElementById('sidebar-app-name');
 
-            if (logoDefault && s.logo_url) logoDefault.src = s.logo_url;
-            if (logoMinimize) logoMinimize.src = s.logo_small_url || s.logo_url || logoMinimize.src;
+            if (logoDefault && s.logo_url) {
+                logoDefault.src = s.logo_url;
+                // Remove the default-SVG filter so custom logos show original colors
+                logoDefault.removeAttribute('data-is-default');
+            }
+            if (logoMinimize) {
+                const smallUrl = s.logo_small_url || s.logo_url;
+                if (smallUrl) {
+                    logoMinimize.src = smallUrl;
+                    logoMinimize.removeAttribute('data-is-default');
+                }
+            }
             if (logoMobile) logoMobile.src = s.logo_small_url || s.logo_url || logoMobile.src;
 
             if (loginLogo) {
@@ -63,7 +74,9 @@
                     if (iconEl) iconEl.style.display = 'none';
                 }
             }
-            if (loginAppName) loginAppName.textContent = s.app_name;
+            if (loginAppName)    loginAppName.textContent    = s.app_name;
+            // Update sidebar app name text next to logo
+            if (sidebarAppName && s.app_name) sidebarAppName.textContent = s.app_name;
 
             // Any element with data-app-name attribute
             document.querySelectorAll('[data-app-name]').forEach(el => {

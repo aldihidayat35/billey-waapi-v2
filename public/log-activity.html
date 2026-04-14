@@ -87,6 +87,15 @@
         .export-btn:hover {
             transform: scale(1.05);
         }
+        .chart-filter-btn {
+            font-size: 11px; padding: 4px 10px; border-radius: 6px;
+            border: 1px solid #e4e6ef; background: transparent;
+            color: #7e8299; cursor: pointer; transition: all .15s ease; font-weight: 500;
+        }
+        .chart-filter-btn.active, .chart-filter-btn:hover {
+            background: #009ef7; border-color: #009ef7; color: #fff;
+        }
+        .chart-filter-group { display: flex; gap: 4px; }
     </style>
 </head>
 <body id="kt_app_body" data-kt-app-layout="dark-sidebar" data-kt-app-header-fixed="true" data-kt-app-sidebar-enabled="true" data-kt-app-sidebar-fixed="true" data-kt-app-sidebar-hoverable="true" data-kt-app-sidebar-push-header="true" data-kt-app-sidebar-push-toolbar="true" data-kt-app-sidebar-push-footer="true" data-kt-app-toolbar-enabled="true" class="app-default">
@@ -207,6 +216,52 @@
                                     </div>
                                 </div>
                                 
+                                <!-- Row 1b: Traffic Charts -->
+                                <div class="row g-5 mb-5" id="activity-charts-row">
+
+                                    <!-- Line Chart: Daily Activity Trend -->
+                                    <div class="col-xl-8">
+                                        <div class="card card-flush">
+                                            <div class="card-header border-0 pt-5 align-items-center">
+                                                <h3 class="card-title align-items-start flex-column">
+                                                    <span class="card-label fw-bold fs-3 mb-1">
+                                                        <i class="bi bi-graph-up text-primary me-2"></i>Tren Trafik Pesan
+                                                    </span>
+                                                    <span class="text-muted fw-semibold fs-7" id="activity-chart-subtitle">Aktivitas pesan per hari</span>
+                                                </h3>
+                                                <div class="card-toolbar">
+                                                    <div class="chart-filter-group">
+                                                        <button class="chart-filter-btn active" onclick="switchActivityRange(this,7)">7H</button>
+                                                        <button class="chart-filter-btn" onclick="switchActivityRange(this,30)">30H</button>
+                                                        <button class="chart-filter-btn" onclick="switchActivityRange(this,90)">90H</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="card-body pt-3 pb-5">
+                                                <div id="chart-activity-line" style="min-height:260px;"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Bar Chart: Messages by Type -->
+                                    <div class="col-xl-4">
+                                        <div class="card card-flush">
+                                            <div class="card-header border-0 pt-5">
+                                                <h3 class="card-title align-items-start flex-column">
+                                                    <span class="card-label fw-bold fs-3 mb-1">
+                                                        <i class="bi bi-bar-chart text-warning me-2"></i>Jenis Pesan
+                                                    </span>
+                                                    <span class="text-muted fw-semibold fs-7">Distribusi tipe pesan</span>
+                                                </h3>
+                                            </div>
+                                            <div class="card-body pt-3 pb-5">
+                                                <div id="chart-activity-type" style="min-height:260px;"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                </div>
+
                                 <!-- Row 2: Filters -->
                                 <div class="row g-5 mb-5">
                                     <div class="col-12">
@@ -338,12 +393,95 @@
     <!-- Metronic 8 Global Javascript Bundle -->
     <script src="assets/plugins/global/plugins.bundle.js"></script>
     <script src="assets/js/scripts.bundle.js"></script>
-    
+    <!-- ApexCharts -->
+    <script src="assets/plugins/custom/apexcharts/apexcharts.min.js"></script>
     <!-- Socket.IO -->
     <script src="/socket.io/socket.io.js"></script>
-    
     <!-- Log Activity Logic -->
     <script src="log-activity.js"></script>
-    
+    <!-- ── Activity Traffic Charts ── -->
+    <script>
+    let _actChart1 = null, _actChart2 = null;
+    async function loadActivityCharts(days) {
+        const sessionId = document.getElementById('session-filter')?.value || '';
+        const url = '/api/stats/activity/daily?days=' + days + (sessionId ? '&sessionId=' + sessionId : '');
+        try {
+            const res  = await fetch(url);
+            const json = await res.json();
+            if (!json.success) return;
+
+            // ── Line Chart ──
+            const el1 = document.getElementById('chart-activity-line');
+            const dates    = json.daily.map(d => d.date);
+            const incoming = json.daily.map(d => d.incoming);
+            const outgoing = json.daily.map(d => d.outgoing);
+            const total    = json.daily.reduce((s,d) => s + d.total, 0);
+            document.getElementById('activity-chart-subtitle').textContent =
+                days + ' hari terakhir • ' + total.toLocaleString('id') + ' total pesan' + (sessionId ? ' — ' + sessionId : '');
+
+            const lineOpts = {
+                series: [
+                    { name: 'Masuk',  data: incoming },
+                    { name: 'Keluar', data: outgoing  },
+                ],
+                chart: { type: 'area', height: 260, fontFamily: 'Inter,sans-serif', toolbar: { show: false }, zoom: { enabled: false } },
+                dataLabels: { enabled: false },
+                stroke: { curve: 'smooth', width: 2 },
+                fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.05, stops: [0,90,100] } },
+                colors: ['#009ef7', '#50CD89'],
+                xaxis: { categories: dates, axisBorder: { show: false }, axisTicks: { show: false }, labels: { style: { colors: '#7e8299', fontSize: '11px' }, rotate: -25 } },
+                yaxis: { labels: { style: { colors: '#7e8299', fontSize: '11px' }, formatter: v => Math.round(v) }, min: 0 },
+                legend: { show: true, position: 'top', horizontalAlign: 'right', labels: { colors: '#3f4254' } },
+                grid: { borderColor: '#f0f0f0', strokeDashArray: 4 },
+                tooltip: { shared: true, intersect: false, y: { formatter: v => v + ' pesan' } },
+                markers: { size: 3, strokeWidth: 0, hover: { sizeOffset: 4 } },
+                noData: { text: 'Belum ada data', style: { color: '#7e8299' } },
+            };
+            if (_actChart1) _actChart1.destroy();
+            el1.innerHTML = '';
+            _actChart1 = new ApexCharts(el1, lineOpts);
+            _actChart1.render();
+
+            // ── Bar Chart: by type ──
+            const el2    = document.getElementById('chart-activity-type');
+            const labels = json.byType.map(t => t.message_type);
+            const counts = json.byType.map(t => t.count);
+            const barOpts = {
+                series: [{ name: 'Jumlah', data: counts }],
+                chart: { type: 'bar', height: 260, fontFamily: 'Inter,sans-serif', toolbar: { show: false } },
+                plotOptions: { bar: { horizontal: true, borderRadius: 4, distributed: true } },
+                colors: ['#009ef7','#50CD89','#F1416C','#7239EA','#FFC700','#17C653'],
+                dataLabels: { enabled: true, formatter: v => v },
+                xaxis: { labels: { style: { colors: '#7e8299', fontSize: '11px' }, formatter: v => Math.round(v) } },
+                yaxis: { categories: labels, labels: { style: { colors: '#7e8299', fontSize: '11px' } } },
+                legend: { show: false },
+                grid: { borderColor: '#f0f0f0', strokeDashArray: 4, xaxis: { lines: { show: true } }, yaxis: { lines: { show: false } } },
+                tooltip: { y: { formatter: v => v + ' pesan' } },
+                noData: { text: 'Belum ada data', style: { color: '#7e8299' } },
+            };
+            if (_actChart2) _actChart2.destroy();
+            el2.innerHTML = '';
+            _actChart2 = new ApexCharts(el2, barOpts);
+            _actChart2.render();
+
+        } catch(e) { console.error('Activity chart error:', e); }
+    }
+
+    let _actCurrentDays = 7;
+    function switchActivityRange(btn, days) {
+        document.querySelectorAll('.chart-filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        _actCurrentDays = days;
+        loadActivityCharts(days);
+    }
+
+    // Hook into session filter change
+    document.addEventListener('DOMContentLoaded', () => {
+        loadActivityCharts(7);
+        // re-render chart when session filter changes
+        const sf = document.getElementById('session-filter');
+        if (sf) sf.addEventListener('change', () => loadActivityCharts(_actCurrentDays));
+    });
+    </script>
 </body>
 </html>

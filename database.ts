@@ -681,7 +681,76 @@ export const messageLogDb = {
             ORDER BY contact
         `)
         return stmt.all(sessionId).map((row: any) => row.contact)
-    }
+    },
+
+    // ── NEW: Daily message stats for line chart ──────────────────────────
+    // Returns array of { date, incoming, outgoing } for last N days
+    getDailyStats: (days: number = 30, sessionId?: string): any[] => {
+        const params: any[] = []
+        let filter = ''
+        if (sessionId) {
+            filter = 'AND session_id = ?'
+            params.push(sessionId)
+        }
+        const stmt = db.prepare(`
+            SELECT
+                DATE(timestamp) as date,
+                SUM(CASE WHEN direction = 'incoming' THEN 1 ELSE 0 END) as incoming,
+                SUM(CASE WHEN direction = 'outgoing' THEN 1 ELSE 0 END) as outgoing,
+                COUNT(*) as total
+            FROM message_logs
+            WHERE timestamp >= DATE('now', ?)
+            ${filter}
+            GROUP BY DATE(timestamp)
+            ORDER BY date ASC
+        `)
+        return stmt.all(`-${days} days`, ...params) as any[]
+    },
+
+    // ── NEW: Peak hours stats for bar chart ──────────────────────────────
+    // Returns array of { hour (0-23), total, incoming, outgoing }
+    getPeakHours: (days: number = 7, sessionId?: string): any[] => {
+        const params: any[] = []
+        let filter = ''
+        if (sessionId) {
+            filter = 'AND session_id = ?'
+            params.push(sessionId)
+        }
+        const stmt = db.prepare(`
+            SELECT
+                CAST(strftime('%H', timestamp) AS INTEGER) as hour,
+                COUNT(*) as total,
+                SUM(CASE WHEN direction = 'incoming' THEN 1 ELSE 0 END) as incoming,
+                SUM(CASE WHEN direction = 'outgoing' THEN 1 ELSE 0 END) as outgoing
+            FROM message_logs
+            WHERE timestamp >= DATE('now', ?)
+            ${filter}
+            GROUP BY hour
+            ORDER BY hour ASC
+        `)
+        // Fill all 24 hours (missing hours = 0)
+        const raw = stmt.all(`-${days} days`, ...params) as any[]
+        const byHour: Record<number, any> = {}
+        raw.forEach((r: any) => { byHour[r.hour] = r })
+        return Array.from({ length: 24 }, (_, h) => byHour[h] || { hour: h, total: 0, incoming: 0, outgoing: 0 })
+    },
+
+    // ── NEW: Message type distribution (for bar chart)
+    getTypeStatistics: (sessionId?: string): any[] => {
+        const params: any[] = []
+        let filter = ''
+        if (sessionId) { filter = 'WHERE session_id = ?'; params.push(sessionId) }
+        return db.prepare(`
+            SELECT
+                COALESCE(message_type, 'text') as message_type,
+                COUNT(*) as count
+            FROM message_logs
+            ${filter}
+            GROUP BY message_type
+            ORDER BY count DESC
+            LIMIT 10
+        `).all(...params) as any[]
+    },
 }
 
 // Session Log Functions

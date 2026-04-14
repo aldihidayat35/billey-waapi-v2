@@ -17,8 +17,16 @@
         
         <!--begin::Mobile logo-->
         <div class="d-flex align-items-center flex-grow-1 flex-lg-grow-0">
-            <a href="/" class="d-lg-none">
-                <img id="header-logo-mobile" alt="Logo" src="/assets/media/logos/default-small.svg" class="h-30px" />
+            <a href="/" class="d-lg-none" style="display:flex;align-items:center;gap:8px;text-decoration:none;">
+                <img id="header-logo-mobile"
+                     alt="Logo"
+                     src="/assets/media/logos/default-small.svg"
+                     data-is-default="true"
+                     style="height:50PX;max-height:50px;width:auto;object-fit:contain;" />
+                <span id="header-app-name-mobile" data-app-name
+                      style="font-size:16px;font-weight:700;color:var(--kt-text-dark,#181C32);
+                             white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;"
+                ></span>
             </a>
         </div>
         <!--end::Mobile logo-->
@@ -145,3 +153,61 @@
 </div>
 <!--end::Change Password Modal-->
 
+<!-- ── Header Dynamic Branding ─────────────────────────────────
+     Updates the mobile logo and app name dynamically using
+     settings from /api/settings/public.
+     Uses same pattern as sidebar (data-is-default CSS filter).
+──────────────────────────────────────────────────────────────── -->
+<style>
+/* Default SVG mobile logo: invert to match theme if needed */
+#header-logo-mobile[data-is-default="true"] {
+    /* Keep default styles — no forced inversion on light header */
+    opacity: 0.85;
+}
+#header-logo-mobile:not([data-is-default]) {
+    filter: none;
+    opacity: 1;
+}
+</style>
+<script>
+(function applyHeaderBranding() {
+    function applySettings(s) {
+        if (!s) return;
+
+        const logoMobile  = document.getElementById('header-logo-mobile');
+        const appNameMob  = document.getElementById('header-app-name-mobile');
+
+        // ── Mobile logo ───────────────────────────────────────────
+        const customSmall = s.logo_small_url || s.logo_url;
+        if (logoMobile && customSmall) {
+            logoMobile.src = customSmall;
+            logoMobile.removeAttribute('data-is-default');
+        }
+
+        // ── Mobile app name ───────────────────────────────────────
+        if (appNameMob && s.app_name) {
+            appNameMob.textContent = s.app_name;
+        }
+
+        // ── Desktop header title (data-app-name spans) ────────────
+        document.querySelectorAll('[data-app-name]').forEach(el => {
+            if (el.id !== 'sidebar-app-name') { // sidebar handles itself
+                el.textContent = s.app_name || el.textContent;
+            }
+        });
+
+        // ── Store globally ────────────────────────────────────────
+        window.APP_SETTINGS = Object.assign(window.APP_SETTINGS || {}, s);
+    }
+
+    // Reuse already-fetched settings, or fetch fresh
+    if (window.APP_SETTINGS && window.APP_SETTINGS.app_name) {
+        applySettings(window.APP_SETTINGS);
+    } else {
+        fetch('/api/settings/public')
+            .then(r => r.ok ? r.json() : null)
+            .then(data => { if (data && data.success) applySettings(data.settings); })
+            .catch(() => {});
+    }
+})();
+</script>

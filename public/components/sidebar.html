@@ -200,7 +200,8 @@
 [data-kt-app-sidebar-minimize="on"] .sb-section-label,
 [data-kt-app-sidebar-minimize="on"] #sidebar-user-name,
 [data-kt-app-sidebar-minimize="on"] #sidebar-user-role,
-[data-kt-app-sidebar-minimize="on"] #sidebar-logout-btn {
+[data-kt-app-sidebar-minimize="on"] #sidebar-logout-btn,
+[data-kt-app-sidebar-minimize="on"] #sidebar-app-name {
     display: none !important;
 }
 [data-kt-app-sidebar-minimize="on"] .sb-item {
@@ -216,6 +217,30 @@
     justify-content: center !important;
     padding: 8px !important;
 }
+
+/* Default SVG logos: invert to white for dark sidebar */
+#sidebar-logo-default[data-is-default="true"],
+#sidebar-logo-minimize[data-is-default="true"] {
+    filter: brightness(0) invert(1);
+    opacity: 0.88;
+}
+/* Custom logos: show original colors, no filter */
+#sidebar-logo-default:not([data-is-default]),
+#sidebar-logo-minimize:not([data-is-default]) {
+    filter: none;
+    opacity: 1;
+}
+/* App name text in logo area */
+#sidebar-app-name {
+    font-size: 15px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.92);
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 140px;
+}
 </style>
 
 <div id="kt_app_sidebar" class="app-sidebar flex-column"
@@ -228,10 +253,31 @@
     data-kt-drawer-toggle="#kt_app_sidebar_mobile_toggle">
 
     <!--begin::Logo-->
-    <div class="app-sidebar-logo px-5" id="kt_app_sidebar_logo" style="position:relative;">
-        <a href="/" style="display:flex;align-items:center;gap:10px;text-decoration:none;">
-            <img id="sidebar-logo-default" alt="Logo" src="/assets/media/logos/default-dark.svg" class="h-28px app-sidebar-logo-default" style="filter:brightness(0) invert(1);opacity:.9;" />
-            <img id="sidebar-logo-minimize" alt="Logo" src="/assets/media/logos/default-small.svg" class="h-22px app-sidebar-logo-minimize" style="filter:brightness(0) invert(1);opacity:.9;" />
+    <div class="app-sidebar-logo px-5" id="kt_app_sidebar_logo" style="position:relative;margin-top: 20px;margin-bottom: 10PX;margin-left: 5px;">
+        <a href="/" style="display:flex;align-items:center;gap:8px;text-decoration:none;min-width:0;overflow:hidden;flex:1;">
+            <!--
+                Logo images:
+                - data-is-default="true" → applies white filter (built-in SVGs on dark bg)
+                - No data-is-default     → no filter (custom uploaded logos)
+                applyBranding() below removes data-is-default when a custom logo is found
+            -->
+            <img id="sidebar-logo-default"
+                 alt="Logo"
+                 src="/assets/media/logos/default-dark.svg"
+                 class="app-sidebar-logo-default flex-shrink-0"
+                 data-is-default="true"
+                 style="height:50px;max-height:50px;width:auto;max-width:80px;object-fit:contain;" />
+            <img id="sidebar-logo-minimize"
+                 alt="Logo"
+                 src="/assets/media/logos/default-small.svg"
+                 class="app-sidebar-logo-minimize flex-shrink-0"
+                 data-is-default="true"
+                 style="height:50px;max-height:50px;width:auto;max-width:50px;object-fit:contain;" />
+            <!-- App name text next to logo; hidden when sidebar is minimized -->
+            <span id="sidebar-app-name" data-app-name
+                  style="font-size:16px;font-weight:700;color:rgba(255,255,255,0.92);letter-spacing:-0.01em;
+                         white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1;"
+            >Billey WA</span>
         </a>
 
         <!--begin::Sidebar toggle-->
@@ -582,5 +628,70 @@
 })();
 </script>
 
-<!-- Dynamic App Branding — loaded once per page via sidebar injection -->
-<script src="/js/app-init.js"></script>
+<!-- ── Sidebar Dynamic Branding ─────────────────────────────────
+     Runs immediately after sidebar elements are in the DOM.
+     Does NOT rely on app-init.js timing — fetches settings itself.
+──────────────────────────────────────────────────────────────── -->
+<script>
+(function applySidebarBranding() {
+    // If global APP_SETTINGS already fetched by app-init.js, use it
+    // Otherwise fetch ourselves so sidebar is never stuck on defaults
+    function applySettings(s) {
+        if (!s) return;
+
+        const logoDefault   = document.getElementById('sidebar-logo-default');
+        const logoMinimize  = document.getElementById('sidebar-logo-minimize');
+        const appNameEl     = document.getElementById('sidebar-app-name');
+
+        // ── Logo image ───────────────────────────────────────────
+        const customLogo  = s.logo_url;
+        const customSmall = s.logo_small_url || s.logo_url;
+
+        if (logoDefault && customLogo) {
+            logoDefault.src = customLogo;
+            // Remove white-filter: custom logos have their own colors
+            logoDefault.removeAttribute('data-is-default');
+        }
+        if (logoMinimize && customSmall) {
+            logoMinimize.src = customSmall;
+            logoMinimize.removeAttribute('data-is-default');
+        }
+
+        // ── App name text ─────────────────────────────────────────
+        if (appNameEl && s.app_name) {
+            appNameEl.textContent = s.app_name;
+        }
+
+        // ── Page title ────────────────────────────────────────────
+        if (s.app_name) {
+            const t = document.title;
+            const sep = t.lastIndexOf(' - ');
+            if (sep !== -1) {
+                document.title = t.substring(0, sep) + ' - ' + s.app_name;
+            }
+        }
+
+        // ── Favicon ───────────────────────────────────────────────
+        if (s.favicon_url) {
+            const links = document.querySelectorAll("link[rel~='icon'], link[rel='shortcut icon']");
+            links.forEach(l => { l.href = s.favicon_url; });
+        }
+
+        // Store globally for other scripts (e.g. notification icon)
+        window.APP_SETTINGS = Object.assign(window.APP_SETTINGS || {}, s);
+    }
+
+    // Use already-fetched settings if available
+    if (window.APP_SETTINGS && window.APP_SETTINGS.app_name) {
+        applySettings(window.APP_SETTINGS);
+    } else {
+        // Fetch fresh — this is guaranteed to run after sidebar DOM is injected
+        fetch('/api/settings/public')
+            .then(r => r.ok ? r.json() : null)
+            .then(data => {
+                if (data && data.success) applySettings(data.settings);
+            })
+            .catch(() => {});
+    }
+})();
+</script>

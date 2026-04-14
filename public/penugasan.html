@@ -407,6 +407,71 @@
                                     </a>
                                 </div>
 
+                                <!-- ══ WORKER PERFORMANCE CHARTS ═══════════════════════════ -->
+                                <div class="mt-8" id="worker-performance-section" style="display:none;">
+                                    <div class="card">
+                                        <div class="card-header border-0 pt-6 align-items-center">
+                                            <div>
+                                                <h3 class="card-title align-items-start flex-column mb-0">
+                                                    <span class="card-label fw-bold fs-3">
+                                                        <i class="bi bi-bar-chart-line text-primary me-2"></i>Performa Worker
+                                                    </span>
+                                                </h3>
+                                                <span class="text-muted fw-semibold fs-7">Statistik penugasan dan aktivitas per worker</span>
+                                            </div>
+                                            <div class="card-toolbar ms-auto">
+                                                <div class="d-flex gap-2" id="perf-filter-group">
+                                                    <button class="btn btn-sm btn-light-primary active" id="perf-btn-weekly"   onclick="switchPerfRange(this,'weekly')">Mingguan</button>
+                                                    <button class="btn btn-sm btn-light" id="perf-btn-monthly"  onclick="switchPerfRange(this,'monthly')">Bulanan</button>
+                                                    <button class="btn btn-sm btn-light" id="perf-btn-yearly"   onclick="switchPerfRange(this,'yearly')">Tahunan</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="card-body pt-4">
+                                            <div class="row g-5">
+                                                <!-- Bar Chart: Perbandingan Antar Worker -->
+                                                <div class="col-xl-6">
+                                                    <p class="fw-semibold text-gray-600 fs-7 mb-2">Perbandingan Aktivitas Antar Worker</p>
+                                                    <div id="chart-worker-bar" style="min-height:280px;">
+                                                        <div class="d-flex align-items-center justify-content-center" style="height:280px;">
+                                                            <span class="spinner-border text-primary"></span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <!-- Line Chart: Tren Performa -->
+                                                <div class="col-xl-6">
+                                                    <p class="fw-semibold text-gray-600 fs-7 mb-2">Tren Aktivitas Harian</p>
+                                                    <div id="chart-worker-line" style="min-height:280px;">
+                                                        <div class="d-flex align-items-center justify-content-center" style="height:280px;">
+                                                            <span class="spinner-border text-primary"></span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <!-- Worker Summary Table -->
+                                            <div class="mt-6">
+                                                <p class="fw-semibold text-gray-600 fs-7 mb-3">Ringkasan Performa</p>
+                                                <div class="table-responsive">
+                                                    <table class="table table-rounded table-striped align-middle fs-7 gy-2" id="worker-perf-table">
+                                                        <thead>
+                                                            <tr class="fw-bold text-muted bg-light">
+                                                                <th class="ps-4">Worker</th>
+                                                                <th>Kontak Aktif</th>
+                                                                <th>Aksi Periode</th>
+                                                                <th>Total Log</th>
+                                                                <th>Aktivitas Terakhir</th>
+                                                                <th>Performansi</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody id="worker-perf-tbody"></tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- ══ END WORKER PERFORMANCE CHARTS ══════════════════════ -->
+
                             </div>
                         </div>
 
@@ -518,7 +583,142 @@
     <script src="assets/plugins/global/plugins.bundle.js"></script>
     <script src="assets/js/scripts.bundle.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- ApexCharts for worker performance charts -->
+    <script src="assets/plugins/custom/apexcharts/apexcharts.min.js"></script>
     <script src="js/header.js"></script>
+
+    <!-- Worker Performance Charts -->
+    <script>
+    let chartWorkerBar  = null;
+    let chartWorkerLine = null;
+    let _currentPerfRange = 'weekly';
+
+    const PERF_COLORS = [
+        '#009ef7','#50CD89','#F1416C','#7239EA','#FFC700','#17C653',
+        '#FF6B00','#00D5D5','#FF3D60','#8950FC'
+    ];
+
+    async function loadWorkerPerformance(range) {
+        _currentPerfRange = range || _currentPerfRange;
+        const section = document.getElementById('worker-performance-section');
+        try {
+            const res  = await fetch('/api/stats/workers/performance?range=' + _currentPerfRange);
+            const json = await res.json();
+            if (!json.success || !json.workers.length) { section.style.display = 'none'; return; }
+
+            section.style.display = 'block';
+            const workers = json.workers;
+            const trend   = json.trend;
+
+            // ── Bar Chart ────────────────────────────────────────────────
+            const barEl = document.getElementById('chart-worker-bar');
+            barEl.innerHTML = '';
+            const barOpts = {
+                series: [{
+                    name: 'Aktivitas',
+                    data: workers.map(w => w.period_actions)
+                }],
+                chart: { type: 'bar', height: 280, fontFamily: 'Inter,sans-serif', toolbar: { show: false } },
+                plotOptions: { bar: { horizontal: false, borderRadius: 4, columnWidth: '55%', distributed: true } },
+                colors: workers.map((_, i) => PERF_COLORS[i % PERF_COLORS.length]),
+                dataLabels: { enabled: true, formatter: v => v || 0 },
+                xaxis: {
+                    categories: workers.map(w => w.worker_name),
+                    labels: { style: { colors: '#7e8299', fontSize: '11px' }, rotate: -25 }
+                },
+                yaxis: { labels: { style: { colors: '#7e8299', fontSize: '11px' }, formatter: v => Math.round(v) } },
+                legend: { show: false },
+                grid: { borderColor: '#f0f0f0', strokeDashArray: 4 },
+                tooltip: { y: { formatter: v => v + ' aktivitas' } }
+            };
+            if (chartWorkerBar) chartWorkerBar.destroy();
+            chartWorkerBar = new ApexCharts(barEl, barOpts);
+            chartWorkerBar.render();
+
+            // ── Line Chart ───────────────────────────────────────────────
+            const lineEl = document.getElementById('chart-worker-line');
+            lineEl.innerHTML = '';
+
+            // Group trend by worker
+            const workerMap = {};
+            const allDates  = [...new Set(trend.map(t => t.date))].sort();
+            workers.forEach((w, i) => {
+                workerMap[w.worker_id] = {
+                    name  : w.worker_name,
+                    color : PERF_COLORS[i % PERF_COLORS.length],
+                    byDay : {}
+                };
+            });
+            trend.forEach(t => {
+                if (workerMap[t.worker_id]) workerMap[t.worker_id].byDay[t.date] = t.actions;
+            });
+            const lineSeries = Object.values(workerMap).map(w => ({
+                name : w.name,
+                data : allDates.map(d => w.byDay[d] || 0)
+            }));
+
+            const lineOpts = {
+                series: lineSeries,
+                chart: { type: 'line', height: 280, fontFamily: 'Inter,sans-serif', toolbar: { show: false }, zoom: { enabled: false } },
+                stroke: { curve: 'smooth', width: 2 },
+                colors: workers.map((_, i) => PERF_COLORS[i % PERF_COLORS.length]),
+                xaxis: { categories: allDates, labels: { style: { colors: '#7e8299', fontSize: '10px' }, rotate: -25 }, axisBorder: { show: false }, axisTicks: { show: false } },
+                yaxis: { labels: { style: { colors: '#7e8299', fontSize: '11px' }, formatter: v => Math.round(v) }, min: 0 },
+                legend: { show: true, position: 'top', labels: { colors: '#3f4254' } },
+                grid:   { borderColor: '#f0f0f0', strokeDashArray: 4 },
+                markers: { size: 3, strokeWidth: 0, hover: { sizeOffset: 4 } },
+                tooltip: { shared: true, intersect: false, y: { formatter: v => v + ' aksi' } },
+                noData: { text: 'Belum ada data aktivitas', style: { color: '#7e8299' } }
+            };
+            if (chartWorkerLine) chartWorkerLine.destroy();
+            chartWorkerLine = new ApexCharts(lineEl, lineOpts);
+            chartWorkerLine.render();
+
+            // ── Summary Table ─────────────────────────────────────────────
+            const tbody = document.getElementById('worker-perf-tbody');
+            tbody.innerHTML = workers.map((w, i) => {
+                const lastAct = w.last_activity
+                    ? new Date(w.last_activity).toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric' })
+                    : '-';
+                const perf = w.period_actions;
+                const bar  = perf > 0 ? `<div class="progress h-6px"><div class="progress-bar" role="progressbar" style="width:${Math.min(perf*5,100)}%;background:${PERF_COLORS[i%PERF_COLORS.length]}"></div></div>` : '<span class="text-muted fs-8">-</span>';
+                return `
+                <tr>
+                    <td class="ps-4">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="symbol symbol-35px">
+                                <span class="symbol-label fw-bold text-white" style="background:${PERF_COLORS[i%PERF_COLORS.length]};border-radius:8px">
+                                    ${w.worker_name.charAt(0).toUpperCase()}
+                                </span>
+                            </div>
+                            <div>
+                                <div class="fw-bold text-gray-800 fs-7">${w.worker_name}</div>
+                                <div class="text-muted fs-8">${w.worker_email || ''}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td><span class="badge badge-light-info">${w.active_contacts}</span></td>
+                    <td><span class="fw-bold text-primary">${w.period_actions}</span></td>
+                    <td>${w.log_count}</td>
+                    <td class="text-muted fs-8">${lastAct}</td>
+                    <td style="min-width:100px">${bar}</td>
+                </tr>`;
+            }).join('');
+
+        } catch(e) {
+            console.error('Error loading worker performance:', e);
+        }
+    }
+
+    function switchPerfRange(btn, range) {
+        document.querySelectorAll('#perf-filter-group button').forEach(b => {
+            b.className = 'btn btn-sm btn-light';
+        });
+        btn.className = 'btn btn-sm btn-light-primary active';
+        loadWorkerPerformance(range);
+    }
+    </script>
+
 
     <script>
         let assignModal = null, currentWorkerId = null;
@@ -605,6 +805,9 @@
                 _allWorkers = d.workers;
                 updateStats(d.workers);
                 renderWorkerCards(d.workers);
+                // Load performance charts
+                loadWorkerPerformance('weekly');
+
             } catch (e) {
                 document.getElementById('loading-state').style.display = 'none';
                 document.getElementById('workers-list').innerHTML =

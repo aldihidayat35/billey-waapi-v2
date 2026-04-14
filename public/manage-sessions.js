@@ -394,6 +394,11 @@ function renderSessions() {
             </div>
         `
     }).join('')
+
+    // Sync trend chart session dropdown
+    if (typeof populateTrendSessionSelect === 'function') {
+        populateTrendSessionSelect(allSessions)
+    }
 }
 
 // Session Actions

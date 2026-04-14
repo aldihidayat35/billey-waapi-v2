@@ -1469,6 +1469,138 @@ app.get('/api/logs/statistics', (req, res) => {
 	}
 })
 
+// ── NEW: Daily message stats (Line Chart) ─────────────────────────────────
+// GET /api/stats/messages/daily?days=30&sessionId=
+app.get('/api/stats/messages/daily', adminOrApiKeyMiddleware, (req, res) => {
+	try {
+		const days = parseInt(req.query.days as string) || 30
+		const sessionId = req.query.sessionId as string | undefined
+		const data = messageLogDb.getDailyStats(days, sessionId)
+		res.json({ success: true, data })
+	} catch (error: any) {
+		console.error('Error fetching daily stats:', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// ── NEW: Peak hours stats (Bar Chart) ─────────────────────────────────────
+// GET /api/stats/messages/peak-hours?days=7&sessionId=
+app.get('/api/stats/messages/peak-hours', adminOrApiKeyMiddleware, (req, res) => {
+	try {
+		const days = parseInt(req.query.days as string) || 7
+		const sessionId = req.query.sessionId as string | undefined
+		const data = messageLogDb.getPeakHours(days, sessionId)
+		res.json({ success: true, data })
+	} catch (error: any) {
+		console.error('Error fetching peak hours:', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// ── NEW: Worker performance stats (Bar + Line Chart) ──────────────────────
+// GET /api/stats/workers/performance?range=weekly|monthly|yearly
+app.get('/api/stats/workers/performance', adminOrApiKeyMiddleware, (req, res) => {
+	try {
+		const range = (req.query.range as string) || 'monthly'
+		let dateFilter: string
+		if (range === 'weekly')       dateFilter = "datetime('now', '-7 days')"
+		else if (range === 'yearly')  dateFilter = "datetime('now', '-1 year')"
+		else                          dateFilter = "datetime('now', '-1 month')"  // monthly
+
+		const workers = db.prepare(`
+			SELECT
+				u.id       as worker_id,
+				u.name     as worker_name,
+				u.email    as worker_email,
+				COUNT(DISTINCT wa.contact || '_' || wa.session_id) as active_contacts,
+				COUNT(al.id) as log_count,
+				COUNT(DISTINCT CASE WHEN al.created_at >= ${dateFilter} THEN al.id END) as period_actions,
+				MAX(al.created_at) as last_activity
+			FROM users u
+			LEFT JOIN worker_assignments wa ON wa.worker_id = u.id
+			LEFT JOIN assignment_logs al ON al.worker_id = u.id
+			WHERE u.role = 'worker'
+			GROUP BY u.id, u.name, u.email
+			ORDER BY period_actions DESC, u.name ASC
+		`).all() as any[]
+
+		// Also get trend: assignments per day for period
+		const trend = db.prepare(`
+			SELECT
+				al.worker_id,
+				u.name as worker_name,
+				DATE(al.created_at) as date,
+				COUNT(*) as actions
+			FROM assignment_logs al
+			JOIN users u ON u.id = al.worker_id
+			WHERE al.created_at >= ${dateFilter}
+			GROUP BY al.worker_id, DATE(al.created_at)
+			ORDER BY date ASC, al.worker_id ASC
+		`).all() as any[]
+
+		res.json({ success: true, workers, trend, range })
+	} catch (error: any) {
+		console.error('Error fetching worker performance:', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// ── NEW: Per-session daily trend (manage-sessions chart) ──────────────────────
+// GET /api/stats/messages/by-session?sessionId=X&days=30
+app.get('/api/stats/messages/by-session', adminOrApiKeyMiddleware, (req, res) => {
+	try {
+		const sessionId = (req.query.sessionId as string) || ''
+		const days = parseInt(req.query.days as string) || 30
+		if (!sessionId) {
+			return res.status(400).json({ success: false, error: 'sessionId diperlukan' })
+		}
+		const data = messageLogDb.getDailyStats(days, sessionId)
+		// Also include total stats for this session
+		const stats = messageLogDb.getStatistics(sessionId)
+		res.json({ success: true, data, stats, sessionId })
+	} catch (error: any) {
+		console.error('Error fetching session trend:', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// ── NEW: Activity log daily trend (log-activity chart) ────────────────────────
+// GET /api/stats/activity/daily?days=30&sessionId=
+// Reuses getDailyStats but returns all sessions grouped + top type breakdown
+app.get('/api/stats/activity/daily', adminOrApiKeyMiddleware, (req, res) => {
+	try {
+		const days = parseInt(req.query.days as string) || 30
+		const sessionId = req.query.sessionId as string | undefined
+
+		const daily = messageLogDb.getDailyStats(days, sessionId)
+
+		// Per-session breakdown for this period
+		const params: any[] = [`-${days} days`]
+		let sessionFilter = ''
+		if (sessionId) { sessionFilter = 'AND session_id = ?'; params.push(sessionId) }
+
+		const bySessions = db.prepare(`
+			SELECT
+				session_id,
+				SUM(CASE WHEN direction='incoming' THEN 1 ELSE 0 END) as incoming,
+				SUM(CASE WHEN direction='outgoing' THEN 1 ELSE 0 END) as outgoing,
+				COUNT(*) as total
+			FROM message_logs
+			WHERE timestamp >= DATE('now', ?)
+			${sessionFilter}
+			GROUP BY session_id
+			ORDER BY total DESC
+		`).all(...params) as any[]
+
+		const byType = messageLogDb.getTypeStatistics(sessionId)
+
+		res.json({ success: true, daily, bySessions, byType })
+	} catch (error: any) {
+		console.error('Error fetching activity daily:', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
 // POST /api/chat/send-media — Send media via multipart upload (cookie auth, supports XHR progress)
 app.post('/api/chat/send-media', authMiddleware, upload.single('file'), async (req: any, res) => {
 	try {
