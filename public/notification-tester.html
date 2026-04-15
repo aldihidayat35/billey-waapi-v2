@@ -44,7 +44,7 @@
                     <div class="d-flex flex-column flex-column-fluid">
                         <!-- Toolbar -->
                         <div id="kt_app_toolbar" class="app-toolbar py-3 py-lg-6">
-                            <div id="kt_app_toolbar_container" class="app-container container-xxl d-flex flex-stack">
+                            <div id="kt_app_toolbar_container" class="app-container container-fluid d-flex flex-stack">
                                 <div class="page-title d-flex flex-column justify-content-center flex-wrap me-3">
                                     <h1 class="page-heading d-flex text-gray-900 fw-bold fs-3 flex-column justify-content-center my-0">
                                         <i class="bi bi-bell-fill text-warning me-2"></i> Notification Tester
@@ -60,7 +60,7 @@
 
                         <!-- Content -->
                         <div id="kt_app_content" class="app-content flex-column-fluid">
-                            <div id="kt_app_content_container" class="app-container container-xxl">
+                            <div id="kt_app_content_container" class="app-container container-fluid">
 
                                 <!-- Stats Row -->
                                 <div class="row g-5 mb-8" id="stats-row">
@@ -220,6 +220,8 @@
 
     <script src="assets/plugins/global/plugins.bundle.js"></script>
     <script src="assets/js/scripts.bundle.js"></script>
+    <!-- App Init: Branding, Favicon, Logo -->
+    <script src="js/app-init.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>

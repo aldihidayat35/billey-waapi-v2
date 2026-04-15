@@ -3,6 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="shortcut icon" href="assets/media/logos/favicon.ico" />
     <title>Broadcast - WhatsApp Multi Session</title>
     
     <!-- Fonts -->
@@ -176,7 +177,21 @@
         .stats-mini.pending { background: #fff8dd; }
         .stats-mini.pending .stat-value { color: #ffc700; }
     </style>
-</head>
+
+    <!-- Auth Check -->
+    <script>
+        (async function() {
+            try {
+                const res = await fetch('/api/auth/me');
+                if (!res.ok) { window.location.href = '/auth/login?error=' + encodeURIComponent('Silakan login terlebih dahulu'); return; }
+                const data = await res.json();
+                if (!data.success || !data.user) { window.location.href = '/auth/login?error=' + encodeURIComponent('Silakan login terlebih dahulu'); return; }
+                window._currentUser = data.user;
+            } catch (e) {
+                window.location.href = '/auth/login?error=' + encodeURIComponent('Terjadi kesalahan. Silakan login kembali');
+            }
+        })();
+    </script></head>
 
 <body id="kt_app_body" data-kt-app-layout="dark-sidebar" data-kt-app-header-fixed="true" data-kt-app-sidebar-enabled="true" data-kt-app-sidebar-fixed="true" data-kt-app-sidebar-hoverable="true" data-kt-app-sidebar-push-header="true" data-kt-app-sidebar-push-toolbar="true" data-kt-app-sidebar-push-footer="true" data-kt-app-toolbar-enabled="true" class="app-default">
     
@@ -480,6 +495,10 @@
     <!-- Metronic JS -->
     <script src="assets/plugins/global/plugins.bundle.js"></script>
     <script src="assets/js/scripts.bundle.js"></script>
+    <!-- App Init: Branding, Favicon, Logo -->
+    <script src="js/app-init.js"></script>
+    <!-- Header Functions -->
+    <script src="js/header.js"></script>
     
     <!-- Broadcast JS -->
     <script src="broadcast.js"></script>

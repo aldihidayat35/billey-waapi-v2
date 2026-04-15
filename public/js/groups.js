@@ -30,22 +30,43 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Load header, sidebar, and footer components
 function loadComponents() {
-	['header', 'sidebar', 'footer'].forEach(comp => {
+	const _comps = ['header', 'sidebar', 'footer'];
+	let _loaded = 0;
+	_comps.forEach(comp => {
 		fetch(`components/${comp}.html`)
 			.then(r => r.text())
 			.then(html => {
 				const el = document.getElementById(`${comp}-container`);
-				if (el) el.innerHTML = html;
+				if (!el) { _loaded++; return; }
+				const tmp = document.createElement('div');
+				tmp.innerHTML = html;
+				const scripts = Array.from(tmp.querySelectorAll('script'));
+				scripts.forEach(s => s.remove());
+				el.innerHTML = tmp.innerHTML;
+				scripts.forEach(os => {
+					const ns = document.createElement('script');
+					if (os.src) { ns.src = os.src; } else { ns.textContent = os.textContent; }
+					document.body.appendChild(ns);
+				});
 				if (comp === 'sidebar') {
 					setTimeout(() => {
 						const link = document.querySelector('a[href="groups.html"]');
 						if (link) link.classList.add('active');
-					}, 100);
+						if (typeof KTMenu !== 'undefined') KTMenu.createInstances();
+						if (typeof KTDrawer !== 'undefined') KTDrawer.createInstances();
+						if (typeof KTScroll !== 'undefined') KTScroll.createInstances();
+					}, 200);
+				}
+				_loaded++;
+				if (_loaded === _comps.length) {
+					document.dispatchEvent(new Event('components-loaded'));
+					if (typeof initializeHeader === 'function') initializeHeader();
 				}
 			})
-			.catch(() => {});
+			.catch(() => { _loaded++; });
 	});
 }
+
 
 // Show toast notification using Toastr
 function showToast(title, message, type = 'info') {

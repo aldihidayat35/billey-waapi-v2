@@ -182,9 +182,15 @@ function wireNoteModal() {
 // ─── Report Modal ──────────────────────────────────────────────
 function openReportModal(contact) {
     const overlay = document.getElementById('report-modal-overlay');
+    const phoneRaw = cleanPhone(contact);
+    const phoneVisible = isPhoneVisible();
+
     document.getElementById('report-worker-name').value = S.user?.name || '-';
-    document.getElementById('report-client-phone').value = cleanPhone(contact);
+    // Tampilkan nomor yang di-mask jika worker tidak bisa melihat HP
+    document.getElementById('report-client-phone').value = phoneVisible ? phoneRaw : maskPhone(phoneRaw);
     document.getElementById('report-text').value = '';
+
+    // Simpan contact asli di dataset untuk digunakan saat kirim
     overlay.dataset.contact = contact;
     overlay.classList.add('show');
     document.getElementById('report-text').focus();
@@ -210,8 +216,14 @@ function wireReportModal() {
             return;
         }
         const workerName = S.user?.name || '-';
-        const clientPhone = document.getElementById('report-client-phone').value;
-        const message = `*Laporan Worker*\n\nWorker : ${workerName}\nClient : ${clientPhone}\nLaporan : ${reportText}`;
+        // Ambil contact asli dari dataset overlay (bukan dari field yang mungkin sudah di-mask)
+        const overlay = document.getElementById('report-modal-overlay');
+        const contactRaw = overlay.dataset.contact || '';
+        const phoneRaw = cleanPhone(contactRaw);
+        const phoneVisible = isPhoneVisible();
+        // Jika worker tidak bisa melihat HP, sembunyikan nomor di pesan WA juga
+        const clientPhoneInMsg = phoneVisible ? phoneRaw : maskPhone(phoneRaw);
+        const message = `*Laporan Worker*\n\nWorker : ${workerName}\nClient : ${clientPhoneInMsg}\nLaporan : ${reportText}`;
         const waUrl = `https://wa.me/${S.adminPhone}?text=${encodeURIComponent(message)}`;
         window.open(waUrl, '_blank');
         closeReportModal();
