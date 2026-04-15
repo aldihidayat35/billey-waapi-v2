@@ -13,10 +13,64 @@ import { logger as activityLogger } from './logger'
 import { messageLogDb, chatTemplateDb, autoReplyDb, autoReplyLogDb, autoReplyCooldownDb, autoForwardConfigDb, autoForwardTokenDb, autoForwardLogDb, db } from './database.js'
 import { getAuthorizedSocketIds } from './notification.js'
 import { saveMedia } from './media-storage.js'
-import { readFileSync, existsSync, readdirSync, rmSync } from 'fs'
+import { readFileSync, existsSync, readdirSync, rmSync, mkdirSync, renameSync, statSync } from 'fs'
 import { join } from 'path'
 
 const pinoLogger = P({ level: 'silent' })
+
+// ─── Persistent Session Storage ──────────────────────────────────
+// All session auth data is stored under this directory.
+// Configurable via SESSION_DIR env var. Defaults to ./sessions
+const SESSION_BASE_DIR = process.env.SESSION_DIR || './sessions'
+
+// Ensure session directory exists at startup
+if (!existsSync(SESSION_BASE_DIR)) {
+	mkdirSync(SESSION_BASE_DIR, { recursive: true })
+	console.log(`📁 Created session directory: ${SESSION_BASE_DIR}`)
+}
+
+/**
+ * Auto-migrate legacy baileys_auth_info_* folders into SESSION_BASE_DIR.
+ * Runs once at import time. Safe to call multiple times (idempotent).
+ */
+function migrateLegacySessionFolders(): void {
+	try {
+		const rootFiles = readdirSync('./')
+		const legacyFolders = rootFiles.filter(f =>
+			f.startsWith('baileys_auth_info_') &&
+			existsSync(join('./', f, 'creds.json'))
+		)
+
+		if (legacyFolders.length === 0) return
+
+		console.log(`🔄 Migrating ${legacyFolders.length} legacy session folder(s) to ${SESSION_BASE_DIR}...`)
+
+		for (const folder of legacyFolders) {
+			const sessionId = folder.replace('baileys_auth_info_', '')
+			const srcPath = join('./', folder)
+			const destPath = join(SESSION_BASE_DIR, sessionId)
+
+			if (existsSync(destPath)) {
+				console.log(`⏭️  Session ${sessionId} already exists in ${SESSION_BASE_DIR}, skipping migration`)
+				continue
+			}
+
+			try {
+				renameSync(srcPath, destPath)
+				console.log(`✅ Migrated: ${folder} → ${destPath}`)
+			} catch (moveErr) {
+				console.error(`❌ Failed to migrate ${folder}:`, moveErr)
+			}
+		}
+
+		console.log('✅ Legacy session migration complete')
+	} catch (err) {
+		console.error('⚠️ Error during legacy session migration:', err)
+	}
+}
+
+// Run migration immediately on module load
+migrateLegacySessionFolders()
 
 // Track messages sent from UI to prevent duplicate display
 const uiSentMessages: Set<string> = new Set()
@@ -58,24 +112,30 @@ export class SessionManager {
 		console.log('🔄 Auto-reconnecting all saved sessions...')
 		
 		try {
-			// Get list of all baileys_auth_info_* folders
-			const currentDir = './'
-			const files = readdirSync(currentDir)
-			const authFolders = files.filter(f => 
-				f.startsWith('baileys_auth_info_') && 
-				existsSync(join(currentDir, f, 'creds.json'))
-			)
+			// Scan SESSION_BASE_DIR for session subdirectories with creds.json
+			if (!existsSync(SESSION_BASE_DIR)) {
+				console.log('📭 Session directory not found, nothing to reconnect')
+				return
+			}
 
-			if (authFolders.length === 0) {
+			const entries = readdirSync(SESSION_BASE_DIR)
+			const sessionIds = entries.filter(name => {
+				const sessionPath = join(SESSION_BASE_DIR, name)
+				try {
+					return statSync(sessionPath).isDirectory() &&
+						existsSync(join(sessionPath, 'creds.json'))
+				} catch { return false }
+			})
+
+			if (sessionIds.length === 0) {
 				console.log('📭 No saved sessions found to reconnect')
 				return
 			}
 
-			console.log(`📋 Found ${authFolders.length} saved sessions: ${authFolders.map(f => f.replace('baileys_auth_info_', '')).join(', ')}`)
+			console.log(`📋 Found ${sessionIds.length} saved sessions: ${sessionIds.join(', ')}`)
 
 			// Reconnect each session with a delay to prevent overload
-			for (const folder of authFolders) {
-				const sessionId = folder.replace('baileys_auth_info_', '')
+			for (const sessionId of sessionIds) {
 				
 				try {
 					console.log(`🔗 Auto-reconnecting session: ${sessionId}`)
@@ -113,7 +173,7 @@ export class SessionManager {
 		}
 
 		const mappings = new Map<string, string>()
-		const authFolder = `./baileys_auth_info_${sessionId}`
+		const authFolder = join(SESSION_BASE_DIR, sessionId)
 
 		try {
 			if (!existsSync(authFolder)) {
@@ -187,7 +247,7 @@ export class SessionManager {
 
 			// Fallback: try individual file lookup
 			const lidNumber = lidJid.replace('@lid', '').replace(/[^0-9]/g, '')
-			const authFolder = `./baileys_auth_info_${sessionId}`
+			const authFolder = join(SESSION_BASE_DIR, sessionId)
 			const reverseMappingFile = join(authFolder, `lid-mapping-${lidNumber}_reverse.json`)
 			
 			if (existsSync(reverseMappingFile)) {
@@ -375,7 +435,7 @@ export class SessionManager {
 		}
 
 		// Delete the auth folder for this session
-		const authFolder = `./baileys_auth_info_${sessionId}`
+		const authFolder = join(SESSION_BASE_DIR, sessionId)
 		if (existsSync(authFolder)) {
 			try {
 				rmSync(authFolder, { recursive: true, force: true })
@@ -429,7 +489,7 @@ export class SessionManager {
 		session.type = type
 		session.phoneNumber = phoneNumber
 
-		const authFolder = `baileys_auth_info_${sessionId}`
+		const authFolder = join(SESSION_BASE_DIR, sessionId)
 		console.log(`📁 Using auth folder: ${authFolder}`)
 		
 		const { state, saveCreds } = await useMultiFileAuthState(authFolder)

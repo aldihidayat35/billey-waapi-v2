@@ -12,14 +12,19 @@ services:
     ports:
       - "8010:8080"
     volumes:
-      # Persist database
+      # Persist database + media files
       - ./data:/app/data
-      # Persist WhatsApp sessions
-      - ./baileys_auth_info:/app/baileys_auth_info
+      # Persist ALL WhatsApp sessions (centralized directory)
+      - ./sessions:/app/sessions
+      # Persist uploads (logo, favicon, etc.)
+      - ./uploads:/app/public/uploads
+      # Persist application logs
+      - ./logs:/app/logs
     environment:
       - NODE_ENV=production
       - PORT=8080
       - TZ=Asia/Jakarta
+      - SESSION_DIR=/app/sessions
     networks:
       whatsapp-network:
         ipv4_address: 172.29.1.10

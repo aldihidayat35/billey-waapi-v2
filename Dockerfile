@@ -41,10 +41,12 @@ RUN npm rebuild && npm run build
 # Set production mode after build
 ENV NODE_ENV=production
 
-# Create data directory for SQLite & sessions
-RUN mkdir -p /app/data && \
-    mkdir -p /app/baileys_auth_info && \
-    chmod -R 755 /app/data /app/baileys_auth_info
+# Create persistent directories for volume mounts
+RUN mkdir -p /app/data \
+    && mkdir -p /app/sessions \
+    && mkdir -p /app/public/uploads \
+    && mkdir -p /app/logs \
+    && chmod -R 755 /app/data /app/sessions /app/public/uploads /app/logs
 
 # Expose port
 EXPOSE 8080
