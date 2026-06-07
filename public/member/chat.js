@@ -523,6 +523,8 @@ function renderMessages() {
             const isFilenameOnly = (m.message_type === 'document') && m.filename && displayText === m.filename;
             if (!isFilenameOnly) {
                 body += `<div class="${m.message_type !== 'text' ? 'msg-caption' : 'msg-text'}">${escHtml(displayText)}</div>`;
+                const linkPreview = renderLinkPreview(displayText);
+                if (linkPreview) body += linkPreview;
             }
         }
 
@@ -643,6 +645,7 @@ function sendMediaMessage() {
 
     const isImage = file.type.startsWith('image/');
     const isVideo = file.type.startsWith('video/');
+    const isAudio = file.type.startsWith('audio/');
 
     // Optimistic render
     const msg = {
@@ -651,7 +654,7 @@ function sendMediaMessage() {
         direction: 'outgoing',
         from_number: S.activeSession,
         to_number: S.activeContact,
-        message_type: isImage ? 'image' : isVideo ? 'video' : 'document',
+        message_type: isImage ? 'image' : isVideo ? 'video' : isAudio ? 'audio' : 'document',
         content: caption || '',
         media_data: null,
         mimetype: file.type,
@@ -953,8 +956,28 @@ function wireUI() {
     });
 
     // Attach file
-    document.getElementById('btn-attach').addEventListener('click', () => {
-        document.getElementById('file-input').click();
+    const attachMenu = document.getElementById('attach-menu');
+    document.getElementById('btn-attach').addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (attachMenu) {
+            attachMenu.classList.toggle('show');
+        } else {
+            document.getElementById('file-input').click();
+        }
+    });
+    attachMenu?.querySelectorAll('.attachment-option').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const fileInput = document.getElementById('file-input');
+            fileInput.setAttribute('accept', btn.dataset.accept || 'image/*,video/*,audio/*,application/pdf,application/msword,.doc,.docx,.xlsx,.xls,.pptx,.ppt');
+            attachMenu.classList.remove('show');
+            fileInput.click();
+        });
+    });
+    document.addEventListener('click', (e) => {
+        if (attachMenu && !attachMenu.contains(e.target) && e.target !== document.getElementById('btn-attach')) {
+            attachMenu.classList.remove('show');
+        }
     });
     document.getElementById('file-input').addEventListener('change', handleFileSelect);
 
@@ -1137,6 +1160,23 @@ function escHtml(str) {
     const d = document.createElement('div');
     d.textContent = str;
     return d.innerHTML;
+}
+
+function renderLinkPreview(text) {
+    const match = String(text || '').match(/https?:\/\/[^\s]+/i);
+    if (!match) return '';
+    try {
+        const url = new URL(match[0]);
+        return `<a class="msg-link-preview" href="${escHtml(url.href)}" target="_blank" rel="noopener noreferrer">
+            <span class="msg-link-icon"><i class="bi bi-link-45deg"></i></span>
+            <span class="msg-link-body">
+                <span class="msg-link-domain">${escHtml(url.hostname.replace(/^www\./, ''))}</span>
+                <span class="msg-link-url">${escHtml(url.href)}</span>
+            </span>
+        </a>`;
+    } catch {
+        return '';
+    }
 }
 
 function truncate(str, n) {

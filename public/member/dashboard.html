@@ -3,1140 +3,776 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#008069">
+    <meta name="theme-color" content="#00a884">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>WhatsApp - Member Portal</title>
+    <title>Message Center - Member Portal</title>
     <link rel="manifest" href="/manifest.json">
     <link rel="icon" id="dynamic-favicon" href="/assets/media/logos/favicon.ico" type="image/x-icon">
     <link rel="apple-touch-icon" id="dynamic-apple-icon" href="/assets/media/logos/pwa-192.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'ui-sans-serif', 'system-ui', 'sans-serif']
+                    },
+                    colors: {
+                        brand: {
+                            50: '#ecfdf5',
+                            100: '#d1fae5',
+                            500: '#10b981',
+                            600: '#059669',
+                            700: '#047857'
+                        },
+                        ink: '#111827'
+                    },
+                    boxShadow: {
+                        soft: '0 18px 70px rgba(15, 23, 42, .10)'
+                    }
+                }
+            }
+        };
+    </script>
     <style>
         :root {
-            --wa-green: #25D366;
-            --wa-header: #008069;
-            --wa-header-dark: #017561;
-            --wa-chat-bg: #efeae2;
+            --wa-green: #00a884;
+            --wa-header: #00a884;
+            --wa-header-dark: #008f72;
+            --wa-chat-bg: #f7f3ed;
             --wa-bubble-out: #d9fdd3;
             --wa-bubble-in: #ffffff;
             --wa-sidebar: #ffffff;
-            --wa-border: #e9edef;
-            --wa-hover: #f0f2f5;
-            --wa-text1: #111b21;
-            --wa-text2: #667781;
-            --wa-unread: #25d366;
-            --topbar-h: 56px;
-            --tabs-h: 40px;
+            --wa-border: #e5e7eb;
+            --wa-hover: #f3f6f8;
+            --wa-text1: #111827;
+            --wa-text2: #6b7280;
+            --wa-unread: #00a884;
+            --app-height: 100vh;
         }
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        html, body {
-            height: 100%; overflow: hidden;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
-            font-size: 15px; color: var(--wa-text1); background: var(--wa-chat-bg);
-        }
-        /* ── App shell ── */
-        .wa-app { display: flex; flex-direction: column; height: var(--app-height, 100vh); height: 100dvh; }
 
-        /* ── Top bar ── */
-        .wa-topbar {
-            flex: 0 0 var(--topbar-h); background: var(--wa-header); color: #fff;
-            display: flex; align-items: center; padding: 0 16px; gap: 10px;
+        * { box-sizing: border-box; }
+        html, body, #member-dashboard-root { height: 100%; }
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #edf3f0;
+            color: var(--wa-text1);
+            font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
         }
-        .wa-topbar .wa-logo { font-size: 22px; flex-shrink: 0; }
-        .wa-topbar .wa-title {
-            flex: 1; font-weight: 600; font-size: 15px;
-            overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
-        }
-        .wa-topbar .wa-btn {
-            background: none; border: none; color: rgba(255,255,255,.85); font-size: 19px;
-            padding: 8px; cursor: pointer; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            transition: background .15s; flex-shrink: 0;
-        }
-        .wa-topbar .wa-btn:hover { background: rgba(255,255,255,.15); color: #fff; }
+        button, input, textarea { font: inherit; }
+        .d-none { display: none !important; }
+        .wa-app { height: var(--app-height, 100vh); height: 100dvh; overflow: hidden; }
+        .wa-body { min-height: 0; }
 
-        /* ── Session tabs ── */
         .wa-tabs {
-            flex: 0 0 var(--tabs-h); background: var(--wa-sidebar);
-            border-bottom: 1px solid var(--wa-border);
-            display: flex; overflow-x: auto; overflow-y: hidden;
-            -webkit-overflow-scrolling: touch; scrollbar-width: none;
+            display: flex;
+            gap: 10px;
+            min-width: 240px;
+            max-width: 560px;
+            overflow-x: auto;
+            scrollbar-width: none;
         }
         .wa-tabs::-webkit-scrollbar { display: none; }
         .wa-tab {
-            flex: 0 0 auto; display: flex; align-items: center; gap: 6px;
-            padding: 0 18px; height: var(--tabs-h);
-            font-size: 13px; font-weight: 600; color: var(--wa-text2);
-            border-bottom: 3px solid transparent; cursor: pointer;
-            white-space: nowrap; transition: color .15s, border-color .15s; user-select: none;
+            height: 44px;
+            display: inline-flex;
+            align-items: center;
+            gap: 9px;
+            padding: 0 18px;
+            border: 1px solid #dbe2e8;
+            border-radius: 10px;
+            background: #fff;
+            color: #111827;
+            font-size: 14px;
+            font-weight: 700;
+            white-space: nowrap;
+            cursor: pointer;
+            box-shadow: 0 6px 18px rgba(15, 23, 42, .04);
+            transition: border-color .18s ease, transform .18s ease, background .18s ease;
         }
-        .wa-tab:hover { color: var(--wa-text1); }
-        .wa-tab.active { color: var(--wa-header); border-bottom-color: var(--wa-header); }
-        .wa-tab .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-        .wa-tab .dot.online  { background: var(--wa-green); }
-        .wa-tab .dot.offline { background: #ccc; }
-        .wa-tab .tab-badge {
-            background: var(--wa-unread); color: #fff; border-radius: 10px;
-            font-size: 10px; font-weight: 700; min-width: 18px; height: 18px;
-            display: inline-flex; align-items: center; justify-content: center;
-            padding: 0 5px; line-height: 1;
+        .wa-tab:hover { transform: translateY(-1px); border-color: #9ee5ce; }
+        .wa-tab.active { background: #ecfdf5; border-color: #86efac; color: #047857; }
+        .wa-tab .dot { width: 11px; height: 11px; border-radius: 999px; display: inline-block; }
+        .wa-tab .dot.online { background: #22c55e; box-shadow: 0 0 0 5px rgba(34, 197, 94, .12); }
+        .wa-tab .dot.offline { background: #cbd5e1; }
+        .tab-badge, .conv-unread {
+            min-width: 22px;
+            height: 22px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 999px;
+            background: var(--wa-unread);
+            color: #fff;
+            font-size: 12px;
+            font-weight: 800;
+            padding: 0 7px;
         }
-
-        /* ── Main body ── */
-        .wa-body { flex: 1; display: flex; overflow: hidden; min-height: 0; }
-
-        /* ── Conversation panel ── */
-        .wa-conv {
-            width: 360px; min-width: 280px; flex-shrink: 0;
-            background: var(--wa-sidebar); border-right: 1px solid var(--wa-border);
-            display: flex; flex-direction: column; overflow: hidden;
-        }
-        .wa-search {
-            padding: 8px 10px; border-bottom: 1px solid var(--wa-border);
-            position: relative; flex-shrink: 0;
-        }
-        .wa-search i {
-            position: absolute; left: 22px; top: 50%; transform: translateY(-50%);
-            color: var(--wa-text2); font-size: 14px; pointer-events: none;
-        }
-        .wa-search input {
-            width: 100%; background: var(--wa-hover); border: none; border-radius: 8px;
-            padding: 8px 12px 8px 34px; font-size: 14px; outline: none; color: var(--wa-text1);
-        }
-        .wa-search input::placeholder { color: var(--wa-text2); }
-        .wa-conv-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-        .wa-conv-list::-webkit-scrollbar { width: 4px; }
-        .wa-conv-list::-webkit-scrollbar-thumb { background: #d0d0d0; border-radius: 2px; }
 
         .conv-item {
-            display: flex; align-items: center; padding: 10px 14px; gap: 12px;
-            cursor: pointer; transition: background .1s;
-            border-bottom: 1px solid var(--wa-border);
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 16px 18px;
+            border-bottom: 1px solid #eef2f5;
+            cursor: pointer;
+            transition: background .18s ease, box-shadow .18s ease, transform .18s ease;
         }
-        .conv-item:hover, .conv-item.active { background: var(--wa-hover); }
-        .conv-ava {
-            width: 49px; height: 49px; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            color: #fff; font-weight: 700; font-size: 17px;
-            flex-shrink: 0; user-select: none;
+        .conv-item::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 12px;
+            bottom: 12px;
+            width: 3px;
+            border-radius: 0 999px 999px 0;
+            background: transparent;
         }
-        .conv-body { flex: 1; min-width: 0; }
-        .conv-row1 { display: flex; align-items: center; gap: 4px; margin-bottom: 3px; }
-        .conv-row2 { display: flex; align-items: center; gap: 4px; }
+        .conv-item:hover { background: #f7fbf9; transform: translateX(2px); }
+        .conv-item.active {
+            background: linear-gradient(90deg, #e8fff4 0%, #f7fffb 100%);
+            box-shadow: inset 0 0 0 1px rgba(16, 185, 129, .10);
+        }
+        .conv-item.active::before { background: var(--wa-green); }
+        .conv-ava, .hdr-ava {
+            flex: 0 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 999px;
+            color: #fff;
+            font-weight: 800;
+            letter-spacing: .01em;
+            box-shadow: inset 0 0 0 1px rgba(255,255,255,.45), 0 8px 22px rgba(15,23,42,.10);
+        }
+        .conv-ava { width: 56px; height: 56px; font-size: 17px; }
+        .hdr-ava { width: 48px; height: 48px; font-size: 15px; }
+        .conv-body, .hdr-info { min-width: 0; flex: 1; }
+        .conv-row1, .conv-row2 { display: flex; align-items: center; gap: 8px; }
+        .conv-row1 { margin-bottom: 5px; }
         .conv-name {
-            flex: 1; font-weight: 600; font-size: 15px;
-            overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--wa-text1);
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-size: 15px;
+            font-weight: 800;
+            color: #111827;
         }
-        .conv-time { font-size: 11px; color: var(--wa-text2); flex-shrink: 0; }
+        .conv-time { flex: 0 0 auto; font-size: 12px; color: #4b5563; }
         .conv-last {
-            flex: 1; font-size: 13px; color: var(--wa-text2);
-            overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
-        }
-        .conv-unread {
-            flex-shrink: 0; background: var(--wa-unread); color: #fff;
-            border-radius: 11px; font-size: 11px; font-weight: 700;
-            min-width: 20px; height: 20px;
-            display: inline-flex; align-items: center; justify-content: center; padding: 0 5px;
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: #4b5563;
+            font-size: 13px;
+            line-height: 1.45;
         }
         .conv-empty {
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            padding: 48px 20px; color: var(--wa-text2); text-align: center; gap: 10px;
+            min-height: 260px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            color: var(--wa-text2);
+            text-align: center;
+            padding: 34px;
         }
-        .conv-empty i { font-size: 44px; color: #ccc; }
-        .conv-empty p { font-size: 13px; }
+        .conv-empty i { font-size: 42px; color: #cbd5e1; }
 
-        /* Skeleton loader */
         .skel {
-            background: linear-gradient(90deg, #f0f0f0 25%, #e4e4e4 50%, #f0f0f0 75%);
-            background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 4px;
+            background: linear-gradient(90deg, #eef2f7 25%, #f8fafc 50%, #eef2f7 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.35s infinite;
+            border-radius: 10px;
         }
         @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+        @keyframes bubbleIn { from { opacity: 0; transform: translateY(8px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        @keyframes menuPop { from { opacity: 0; transform: translateY(8px) scale(.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
 
-        /* ── Chat panel ── */
-        .wa-chat {
-            flex: 1; display: flex; flex-direction: column;
-            overflow: hidden; background: var(--wa-chat-bg); min-width: 0;
+        .chat-surface {
+            background-color: var(--wa-chat-bg);
+            background-image:
+                radial-gradient(circle at 20px 20px, rgba(16, 185, 129, .045) 2px, transparent 2px),
+                radial-gradient(circle at 90px 70px, rgba(15, 23, 42, .035) 1.5px, transparent 1.5px),
+                linear-gradient(135deg, rgba(255,255,255,.58), rgba(255,255,255,.16));
+            background-size: 120px 120px, 130px 130px, auto;
         }
-
-        /* Chat header */
-        .chat-hdr {
-            flex: 0 0 56px; background: var(--wa-sidebar);
-            border-bottom: 1px solid var(--wa-border);
-            display: flex; align-items: center; padding: 0 16px; gap: 12px;
+        .chat-msgs {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            padding: 22px 28px;
+            scroll-behavior: smooth;
         }
-        .btn-back {
-            display: none; background: none; border: none;
-            font-size: 20px; color: var(--wa-text2); cursor: pointer; padding: 4px;
-        }
-        .hdr-ava {
-            width: 40px; height: 40px; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            color: #fff; font-weight: 700; font-size: 15px; flex-shrink: 0;
-        }
-        .hdr-info { flex: 1; min-width: 0; }
-        .hdr-name {
-            font-weight: 600; font-size: 15px;
-            overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
-        }
-        .hdr-sub { font-size: 12px; color: var(--wa-text2); }
-
-        /* Chat messages */
-        .chat-msgs { flex: 1; overflow-y: auto; padding: 12px 16px; -webkit-overflow-scrolling: touch; }
-        .chat-msgs::-webkit-scrollbar { width: 4px; }
-        .chat-msgs::-webkit-scrollbar-thumb { background: #c5c5c5; border-radius: 2px; }
-
-        /* Day divider */
-        .msg-day { display: flex; align-items: center; justify-content: center; margin: 14px 0 8px; }
+        .msg-day { display: flex; justify-content: center; margin: 8px 0 18px; }
         .msg-day-label {
-            background: rgba(225,245,254,.92); color: var(--wa-text2); font-size: 12px;
-            font-weight: 500; padding: 4px 12px; border-radius: 8px;
-            box-shadow: 0 1px 2px rgba(0,0,0,.08);
+            padding: 7px 14px;
+            border-radius: 999px;
+            background: rgba(255,255,255,.82);
+            border: 1px solid rgba(226,232,240,.8);
+            color: #64748b;
+            font-size: 12px;
+            font-weight: 700;
+            box-shadow: 0 8px 24px rgba(15,23,42,.06);
         }
-
-        /* Message rows */
-        .msg-row { display: flex; margin-bottom: 2px; }
-        .msg-row.out { justify-content: flex-end; padding-left: 52px; }
-        .msg-row.in  { justify-content: flex-start; padding-right: 52px; }
-
-        /* Bubbles */
+        .msg-row {
+            display: flex;
+            margin: 10px 0;
+            animation: bubbleIn .22s ease both;
+        }
+        .msg-row.in { justify-content: flex-start; padding-right: min(20vw, 180px); }
+        .msg-row.out { justify-content: flex-end; padding-left: min(20vw, 180px); }
         .msg-bubble {
-            padding: 6px 9px 4px; border-radius: 7.5px; word-break: break-word;
-            font-size: 14px; line-height: 1.45; box-shadow: 0 1px 2px rgba(0,0,0,.1);
-            position: relative; max-width: 100%;
+            position: relative;
+            max-width: min(620px, 100%);
+            padding: 11px 12px 7px;
+            border-radius: 16px;
+            border: 1px solid rgba(15, 23, 42, .08);
+            box-shadow: 0 10px 30px rgba(15,23,42,.08);
+            word-break: break-word;
+            line-height: 1.55;
+            font-size: 14px;
         }
-        .msg-row.in  .msg-bubble { background: var(--wa-bubble-in);  border-top-left-radius: 0; }
-        .msg-row.out .msg-bubble { background: var(--wa-bubble-out); border-top-right-radius: 0; }
-        .msg-bubble.pending { opacity: .6; }
-
-        /* Tails */
-        .msg-row.in .msg-bubble::before {
-            content: ''; position: absolute; top: 0; left: -8px;
-            border: 8px solid transparent; border-top-color: var(--wa-bubble-in); border-right: none;
-        }
-        .msg-row.out .msg-bubble::before {
-            content: ''; position: absolute; top: 0; right: -8px;
-            border: 8px solid transparent; border-top-color: var(--wa-bubble-out); border-left: none;
-        }
-
+        .msg-row.in .msg-bubble { background: var(--wa-bubble-in); border-top-left-radius: 5px; }
+        .msg-row.out .msg-bubble { background: linear-gradient(135deg, #dcfce7, #d9fdd3); border-top-right-radius: 5px; }
+        .msg-bubble.pending { opacity: .68; filter: saturate(.75); }
         .msg-text { white-space: pre-wrap; }
-        .msg-media img {
-            max-width: 280px; max-height: 280px; width: 100%;
-            border-radius: 6px; cursor: pointer; display: block; object-fit: cover;
+        .msg-media img, .msg-media video {
+            display: block;
+            width: 100%;
+            max-width: 310px;
+            max-height: 320px;
+            object-fit: cover;
+            border-radius: 13px;
+            cursor: pointer;
+            background: #e5e7eb;
         }
-        .msg-media video { max-width: 280px; max-height: 280px; width: 100%; border-radius: 6px; display: block; }
+        .msg-media audio { width: min(310px, 72vw); }
         .msg-doc {
-            display: flex; align-items: center; gap: 10px;
-            background: rgba(0,0,0,.05); border-radius: 6px; padding: 8px 12px;
-            cursor: pointer; min-width: 160px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 230px;
+            padding: 13px 14px;
+            border-radius: 13px;
+            background: rgba(255,255,255,.62);
+            border: 1px solid rgba(15,23,42,.08);
+            cursor: pointer;
         }
-        .msg-doc i { font-size: 26px; color: var(--wa-text2); flex-shrink: 0; }
-        .msg-doc-name { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; }
-        .msg-doc-expired { opacity: .5; cursor: default; }
+        .msg-doc i {
+            width: 44px;
+            height: 44px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 12px;
+            background: #eef2ff;
+            color: #4f46e5;
+            font-size: 22px;
+        }
+        .msg-doc-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+        .msg-link-preview {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            margin-top: 9px;
+            padding: 11px 12px;
+            border-radius: 13px;
+            border: 1px solid rgba(15,23,42,.08);
+            background: rgba(255,255,255,.58);
+            color: inherit;
+            text-decoration: none;
+        }
+        .msg-link-preview:hover { background: rgba(255,255,255,.82); }
+        .msg-link-icon {
+            width: 38px;
+            height: 38px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex: 0 0 auto;
+            border-radius: 12px;
+            background: #e0f2fe;
+            color: #0284c7;
+            font-size: 20px;
+        }
+        .msg-link-body { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+        .msg-link-domain { font-size: 13px; font-weight: 800; color: #0f172a; }
+        .msg-link-url {
+            max-width: 260px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: #64748b;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .msg-caption { margin-top: 8px; color: #334155; font-size: 13px; white-space: pre-wrap; }
         .msg-media-expired {
-            display: flex; align-items: center; gap: 8px;
-            background: rgba(0,0,0,.05); border-radius: 6px; padding: 12px 14px;
-            color: var(--wa-text2); font-size: 12px; font-style: italic;
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            padding: 13px 14px;
+            border-radius: 12px;
+            background: rgba(15,23,42,.05);
+            color: #64748b;
+            font-size: 13px;
+            font-style: italic;
         }
-        .msg-media-expired i { font-size: 22px; }
-        .msg-caption { font-size: 13px; color: var(--wa-text2); margin-top: 4px; white-space: pre-wrap; }
-        .msg-footer { display: flex; align-items: center; justify-content: flex-end; gap: 3px; margin-top: 3px; }
-        .msg-time  { font-size: 11px; color: var(--wa-text2); }
-        .msg-check { font-size: 13px; color: #53bdeb; }
-
-        /* Hide/Unhide button */
+        .msg-footer {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 5px;
+            margin-top: 5px;
+            min-height: 16px;
+        }
+        .msg-time { color: #64748b; font-size: 11px; font-weight: 600; }
+        .msg-check { color: #0ea5e9; font-size: 14px; }
         .msg-hide-btn {
-            position: absolute; top: 2px; right: 2px; z-index: 2;
-            background: rgba(0,0,0,.05); border: none; border-radius: 50%;
-            width: 24px; height: 24px; display: none; align-items: center; justify-content: center;
-            font-size: 12px; color: var(--wa-text2); cursor: pointer; transition: background .12s, color .12s;
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            z-index: 2;
+            width: 26px;
+            height: 26px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            border: 0;
+            border-radius: 999px;
+            background: rgba(15,23,42,.08);
+            color: #475569;
+            cursor: pointer;
         }
-        .msg-bubble:hover .msg-hide-btn { display: flex; }
-        .msg-hide-btn:hover { background: rgba(0,0,0,.12); color: #111; }
-        .msg-row.out .msg-hide-btn { right: auto; left: 2px; }
+        .msg-row.out .msg-hide-btn { right: auto; left: 6px; }
+        .msg-bubble:hover .msg-hide-btn, .msg-bubble.msg-hidden .msg-hide-btn { display: flex; }
+        .msg-bubble.msg-hidden { opacity: .48; background-image: repeating-linear-gradient(135deg, transparent, transparent 7px, rgba(15,23,42,.06) 7px, rgba(15,23,42,.06) 14px) !important; }
+        .msg-hidden-badge { display: inline-flex; align-items: center; gap: 2px; color: #dc2626; font-size: 10px; font-weight: 800; margin-right: 5px; }
 
-        /* Hidden message style */
-        .msg-bubble.msg-hidden {
-            opacity: 0.45;
-            background-image: repeating-linear-gradient(135deg, transparent, transparent 6px, rgba(0,0,0,.04) 6px, rgba(0,0,0,.04) 12px) !important;
+        .attachment-menu {
+            position: absolute;
+            left: 18px;
+            bottom: 76px;
+            width: 184px;
+            display: none;
+            padding: 9px;
+            border-radius: 16px;
+            background: rgba(255,255,255,.96);
+            border: 1px solid rgba(226,232,240,.95);
+            box-shadow: 0 22px 60px rgba(15,23,42,.18);
+            z-index: 60;
+            animation: menuPop .16s ease both;
         }
-        .msg-bubble.msg-hidden .msg-hide-btn { display: flex; color: #e74c3c; }
-
-        /* Hidden badge */
-        .msg-hidden-badge {
-            display: inline-flex; align-items: center;
-            font-size: 9px; color: #dc3545; font-weight: 600;
-            margin-right: 4px; letter-spacing: .02em;
+        .attachment-menu.show { display: block; }
+        .attachment-option {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            border: 0;
+            background: transparent;
+            padding: 10px;
+            border-radius: 12px;
+            color: #111827;
+            cursor: pointer;
+            text-align: left;
+            font-weight: 700;
         }
+        .attachment-option:hover { background: #f8fafc; }
+        .attachment-option i {
+            width: 30px;
+            height: 30px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            color: #fff;
+        }
+        .attachment-option.image i { background: #22c55e; }
+        .attachment-option.video i { background: #6366f1; }
+        .attachment-option.document i { background: #0ea5e9; }
+        .attachment-option.audio i { background: #f97316; }
 
-        /* Assignment deadline banner */
+        .note-icon, .report-icon, .note-icon-hdr, .report-icon-hdr {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex: 0 0 auto;
+            cursor: pointer;
+            transition: transform .15s ease, background .15s ease;
+        }
+        .note-icon, .report-icon { width: 22px; height: 22px; margin-left: 5px; border-radius: 7px; font-size: 11px; }
+        .note-icon-hdr, .report-icon-hdr { width: 36px; height: 36px; border-radius: 12px; font-size: 14px; }
+        .note-icon:hover, .report-icon:hover, .note-icon-hdr:hover, .report-icon-hdr:hover { transform: scale(1.08); }
+        .note-low, .note-icon.note-low { background: #ecfdf5; color: #059669; }
+        .note-medium, .note-icon.note-medium { background: #fff7ed; color: #ea580c; }
+        .note-critical, .note-icon.note-critical { background: #fef2f2; color: #dc2626; }
+        .report-icon, .report-icon-hdr { background: #eff6ff; color: #2563eb; }
+
         .assignment-banner {
-            background: linear-gradient(135deg, #fff3cd, #fce8b2);
-            border-bottom: 1px solid #e9c46a;
-            padding: 5px 14px; font-size: 11px; color: #7f6d2e;
-            display: flex; align-items: center; flex-wrap: wrap; gap: 4px;
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 10px 18px;
+            background: #fffbeb;
+            border-bottom: 1px solid #fde68a;
+            color: #92400e;
+            font-size: 12px;
+            font-weight: 700;
         }
 
-        /* Desktop empty chat */
-        .chat-empty {
-            flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
-            color: var(--wa-text2); text-align: center; gap: 14px; padding: 40px;
+        .media-overlay, .note-modal-overlay, .report-modal-overlay, .tpl-overlay, .img-viewer {
+            position: fixed;
+            inset: 0;
+            z-index: 200;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(15,23,42,.58);
+            backdrop-filter: blur(8px);
         }
-        .chat-empty .icon-wrap {
-            width: 80px; height: 80px; border-radius: 50%; background: rgba(0,128,105,.08);
-            display: flex; align-items: center; justify-content: center;
+        .media-overlay.show, .note-modal-overlay.show, .report-modal-overlay.show, .tpl-overlay.show, .img-viewer.show { display: flex; }
+        .media-box, .note-modal, .report-modal, .tpl-panel {
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 18px;
+            box-shadow: 0 28px 90px rgba(15,23,42,.28);
+            overflow: hidden;
         }
-        .chat-empty .icon-wrap i { font-size: 36px; color: var(--wa-header); }
-        .chat-empty h5 { font-size: 16px; font-weight: 600; color: var(--wa-text1); }
-        .chat-empty p  { font-size: 13px; max-width: 240px; }
-
-        /* Input bar */
-        .chat-input {
-            flex: 0 0 auto; background: #f0f2f5;
-            padding: 8px 12px; display: flex; align-items: flex-end; gap: 8px;
+        .media-box { width: min(440px, 92vw); padding: 20px; }
+        .media-box-hdr, .note-modal-hdr, .report-modal-hdr, .tpl-hdr {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
         }
-        .btn-attach {
-            background: none; border: none; color: var(--wa-text2); font-size: 22px;
-            padding: 8px; cursor: pointer; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            transition: background .15s; flex-shrink: 0;
-        }
-        .btn-attach:hover { background: rgba(0,0,0,.06); }
-        .chat-input textarea {
-            flex: 1; background: #fff; border: none; border-radius: 21px;
-            padding: 10px 16px; font-size: 14px; resize: none; outline: none;
-            min-height: 42px; max-height: 110px; overflow-y: auto;
-            line-height: 1.4; color: var(--wa-text1); font-family: inherit;
-        }
-        .chat-input textarea::placeholder { color: var(--wa-text2); }
-        .btn-send {
-            width: 42px; height: 42px; background: var(--wa-header); border: none;
-            border-radius: 50%; color: #fff; font-size: 17px;
-            display: flex; align-items: center; justify-content: center;
-            cursor: pointer; flex-shrink: 0; transition: background .15s;
-        }
-        .btn-send:hover { background: var(--wa-header-dark); }
-
-        /* No sessions */
-        .wa-no-sess {
-            flex: 1; display: flex; align-items: center; justify-content: center;
-            flex-direction: column; text-align: center; gap: 14px;
-            color: var(--wa-text2); padding: 40px;
-        }
-        .wa-no-sess i  { font-size: 64px; color: #ddd; }
-        .wa-no-sess h5 { font-size: 16px; font-weight: 600; color: var(--wa-text1); }
-        .wa-no-sess p  { font-size: 13px; }
-
-        /* Media overlay */
-        .media-overlay {
-            position: fixed; inset: 0; background: rgba(0,0,0,.55);
-            z-index: 200; display: none; align-items: center; justify-content: center;
-        }
-        .media-overlay.show { display: flex; }
-        .media-box {
-            background: #fff; border-radius: 14px; padding: 20px;
-            width: 90%; max-width: 420px; box-shadow: 0 8px 40px rgba(0,0,0,.2);
-        }
-        .media-box-hdr {
-            display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;
-        }
-        .media-box-hdr h6 { font-size: 15px; font-weight: 600; }
-        .media-close-btn {
-            background: var(--wa-hover); border: none; width: 30px; height: 30px;
-            border-radius: 50%; display: flex; align-items: center; justify-content: center;
-            cursor: pointer; font-size: 15px; color: var(--wa-text2);
+        .media-box-hdr { margin-bottom: 14px; }
+        .media-box-hdr h6 { margin: 0; font-size: 16px; font-weight: 800; }
+        .media-close-btn, .note-modal-close, .report-modal-close, .tpl-hdr-close {
+            width: 34px;
+            height: 34px;
+            border: 0;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #f1f5f9;
+            color: #475569;
+            cursor: pointer;
         }
         .media-preview {
-            max-height: 260px; overflow: hidden; margin-bottom: 12px;
-            text-align: center; border-radius: 8px; background: var(--wa-hover);
-        }
-        .media-preview img, .media-preview video { max-width: 100%; max-height: 260px; border-radius: 8px; }
-        .media-preview .doc-placeholder {
-            padding: 32px; display: flex; flex-direction: column; align-items: center; gap: 8px; color: var(--wa-text2);
-        }
-        .media-preview .doc-placeholder i { font-size: 48px; }
-        .media-caption-inp {
-            width: 100%; background: var(--wa-hover); border: none; border-radius: 8px;
-            padding: 9px 14px; font-size: 14px; outline: none; margin-bottom: 12px;
-            color: var(--wa-text1); font-family: inherit;
-        }
-        .media-send-btn {
-            width: 100%; background: var(--wa-header); color: #fff; border: none;
-            border-radius: 8px; padding: 10px; font-size: 14px; font-weight: 600; cursor: pointer;
-            display: flex; align-items: center; justify-content: center; gap: 6px;
-            transition: background .15s;
-        }
-        .media-send-btn:hover { background: var(--wa-header-dark); }
-
-        /* Image viewer */
-        .img-viewer {
-            position: fixed; inset: 0; background: rgba(0,0,0,.9);
-            z-index: 300; display: none; align-items: center; justify-content: center; cursor: pointer;
-        }
-        .img-viewer.show { display: flex; }
-        .img-viewer img { max-width: 92%; max-height: 92vh; border-radius: 6px; object-fit: contain; }
-        .img-viewer-close {
-            position: absolute; top: 14px; right: 14px;
-            background: rgba(255,255,255,.15); border: none; color: #fff; font-size: 22px;
-            width: 40px; height: 40px; border-radius: 50%; cursor: pointer;
-            display: flex; align-items: center; justify-content: center;
-        }
-        .img-viewer-close:hover { background: rgba(255,255,255,.25); }
-
-        /* Scrollbars */
-        ::-webkit-scrollbar { width: 5px; }
-        ::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            .wa-conv           { width: 100%; min-width: 0; flex-shrink: 1; }
-            .wa-conv.mob-hide  { display: none; }
-            .wa-chat.mob-hide  { display: none; }
-            .btn-back          { display: flex !important; }
-            .msg-row.out       { padding-left: 24px; }
-            .msg-row.in        { padding-right: 24px; }
-        }
-        .d-none { display: none !important; }
-
-        /* Assignment Note Icons */
-        .note-icon {
-            display: inline-flex; align-items: center; justify-content: center;
-            width: 20px; height: 20px; border-radius: 4px; cursor: pointer;
-            font-size: 11px; flex-shrink: 0; margin-left: 4px;
-            transition: transform .15s;
-        }
-        .note-icon:hover { transform: scale(1.15); }
-        .note-icon.note-low { background: #e8f5e9; color: #4caf50; }
-        .note-icon.note-medium { background: #fff3e0; color: #ff9800; }
-        .note-icon.note-critical { background: #ffebee; color: #f44336; }
-        .note-icon-hdr {
-            display: inline-flex; align-items: center; justify-content: center;
-            width: 26px; height: 26px; border-radius: 6px; cursor: pointer;
-            font-size: 13px; flex-shrink: 0; margin-left: 8px;
-            transition: transform .15s;
-        }
-        .note-icon-hdr:hover { transform: scale(1.1); }
-        .note-icon-hdr.note-low { background: #e8f5e9; color: #4caf50; }
-        .note-icon-hdr.note-medium { background: #fff3e0; color: #ff9800; }
-        .note-icon-hdr.note-critical { background: #ffebee; color: #f44336; }
-
-        /* Report Icon (conv-list) */
-        .report-icon {
-            display: inline-flex; align-items: center; justify-content: center;
-            width: 20px; height: 20px; border-radius: 4px; cursor: pointer;
-            font-size: 11px; flex-shrink: 0; margin-left: 4px;
-            background: #e3f2fd; color: #1976d2;
-            transition: transform .15s;
-        }
-        .report-icon:hover { transform: scale(1.15); background: #bbdefb; }
-        /* Report Icon (header) */
-        .report-icon-hdr {
-            display: inline-flex; align-items: center; justify-content: center;
-            width: 26px; height: 26px; border-radius: 6px; cursor: pointer;
-            font-size: 13px; flex-shrink: 0; margin-left: 4px;
-            background: #e3f2fd; color: #1976d2;
-            transition: transform .15s;
-        }
-        .report-icon-hdr:hover { transform: scale(1.1); background: #bbdefb; }
-
-        /* Report Modal */
-        .report-modal-overlay {
-            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,.45); z-index: 9999;
-            align-items: center; justify-content: center;
-        }
-        .report-modal-overlay.show { display: flex; }
-        .report-modal {
-            background: #fff; border-radius: 12px; width: 92%; max-width: 420px;
-            box-shadow: 0 8px 30px rgba(0,0,0,.18); overflow: hidden;
-            border-top: 4px solid #1976d2;
-        }
-        .report-modal-hdr {
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 14px 16px; border-bottom: 1px solid #eee;
-        }
-        .report-modal-hdr-left { display: flex; align-items: center; gap: 8px; }
-        .report-modal-icon { font-size: 18px; color: #1976d2; }
-        .report-modal-title { font-weight: 600; font-size: 15px; color: #333; }
-        .report-modal-close {
-            background: none; border: none; font-size: 20px; color: #999;
-            cursor: pointer; padding: 4px; line-height: 1;
-        }
-        .report-modal-close:hover { color: #333; }
-        .report-modal-body { padding: 16px; }
-        .report-modal-body label { font-size: 13px; font-weight: 600; color: #555; margin-bottom: 4px; display: block; }
-        .report-modal-body input[readonly] {
-            background: #f5f5f5; border: 1px solid #e0e0e0; border-radius: 6px;
-            padding: 8px 12px; width: 100%; font-size: 14px; color: #333; margin-bottom: 12px;
-        }
-        .report-modal-body textarea {
-            width: 100%; border: 1px solid #ddd; border-radius: 6px;
-            padding: 8px 12px; font-size: 14px; resize: vertical; min-height: 80px;
+            min-height: 150px;
+            max-height: 300px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             margin-bottom: 12px;
+            border-radius: 16px;
+            background: #f8fafc;
+            color: #64748b;
         }
-        .report-modal-body textarea:focus { outline: none; border-color: #1976d2; }
-        .report-send-btn {
-            display: block; width: 100%; padding: 10px; border: none; border-radius: 8px;
-            background: #25d366; color: #fff; font-size: 15px; font-weight: 600;
-            cursor: pointer; transition: background .2s;
+        .media-preview img, .media-preview video { max-width: 100%; max-height: 300px; border-radius: 14px; }
+        .doc-icon { font-size: 44px; color: #2563eb; }
+        .media-caption-inp, .tpl-search input, .report-modal-body input, .report-modal-body textarea {
+            width: 100%;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            background: #f8fafc;
+            padding: 11px 13px;
+            outline: none;
         }
-        .report-send-btn:hover { background: #1ebe5d; }
+        .media-caption-inp { margin-bottom: 12px; }
+        .media-caption-inp:focus, .tpl-search input:focus, .report-modal-body textarea:focus { border-color: #86efac; box-shadow: 0 0 0 4px rgba(34,197,94,.12); background: #fff; }
+        .media-send-btn, .report-send-btn {
+            width: 100%;
+            border: 0;
+            border-radius: 13px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 14px;
+            background: var(--wa-green);
+            color: #fff;
+            font-weight: 800;
+            cursor: pointer;
+        }
+        .img-viewer { z-index: 300; background: rgba(2,6,23,.92); cursor: zoom-out; }
+        .img-viewer img { max-width: 92vw; max-height: 90vh; object-fit: contain; border-radius: 14px; }
+        .img-viewer-close { position: fixed; top: 18px; right: 18px; z-index: 2; width: 42px; height: 42px; border: 0; border-radius: 999px; background: rgba(255,255,255,.14); color: #fff; }
 
-        /* Note Modal */
-        .note-modal-overlay {
-            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,.45); z-index: 9999;
-            align-items: center; justify-content: center;
-        }
-        .note-modal-overlay.show { display: flex; }
-        .note-modal {
-            background: #fff; border-radius: 12px; width: 340px; max-width: 90vw;
-            box-shadow: 0 8px 32px rgba(0,0,0,.25); overflow: hidden;
-            border-top: 4px solid #4caf50;
-        }
-        .note-modal.priority-medium { border-top-color: #ff9800; }
-        .note-modal.priority-critical { border-top-color: #f44336; }
-        .note-modal-hdr {
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 14px 16px; border-bottom: 1px solid #eee;
-        }
-        .note-modal-hdr-left { display: flex; align-items: center; gap: 8px; }
-        .note-modal-icon { font-size: 18px; color: #4caf50; }
-        .note-modal.priority-medium .note-modal-icon { color: #ff9800; }
-        .note-modal.priority-critical .note-modal-icon { color: #f44336; }
-        .note-modal-title { font-weight: 600; font-size: 15px; color: #333; }
-        .note-modal-close {
-            background: none; border: none; font-size: 20px; color: #999;
-            cursor: pointer; padding: 4px; line-height: 1;
-        }
-        .note-modal-close:hover { color: #333; }
-        .note-modal-body { padding: 16px; }
-        .note-priority-badge {
-            display: inline-block; padding: 3px 10px; border-radius: 12px;
-            font-size: 12px; font-weight: 600; margin-bottom: 10px;
-            background: #e8f5e9; color: #4caf50;
-        }
-        .note-modal.priority-medium .note-priority-badge { background: #fff3e0; color: #ff9800; }
-        .note-modal.priority-critical .note-priority-badge { background: #ffebee; color: #f44336; }
-        .note-content {
-            font-size: 14px; color: #444; line-height: 1.5;
-            white-space: pre-wrap; word-break: break-word;
-        }
-        /* Template Picker */
-        .tpl-overlay {
-            display: none; position: fixed; inset: 0;
-            background: rgba(0,0,0,.45); z-index: 250;
-            align-items: flex-end; justify-content: center;
-        }
-        .tpl-overlay.show { display: flex; }
-        .tpl-panel {
-            background: #fff; border-radius: 16px 16px 0 0; width: 100%; max-width: 520px;
-            max-height: 70vh; display: flex; flex-direction: column;
-            box-shadow: 0 -4px 30px rgba(0,0,0,.15); overflow: hidden;
-            animation: tplSlideUp .25s ease;
-        }
-        @keyframes tplSlideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-        .tpl-hdr {
-            display: flex; align-items: center; padding: 14px 16px;
-            border-bottom: 1px solid #eee; gap: 10px; flex-shrink: 0;
-        }
-        .tpl-hdr i { font-size: 20px; color: var(--wa-header); }
-        .tpl-hdr-title { font-weight: 600; font-size: 15px; flex: 1; }
-        .tpl-hdr-close {
-            background: var(--wa-hover); border: none; width: 30px; height: 30px;
-            border-radius: 50%; display: flex; align-items: center; justify-content: center;
-            cursor: pointer; font-size: 15px; color: var(--wa-text2);
-        }
-        .tpl-search {
-            padding: 10px 16px; border-bottom: 1px solid #f0f0f0; flex-shrink: 0;
-        }
-        .tpl-search input {
-            width: 100%; background: var(--wa-hover); border: none; border-radius: 8px;
-            padding: 8px 12px; font-size: 14px; outline: none; color: var(--wa-text1);
-        }
-        .tpl-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-        .tpl-item {
-            padding: 12px 16px; border-bottom: 1px solid #f5f5f5;
-            cursor: pointer; transition: background .1s;
-        }
-        .tpl-item:hover { background: #f0faf4; }
-        .tpl-item:active { background: #e0f5eb; }
-        .tpl-code {
-            font-family: 'Consolas', monospace; font-weight: 700; font-size: 13px;
-            color: var(--wa-header); background: #f0faf4; padding: 2px 8px;
-            border-radius: 4px; display: inline-block; margin-bottom: 4px;
-        }
-        .tpl-code::before { content: '#'; color: #25d366; }
-        .tpl-title { font-weight: 600; font-size: 14px; color: var(--wa-text1); margin-bottom: 2px; }
-        .tpl-preview {
-            font-size: 12px; color: var(--wa-text2); white-space: pre-wrap;
-            max-height: 40px; overflow: hidden; line-height: 1.4;
-        }
-        .tpl-media-badge {
-            display: inline-flex; align-items: center; gap: 3px;
-            font-size: 11px; color: #1976d2; background: #e3f2fd;
-            padding: 1px 6px; border-radius: 4px; margin-left: 6px;
-        }
-        .tpl-empty {
-            padding: 40px 20px; text-align: center; color: var(--wa-text2);
-        }
-        .tpl-empty i { font-size: 36px; color: #ddd; display: block; margin-bottom: 8px; }
-        .btn-template {
-            background: none; border: none; color: var(--wa-text2); font-size: 22px;
-            padding: 8px; cursor: pointer; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            transition: background .15s; flex-shrink: 0;
-        }
-        .btn-template:hover { background: rgba(0,0,0,.06); color: var(--wa-header); }
-        @media (min-width: 769px) {
-            .tpl-panel { border-radius: 16px; margin-bottom: 20px; max-height: 60vh; }
-            .tpl-overlay { align-items: center; }
-        }
+        .note-modal, .report-modal { width: min(430px, 92vw); }
+        .note-modal-hdr, .report-modal-hdr { padding: 16px 18px; border-bottom: 1px solid #eef2f7; }
+        .note-modal-hdr-left, .report-modal-hdr-left { display: flex; align-items: center; gap: 10px; font-weight: 800; }
+        .note-modal-body, .report-modal-body { padding: 18px; }
+        .note-priority-badge { display: inline-flex; padding: 5px 11px; border-radius: 999px; background: #ecfdf5; color: #047857; font-size: 12px; font-weight: 800; margin-bottom: 12px; }
+        .note-content { color: #334155; line-height: 1.6; white-space: pre-wrap; }
+        .report-modal-body label { display: block; margin: 12px 0 6px; color: #475569; font-size: 12px; font-weight: 800; }
+        .report-modal-body textarea { min-height: 100px; resize: vertical; margin-bottom: 14px; }
 
-        /* ── PWA Install Bottom Sheet ── */
+        .tpl-overlay { z-index: 250; }
+        .tpl-panel { width: min(540px, 92vw); max-height: 72vh; display: flex; flex-direction: column; }
+        .tpl-hdr { padding: 16px 18px; border-bottom: 1px solid #eef2f7; font-weight: 800; }
+        .tpl-hdr i { color: var(--wa-green); }
+        .tpl-search { padding: 14px 18px; border-bottom: 1px solid #eef2f7; }
+        .tpl-list { overflow-y: auto; }
+        .tpl-item { padding: 14px 18px; border-bottom: 1px solid #f1f5f9; cursor: pointer; }
+        .tpl-item:hover { background: #f0fdf4; }
+        .tpl-code { display: inline-flex; border-radius: 999px; background: #ecfdf5; color: #047857; padding: 3px 10px; font-size: 12px; font-weight: 800; }
+        .tpl-code::before { content: '#'; }
+        .tpl-title { margin-top: 6px; font-weight: 800; }
+        .tpl-preview { margin-top: 4px; color: #64748b; font-size: 13px; line-height: 1.5; }
+        .tpl-media-badge { margin-left: 7px; display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; background: #eff6ff; color: #2563eb; padding: 3px 8px; font-size: 11px; font-weight: 800; }
+        .tpl-empty { padding: 44px 20px; text-align: center; color: #64748b; }
+        .tpl-empty i { display: block; margin-bottom: 10px; color: #cbd5e1; font-size: 34px; }
+
         .pwa-backdrop {
-            position: fixed; inset: 0; z-index: 90000;
-            background: rgba(0,0,0,0); /* start transparent */
+            position: fixed;
+            inset: 0;
+            z-index: 90000;
+            background: rgba(0,0,0,0);
             pointer-events: none;
-            transition: background 0.35s ease;
+            transition: background .35s ease;
         }
-        .pwa-backdrop.visible {
-            background: rgba(0,0,0,0.45);
-            pointer-events: auto;
-        }
+        .pwa-backdrop.visible { background: rgba(15,23,42,.45); pointer-events: auto; }
         .pwa-sheet {
-            position: fixed; bottom: 0; left: 0; right: 0; z-index: 90001;
-            background: #fff;
-            border-radius: 20px 20px 0 0;
-            padding: 0 0 env(safe-area-inset-bottom, 16px);
-            box-shadow: 0 -8px 40px rgba(0,0,0,0.18);
-            transform: translateY(110%);
-            transition: transform 0.42s cubic-bezier(0.32, 0.72, 0, 1);
-            will-change: transform;
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 90001;
             max-width: 520px;
             margin: 0 auto;
+            padding-bottom: env(safe-area-inset-bottom, 16px);
+            border-radius: 22px 22px 0 0;
+            background: #fff;
+            box-shadow: 0 -20px 70px rgba(15,23,42,.24);
+            transform: translateY(110%);
+            transition: transform .42s cubic-bezier(.32,.72,0,1);
         }
-        .pwa-sheet.open {
-            transform: translateY(0);
+        .pwa-sheet.open { transform: translateY(0); }
+        .pwa-handle { width: 42px; height: 4px; border-radius: 999px; background: #dbe3ea; margin: 10px auto 0; }
+        .pwa-body { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 18px 28px 24px; text-align: center; }
+        .pwa-icon-wrap { width: 68px; height: 68px; display: flex; align-items: center; justify-content: center; overflow: hidden; border-radius: 18px; background: #ecfdf5; box-shadow: 0 8px 24px rgba(15,23,42,.12); }
+        .pwa-icon-wrap img { width: 100%; height: 100%; object-fit: cover; }
+        .pwa-icon-fallback { font-size: 34px; color: var(--wa-green); }
+        .pwa-title { margin: 0; font-weight: 800; }
+        .pwa-desc { margin: 0; max-width: 320px; color: #64748b; font-size: 13px; line-height: 1.55; }
+        .pwa-actions { display: flex; gap: 10px; width: 100%; }
+        .pwa-btn-later, .pwa-btn-install { border: 0; border-radius: 13px; padding: 13px 16px; font-weight: 800; cursor: pointer; }
+        .pwa-btn-later { background: #f1f5f9; color: #475569; }
+        .pwa-btn-install { flex: 1; background: var(--wa-green); color: #fff; }
+        .pwa-hint { color: #94a3b8; font-size: 12px; }
+
+        @media (max-width: 1180px) {
+            .contact-panel { display: none; }
         }
-        /* drag handle */
-        .pwa-handle {
-            width: 40px; height: 4px; border-radius: 2px;
-            background: #e0e0e0;
-            margin: 10px auto 0;
-        }
-        .pwa-body {
-            display: flex; flex-direction: column; align-items: center;
-            padding: 16px 28px 24px; gap: 12px; text-align: center;
-        }
-        .pwa-icon-wrap {
-            width: 68px; height: 68px; border-radius: 16px;
-            overflow: hidden; flex-shrink: 0;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.12);
-            background: #f5f5f5;
-            display: flex; align-items: center; justify-content: center;
-        }
-        .pwa-icon-wrap img {
-            width: 100%; height: 100%; object-fit: cover;
-        }
-        .pwa-icon-wrap .pwa-icon-fallback {
-            font-size: 34px; color: var(--wa-header);
-        }
-        .pwa-title {
-            font-size: 16px; font-weight: 700;
-            color: #111; margin: 0;
-        }
-        .pwa-desc {
-            font-size: 13.5px; color: #667781; line-height: 1.5;
-            margin: 0; max-width: 300px;
-        }
-        .pwa-actions {
-            display: flex; gap: 10px; width: 100%; margin-top: 4px;
-        }
-        .pwa-btn-install {
-            flex: 1; background: var(--wa-header);
-            color: #fff; border: none; border-radius: 12px;
-            font-size: 15px; font-weight: 700;
-            padding: 14px 20px; cursor: pointer;
-            display: flex; align-items: center; justify-content: center; gap: 8px;
-            transition: background .2s, transform .1s;
-            letter-spacing: 0.01em;
-        }
-        .pwa-btn-install:active { transform: scale(.97); }
-        .pwa-btn-install:hover { background: var(--wa-header-dark); }
-        .pwa-btn-later {
-            background: var(--wa-hover); color: var(--wa-text2);
-            border: none; border-radius: 12px;
-            font-size: 14px; font-weight: 600;
-            padding: 14px 18px; cursor: pointer;
-            transition: background .2s;
-            white-space: nowrap;
-        }
-        .pwa-btn-later:hover { background: #e4e6e9; }
-        .pwa-hint {
-            font-size: 11.5px; color: #b0bec5;
-            margin-top: -4px;
-            display: flex; align-items: center; gap: 4px;
+        @media (max-width: 820px) {
+            .desktop-only { display: none !important; }
+            .wa-body { position: relative; }
+            .wa-conv { width: 100% !important; }
+            .wa-conv.mob-hide { display: none !important; }
+            .wa-chat { width: 100% !important; }
+            .wa-chat.mob-hide { display: none !important; }
+            .btn-back { display: inline-flex !important; }
+            .chat-msgs { padding: 16px 14px; }
+            .msg-row.in { padding-right: 22px; }
+            .msg-row.out { padding-left: 22px; }
+            .attachment-menu { left: 12px; bottom: 72px; }
         }
     </style>
 </head>
 <body>
-<div class="wa-app">
+    <div id="member-dashboard-root"></div>
 
-    <!-- Top Bar -->
-    <div class="wa-topbar">
-        <i class="bi bi-whatsapp wa-logo"></i>
-        <span class="wa-title" id="topbar-name">WhatsApp Chat</span>
-        <!-- Admin-only quick nav buttons (shown after role check in chat.js) -->
-        <button class="wa-btn" id="btn-admin-dashboard" title="Dashboard Admin" style="display:none" onclick="location.href='/'">
-            <i class="bi bi-house-door-fill"></i>
-        </button>
-        <button class="wa-btn" id="btn-admin-penugasan" title="Penugasan Worker" style="display:none" onclick="location.href='/penugasan.html'">
-            <i class="bi bi-person-check-fill"></i>
-        </button>
-        <button class="wa-btn" id="btn-refresh" title="Refresh">
-            <i class="bi bi-arrow-clockwise"></i>
-        </button>
-        <button class="wa-btn" id="btn-read-all" title="Tandai semua dibaca">
-            <i class="bi bi-check2-all"></i>
-        </button>
-        <button class="wa-btn" id="btn-pwa-install" title="Install Aplikasi" style="display:none">
-            <i class="bi bi-download"></i>
-        </button>
-        <button class="wa-btn" id="btn-logout" title="Keluar">
-            <i class="bi bi-box-arrow-right"></i>
-        </button>
-    </div>
-
-    <!-- Session Tabs -->
-    <div class="wa-tabs" id="session-tabs"></div>
-
-    <!-- Body -->
-    <div class="wa-body">
-
-        <!-- No sessions placeholder -->
-        <div class="wa-no-sess d-none" id="no-sessions">
-            <i class="bi bi-phone-x"></i>
-            <h5>Belum ada session</h5>
-            <p>Hubungi admin untuk mendapatkan akses session WhatsApp.</p>
-        </div>
-
-        <!-- Left: Conversation list -->
-        <div class="wa-conv" id="conv-panel">
-            <div class="wa-search">
-                <i class="bi bi-search"></i>
-                <input type="text" id="conv-search-input" placeholder="Cari kontak...">
-            </div>
-            <div class="wa-conv-list" id="conv-list">
-                <!-- Skeleton loader -->
-                <div id="conv-loading" style="padding:14px;">
-                    <div style="display:flex;gap:12px;margin-bottom:16px;">
-                        <div class="skel" style="width:49px;height:49px;border-radius:50%;flex-shrink:0;"></div>
-                        <div style="flex:1;"><div class="skel" style="height:13px;width:55%;margin-bottom:9px;"></div><div class="skel" style="height:11px;width:80%;"></div></div>
-                    </div>
-                    <div style="display:flex;gap:12px;margin-bottom:16px;">
-                        <div class="skel" style="width:49px;height:49px;border-radius:50%;flex-shrink:0;"></div>
-                        <div style="flex:1;"><div class="skel" style="height:13px;width:70%;margin-bottom:9px;"></div><div class="skel" style="height:11px;width:60%;"></div></div>
-                    </div>
-                    <div style="display:flex;gap:12px;">
-                        <div class="skel" style="width:49px;height:49px;border-radius:50%;flex-shrink:0;"></div>
-                        <div style="flex:1;"><div class="skel" style="height:13px;width:45%;margin-bottom:9px;"></div><div class="skel" style="height:11px;width:75%;"></div></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Right: Chat panel -->
-        <div class="wa-chat mob-hide" id="chat-panel">
-
-            <!-- Header (shown when chat is open) -->
-            <div class="chat-hdr d-none" id="chat-hdr">
-                <button class="btn-back" id="btn-back"><i class="bi bi-arrow-left"></i></button>
-                <div class="hdr-ava" id="chat-hdr-avatar"></div>
-                <div class="hdr-info">
-                    <div class="hdr-name" id="chat-hdr-name">&mdash;</div>
-                    <div class="hdr-sub"  id="chat-hdr-phone">&mdash;</div>
-                </div>
-                <span class="note-icon-hdr d-none" id="chat-hdr-note" title="Catatan penugasan"><i class="bi bi-sticky-fill"></i></span>
-                <span class="report-icon-hdr" id="chat-hdr-report" title="Laporan"><i class="bi bi-flag-fill"></i></span>
-            </div>
-
-            <!-- Assignment deadline banner (worker only) -->
-            <div class="assignment-banner d-none" id="assignment-banner"></div>
-
-            <!-- Empty state (desktop) -->
-            <div class="chat-empty" id="chat-empty">
-                <div class="icon-wrap"><i class="bi bi-chat-quote"></i></div>
-                <h5>Pilih percakapan</h5>
-                <p>Klik salah satu kontak di kiri untuk membuka obrolan.</p>
-            </div>
-
-            <!-- Messages -->
-            <div class="chat-msgs d-none" id="chat-messages"></div>
-
-            <!-- Input bar -->
-            <div class="chat-input d-none" id="input-bar">
-                <button class="btn-attach" id="btn-attach" title="Lampirkan file">
-                    <i class="bi bi-paperclip"></i>
-                </button>
-                <button class="btn-template" id="btn-template" title="Template Chat">
-                    <i class="bi bi-lightning-charge-fill"></i>
-                </button>
-                <input type="file" id="file-input" style="display:none;"
-                    accept="image/*,video/*,application/pdf,application/msword,.docx,.xlsx,.pptx">
-                <textarea id="msg-input" rows="1" placeholder="Ketik pesan..."></textarea>
-                <button class="btn-send" id="btn-send">
-                    <i class="bi bi-send-fill"></i>
-                </button>
-            </div>
-
-        </div>
-    </div><!-- /wa-body -->
-</div><!-- /wa-app -->
-
-<!-- File Upload Overlay -->
-<div class="media-overlay" id="media-overlay">
-    <div class="media-box">
-        <div class="media-box-hdr">
-            <h6>Kirim File</h6>
-            <button class="media-close-btn" id="media-close"><i class="bi bi-x"></i></button>
-        </div>
-        <div class="media-preview" id="media-preview"></div>
-        <input class="media-caption-inp" type="text" id="media-caption" placeholder="Tambahkan keterangan...">
-        <!-- Upload Progress -->
-        <div id="upload-progress" style="display:none; padding: 0 16px 8px;">
-            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                <small style="color:#8696a0;" id="upload-status">Mengunggah...</small>
-                <small style="font-weight:600; color:var(--wa-text1);" id="upload-percent">0%</small>
-            </div>
-            <div style="height:4px; background:#e9ecef; border-radius:2px; overflow:hidden;">
-                <div id="upload-bar" style="height:100%; width:0%; background:var(--wa-header); transition:width 0.3s ease;"></div>
-            </div>
-        </div>
-        <button class="media-send-btn" id="media-send">
-            <i class="bi bi-send-fill"></i> Kirim
-        </button>
-    </div>
-</div>
-
-<!-- Image Viewer -->
-<div class="img-viewer" id="image-viewer">
-    <button class="img-viewer-close" id="img-viewer-close"><i class="bi bi-x"></i></button>
-    <img id="image-viewer-img" alt="">
-</div>
-
-<!-- Assignment Note Modal -->
-<div class="note-modal-overlay" id="note-modal-overlay">
-    <div class="note-modal" id="note-modal">
-        <div class="note-modal-hdr">
-            <div class="note-modal-hdr-left">
-                <i class="bi bi-sticky-fill note-modal-icon"></i>
-                <span class="note-modal-title">Catatan Penugasan</span>
-            </div>
-            <button class="note-modal-close" id="note-modal-close"><i class="bi bi-x"></i></button>
-        </div>
-        <div class="note-modal-body">
-            <div class="note-priority-badge" id="note-priority-badge">Low</div>
-            <div class="note-content" id="note-content">-</div>
-        </div>
-    </div>
-</div>
-
-<!-- Report Modal -->
-<div class="report-modal-overlay" id="report-modal-overlay">
-    <div class="report-modal" id="report-modal">
-        <div class="report-modal-hdr">
-            <div class="report-modal-hdr-left">
-                <i class="bi bi-flag-fill report-modal-icon"></i>
-                <span class="report-modal-title">Laporan Client</span>
-            </div>
-            <button class="report-modal-close" id="report-modal-close"><i class="bi bi-x"></i></button>
-        </div>
-        <div class="report-modal-body">
-            <label>Nama Worker</label>
-            <input type="text" id="report-worker-name" readonly />
-            <label>Nomor Client</label>
-            <input type="text" id="report-client-phone" readonly />
-            <label>Laporan</label>
-            <textarea id="report-text" placeholder="Tulis laporan di sini..."></textarea>
-            <button class="report-send-btn" id="report-send-btn">
-                <i class="bi bi-whatsapp me-1"></i> Kirim via WhatsApp
-            </button>
-        </div>
-    </div>
-</div>
-
-<!-- Template Picker Overlay -->
-<div class="tpl-overlay" id="tpl-overlay">
-    <div class="tpl-panel">
-        <div class="tpl-hdr">
-            <i class="bi bi-lightning-charge-fill"></i>
-            <span class="tpl-hdr-title">Pilih Template</span>
-            <button class="tpl-hdr-close" id="tpl-close"><i class="bi bi-x"></i></button>
-        </div>
-        <div class="tpl-search">
-            <input type="text" id="tpl-search-input" placeholder="Cari template...">
-        </div>
-        <div class="tpl-list" id="tpl-list">
-            <div class="tpl-empty"><i class="bi bi-hourglass-split"></i>Memuat template...</div>
-        </div>
-    </div>
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script>
-// Fix mobile viewport height (address bar hide/show)
-function setAppHeight() {
-    document.documentElement.style.setProperty('--app-height', window.innerHeight + 'px');
-}
-window.addEventListener('resize', setAppHeight);
-setAppHeight();
-
-// Load dynamic branding from settings
-fetch('/api/settings/public').then(r => r.json()).then(d => {
-    if (d.success && d.settings) {
-        if (d.settings.favicon_url) {
-            const fav = document.getElementById('dynamic-favicon');
-            if (fav) { fav.href = d.settings.favicon_url; fav.type = 'image/png'; }
-            const apple = document.getElementById('dynamic-apple-icon');
-            if (apple) apple.href = d.settings.favicon_url;
+    <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="/member/dashboard-react.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        function setAppHeight() {
+            document.documentElement.style.setProperty('--app-height', window.innerHeight + 'px');
         }
-        if (d.settings.app_name) document.title = d.settings.app_name;
-    }
-}).catch(() => {});
-</script>
-<script src="/socket.io/socket.io.js"></script>
-<!-- Firebase SDK for push notifications -->
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js"></script>
-<script src="/js/notifications.js"></script>
-<script src="/member/chat.js"></script>
-<script>
-// Initialize notifications after chat.js has set up the socket
-document.addEventListener('DOMContentLoaded', () => {
-    // Wait for socket to be ready (chat.js creates S.socket)
-    const checkSocket = setInterval(() => {
-        if (typeof S !== 'undefined' && S.socket) {
-            clearInterval(checkSocket);
-            NotificationManager.init(S.socket, {
-                // TODO: Replace with your VAPID key from Firebase Console
-                // Firebase Console → Project Settings → Cloud Messaging → Web Push certificates
-                vapidKey: 'BAPL5bqGjrmHDEaz2cIuRWkGLkABy3r45uf7dm29s79n9TmQLcm2JNgqROVW4dumPlqK-yaM6Rufnwz6LkqCR58'
-            });
-        }
-    }, 500);
-});
-</script>
+        window.addEventListener('resize', setAppHeight);
+        setAppHeight();
 
-<!-- ====================================================
-     PWA Install Bottom Sheet
-     Shows when: logged in + not already installed as PWA
-===================================================== -->
-<div class="pwa-backdrop" id="pwa-backdrop"></div>
-<div class="pwa-sheet" id="pwa-sheet" role="dialog" aria-modal="true" aria-label="Install aplikasi">
-    <div class="pwa-handle"></div>
-    <div class="pwa-body">
-        <div class="pwa-icon-wrap" id="pwa-icon-wrap">
-            <!-- Filled dynamically with favicon or fallback icon -->
-            <i class="bi bi-whatsapp pwa-icon-fallback" id="pwa-icon-fallback"></i>
-        </div>
-        <p class="pwa-title" id="pwa-app-name">Billey WA</p>
-        <p class="pwa-desc">Install aplikasi untuk pengalaman yang lebih baik — akses cepat, notifikasi real-time, dan tampilan fullscreen.</p>
-        <div class="pwa-actions">
-            <button class="pwa-btn-later" id="pwa-btn-later">
-                Nanti
-            </button>
-            <button class="pwa-btn-install" id="pwa-btn-install-sheet">
-                <i class="bi bi-download"></i> Install Sekarang
-            </button>
-        </div>
-        <span class="pwa-hint"><i class="bi bi-shield-check"></i> Gratis, tanpa menggunakan storage ekstra</span>
-    </div>
-</div>
-
-<script>
-// ── PWA Install Bottom Sheet ──────────────────────────────
-(function() {
-    const DISMISSED_KEY = 'pwa_bs_dismissed_at';
-    const BACKOFF_HOURS = 24; // re-show after 24h if dismissed
-
-    let deferredPrompt = null;
-    let sheetOpen = false;
-
-    const backdrop = document.getElementById('pwa-backdrop');
-    const sheet    = document.getElementById('pwa-sheet');
-    const btnInstall = document.getElementById('pwa-btn-install-sheet');
-    const btnLater   = document.getElementById('pwa-btn-later');
-    const iconWrap   = document.getElementById('pwa-icon-wrap');
-    const iconFallback = document.getElementById('pwa-icon-fallback');
-    const appNameEl  = document.getElementById('pwa-app-name');
-
-    // ── PWA detection ──────────────────────────────────────
-    function isPwaInstalled() {
-        return window.matchMedia('(display-mode: standalone)').matches
-            || window.matchMedia('(display-mode: fullscreen)').matches
-            || window.navigator.standalone === true
-            || document.referrer.includes('android-app://');
-    }
-
-    function wasDismissedRecently() {
-        const ts = localStorage.getItem(DISMISSED_KEY);
-        if (!ts) return false;
-        const hours = (Date.now() - Number(ts)) / 3600000;
-        return hours < BACKOFF_HOURS;
-    }
-
-    // ── Open / Close ───────────────────────────────────────
-    function openSheet() {
-        if (sheetOpen) return;
-        sheetOpen = true;
-        backdrop.classList.add('visible');
-        // Slight delay so CSS transition fires after display
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => sheet.classList.add('open'));
+        fetch('/api/settings/public').then(r => r.json()).then(d => {
+            if (d.success && d.settings) {
+                window.APP_SETTINGS = d.settings;
+                if (d.settings.favicon_url) {
+                    const fav = document.getElementById('dynamic-favicon');
+                    if (fav) { fav.href = d.settings.favicon_url; fav.type = 'image/png'; }
+                    const apple = document.getElementById('dynamic-apple-icon');
+                    if (apple) apple.href = d.settings.favicon_url;
+                }
+                if (d.settings.app_name) document.title = d.settings.app_name + ' - Message Center';
+                document.dispatchEvent(new CustomEvent('components-loaded'));
+            }
+        }).catch(() => {});
+    </script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js"></script>
+    <script src="/js/notifications.js"></script>
+    <script src="/member/chat.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const checkSocket = setInterval(() => {
+                if (typeof S !== 'undefined' && S.socket && window.NotificationManager) {
+                    clearInterval(checkSocket);
+                    NotificationManager.init(S.socket, {
+                        vapidKey: 'BAPL5bqGjrmHDEaz2cIuRWkGLkABy3r45uf7dm29s79n9TmQLcm2JNgqROVW4dumPlqK-yaM6Rufnwz6LkqCR58'
+                    });
+                }
+            }, 500);
         });
-    }
+    </script>
+    <script>
+        (function() {
+            const DISMISSED_KEY = 'pwa_bs_dismissed_at';
+            const BACKOFF_HOURS = 24;
+            let deferredPrompt = null;
+            let sheetOpen = false;
 
-    function closeSheet() {
-        if (!sheetOpen) return;
-        sheet.classList.remove('open');
-        backdrop.classList.remove('visible');
-        sheetOpen = false;
-    }
+            function isPwaInstalled() {
+                return window.matchMedia('(display-mode: standalone)').matches
+                    || window.matchMedia('(display-mode: fullscreen)').matches
+                    || window.navigator.standalone === true
+                    || document.referrer.includes('android-app://');
+            }
 
-    // ── Dismiss (store timestamp) ──────────────────────────
-    function dismiss() {
-        localStorage.setItem(DISMISSED_KEY, Date.now().toString());
-        closeSheet();
-    }
+            function wasDismissedRecently() {
+                const ts = localStorage.getItem(DISMISSED_KEY);
+                if (!ts) return false;
+                return ((Date.now() - Number(ts)) / 3600000) < BACKOFF_HOURS;
+            }
 
-    // ── Load dynamic branding into sheet ──────────────────
-    function applyBranding() {
-        const s = window.APP_SETTINGS;
-        if (!s) return;
-        if (s.app_name) appNameEl.textContent = s.app_name;
-        const iconUrl = s.favicon_url || s.logo_url;
-        if (iconUrl) {
-            const img = document.createElement('img');
-            img.src = iconUrl;
-            img.alt = s.app_name || 'App Icon';
-            img.onerror = () => { /* keep fallback icon */ };
-            img.onload = () => {
-                iconFallback.style.display = 'none';
-                iconWrap.appendChild(img);
-            };
-            // Pre-load ahead of time
-            const t = new Image();
-            t.src = iconUrl;
-        }
-    }
+            function getEls() {
+                return {
+                    backdrop: document.getElementById('pwa-backdrop'),
+                    sheet: document.getElementById('pwa-sheet'),
+                    btnInstall: document.getElementById('pwa-btn-install-sheet'),
+                    btnLater: document.getElementById('pwa-btn-later'),
+                    iconWrap: document.getElementById('pwa-icon-wrap'),
+                    iconFallback: document.getElementById('pwa-icon-fallback'),
+                    appNameEl: document.getElementById('pwa-app-name')
+                };
+            }
 
-    // ── Core init ─────────────────────────────────────────
-    function init() {
-        // Don't show if already installed
-        if (isPwaInstalled()) return;
-        // Don't show if dismissed recently
-        if (wasDismissedRecently()) return;
-        // Don't show if no install prompt available AND not on iOS
-        // (iOS doesn't fire beforeinstallprompt but can still install via Safari share sheet)
-        const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+            function openSheet() {
+                const { backdrop, sheet } = getEls();
+                if (sheetOpen || !backdrop || !sheet) return;
+                sheetOpen = true;
+                backdrop.classList.add('visible');
+                requestAnimationFrame(() => requestAnimationFrame(() => sheet.classList.add('open')));
+            }
 
-        // Apply branding when settings are ready
-        if (window.APP_SETTINGS) {
-            applyBranding();
-        } else {
-            document.addEventListener('components-loaded', applyBranding);
-            // Also handle if app-init.js already ran
-            setTimeout(applyBranding, 600);
-        }
+            function closeSheet() {
+                const { backdrop, sheet } = getEls();
+                if (!sheetOpen || !backdrop || !sheet) return;
+                sheet.classList.remove('open');
+                backdrop.classList.remove('visible');
+                sheetOpen = false;
+            }
 
-        if (deferredPrompt || isIos) {
-            // Show 1.2s after page load so user can orient themselves first
-            setTimeout(openSheet, 1200);
-        }
-        // For non-iOS browsers, wait for beforeinstallprompt
-        // (already stored in deferredPrompt via event listener below)
-    }
-
-    // ── Capture install prompt ────────────────────────────
-    window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        deferredPrompt = e;
-        // If init already ran and decided to show → open now
-        if (!isPwaInstalled() && !wasDismissedRecently() && !sheetOpen) {
-            setTimeout(openSheet, 1200);
-        }
-    });
-
-    // ── Hide if installed mid-session ─────────────────────
-    window.addEventListener('appinstalled', () => {
-        deferredPrompt = null;
-        closeSheet();
-        console.log('✅ PWA installeret');
-    });
-
-    // ── Backdrop click → dismiss ──────────────────────────
-    backdrop.addEventListener('click', dismiss);
-
-    // ── Later button ──────────────────────────────────────
-    btnLater.addEventListener('click', dismiss);
-
-    // ── Install button ───────────────────────────────────
-    btnInstall.addEventListener('click', async () => {
-        if (deferredPrompt) {
-            deferredPrompt.prompt();
-            const { outcome } = await deferredPrompt.userChoice;
-            deferredPrompt = null;
-            if (outcome === 'accepted') {
+            function dismiss() {
+                localStorage.setItem(DISMISSED_KEY, Date.now().toString());
                 closeSheet();
-            } else {
-                dismiss();
             }
-        } else {
-            // iOS: show instructions in a subtle way
-            const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
-            if (isIos) {
-                btnInstall.innerHTML = '<i class="bi bi-share"></i> Tap Share → Add to Home Screen';
-                btnInstall.style.fontSize = '12px';
-                setTimeout(() => {
-                    btnInstall.innerHTML = '<i class="bi bi-download"></i> Install Sekarang';
-                    btnInstall.style.fontSize = '';
-                    dismiss();
-                }, 4000);
-            } else {
-                dismiss();
+
+            function applyBranding() {
+                const { iconWrap, iconFallback, appNameEl } = getEls();
+                const s = window.APP_SETTINGS;
+                if (!s) return;
+                if (s.app_name && appNameEl) appNameEl.textContent = s.app_name;
+                const iconUrl = s.favicon_url || s.logo_url;
+                if (iconUrl && iconWrap && iconFallback && !iconWrap.querySelector('img')) {
+                    const img = document.createElement('img');
+                    img.src = iconUrl;
+                    img.alt = s.app_name || 'App Icon';
+                    img.onload = () => {
+                        iconFallback.style.display = 'none';
+                        iconWrap.appendChild(img);
+                    };
+                }
             }
-        }
-    });
 
-    // Swipe down to dismiss
-    let touchStartY = 0;
-    sheet.addEventListener('touchstart', (e) => {
-        touchStartY = e.touches[0].clientY;
-    }, { passive: true });
-    sheet.addEventListener('touchmove', (e) => {
-        const dy = e.touches[0].clientY - touchStartY;
-        if (dy > 0) {
-            sheet.style.transform = `translateY(${dy}px)`;
-        }
-    }, { passive: true });
-    sheet.addEventListener('touchend', (e) => {
-        const dy = e.changedTouches[0].clientY - touchStartY;
-        sheet.style.transform = '';
-        sheet.style.transition = '';
-        if (dy > 80) {
-            dismiss();
-        }
-    }, { passive: true });
+            function init() {
+                const els = getEls();
+                if (!els.backdrop || !els.sheet || !els.btnInstall || !els.btnLater) return;
+                if (isPwaInstalled() || wasDismissedRecently()) return;
 
-    // ── Trigger after user is verified as logged-in ───────
-    // chat.js sets S.user — we wait for it
-    const checkUser = setInterval(() => {
-        if (typeof S !== 'undefined' && S.user) {
-            clearInterval(checkUser);
-            init();
-        }
-    }, 300);
-})();
-</script>
+                applyBranding();
+                document.addEventListener('components-loaded', applyBranding);
+
+                const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+                if (deferredPrompt || isIos) setTimeout(openSheet, 1200);
+
+                els.backdrop.addEventListener('click', dismiss);
+                els.btnLater.addEventListener('click', dismiss);
+                els.btnInstall.addEventListener('click', async () => {
+                    if (deferredPrompt) {
+                        deferredPrompt.prompt();
+                        const { outcome } = await deferredPrompt.userChoice;
+                        deferredPrompt = null;
+                        if (outcome === 'accepted') closeSheet();
+                        else dismiss();
+                    } else if (isIos) {
+                        els.btnInstall.innerHTML = '<i class="bi bi-share"></i> Tap Share, lalu Add to Home Screen';
+                        setTimeout(() => {
+                            els.btnInstall.innerHTML = '<i class="bi bi-download"></i> Install Sekarang';
+                            dismiss();
+                        }, 4000);
+                    } else {
+                        dismiss();
+                    }
+                });
+
+                let touchStartY = 0;
+                els.sheet.addEventListener('touchstart', e => { touchStartY = e.touches[0].clientY; }, { passive: true });
+                els.sheet.addEventListener('touchmove', e => {
+                    const dy = e.touches[0].clientY - touchStartY;
+                    if (dy > 0) els.sheet.style.transform = `translateY(${dy}px)`;
+                }, { passive: true });
+                els.sheet.addEventListener('touchend', e => {
+                    const dy = e.changedTouches[0].clientY - touchStartY;
+                    els.sheet.style.transform = '';
+                    if (dy > 80) dismiss();
+                }, { passive: true });
+            }
+
+            window.addEventListener('beforeinstallprompt', e => {
+                e.preventDefault();
+                deferredPrompt = e;
+                if (!isPwaInstalled() && !wasDismissedRecently() && !sheetOpen) setTimeout(openSheet, 1200);
+            });
+            window.addEventListener('appinstalled', () => {
+                deferredPrompt = null;
+                closeSheet();
+            });
+
+            const checkUser = setInterval(() => {
+                if (typeof S !== 'undefined' && S.user) {
+                    clearInterval(checkUser);
+                    init();
+                }
+            }, 300);
+        })();
+    </script>
 </body>
 </html>

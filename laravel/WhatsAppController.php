@@ -5,10 +5,17 @@ namespace App\Http\Controllers;
 use App\Services\WhatsAppService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use RuntimeException;
 
 /**
  * Contoh Controller untuk WhatsApp API
- * Copy dan sesuaikan dengan kebutuhan Anda
+ * Copy dan sesuaikan dengan kebutuhan Anda.
+ *
+ * Catatan:
+ * - sendImage / sendDocument sekarang menerima PATH FILE LOKAL (string), bukan URL.
+ *   Untuk kirim dari URL publik, gunakan sendMediaUrl() lewat route /whatsapp/send-media-url.
+ * - Endpoint yang panggil method deprecated di service akan return HTTP 501
+ *   dengan pesan error yang jelas (lihat LARAVEL-INTEGRATION.md).
  */
 class WhatsAppController extends Controller
 {
@@ -20,7 +27,7 @@ class WhatsAppController extends Controller
     }
 
     /**
-     * Kirim pesan teks
+     * Kirim pesan teks.
      * POST /whatsapp/send
      */
     public function send(Request $request): JsonResponse
@@ -31,153 +38,200 @@ class WhatsAppController extends Controller
             'session' => 'nullable|string',
         ]);
 
-        $result = $this->whatsapp->sendText(
+        return $this->safeCall(fn () => $this->whatsapp->sendText(
             $request->phone,
             $request->message,
             $request->session
-        );
-
-        return response()->json($result);
+        ));
     }
 
     /**
-     * Kirim gambar
+     * Kirim gambar dari file lokal (multipart upload).
      * POST /whatsapp/send-image
+     * Body: multipart/form-data, field 'file' = binary, 'phone' = nomor, 'caption' = optional
      */
     public function sendImage(Request $request): JsonResponse
     {
         $request->validate([
             'phone' => 'required|string',
-            'image_url' => 'required|url',
+            'file' => 'required|file',
             'caption' => 'nullable|string',
             'session' => 'nullable|string',
         ]);
 
-        $result = $this->whatsapp->sendImage(
+        return $this->safeCall(fn () => $this->whatsapp->sendImage(
             $request->phone,
-            $request->image_url,
+            $request->file('file')->getRealPath(),
             $request->caption ?? '',
             $request->session
-        );
-
-        return response()->json($result);
+        ));
     }
 
     /**
-     * Kirim dokumen
+     * Kirim dokumen dari file lokal (multipart upload).
      * POST /whatsapp/send-document
+     * Body: multipart/form-data, field 'file' = binary, 'phone', 'filename'?, 'caption'?
      */
     public function sendDocument(Request $request): JsonResponse
     {
         $request->validate([
             'phone' => 'required|string',
-            'document_url' => 'required|url',
+            'file' => 'required|file',
+            'filename' => 'nullable|string',
+            'caption' => 'nullable|string',
+            'session' => 'nullable|string',
+        ]);
+
+        return $this->safeCall(fn () => $this->whatsapp->sendDocument(
+            $request->phone,
+            $request->file('file')->getRealPath(),
+            $request->filename,
+            $request->caption,
+            $request->session
+        ));
+    }
+
+    /**
+     * Kirim media dari URL publik. Server yang download & dispatch
+     * ke sendImage/sendVideo/sendDocument sesuai MIME type.
+     * POST /whatsapp/send-media-url
+     * Body (JSON): { phone, file_url, message?, caption?, mimetype?, filename?, session? }
+     */
+    public function sendMediaUrl(Request $request): JsonResponse
+    {
+        $request->validate([
+            'phone' => 'required|string',
+            'file_url' => 'required|url',
+            'message' => 'nullable|string',
+            'caption' => 'nullable|string',
+            'mimetype' => 'nullable|string',
             'filename' => 'nullable|string',
             'session' => 'nullable|string',
         ]);
 
-        $result = $this->whatsapp->sendDocument(
+        return $this->safeCall(fn () => $this->whatsapp->sendMediaUrl(
             $request->phone,
-            $request->document_url,
-            $request->filename ?? '',
-            $request->session
-        );
-
-        return response()->json($result);
-    }
-
-    /**
-     * Broadcast ke banyak nomor
-     * POST /whatsapp/broadcast
-     */
-    public function broadcast(Request $request): JsonResponse
-    {
-        $request->validate([
-            'phones' => 'required|array|min:1',
-            'phones.*' => 'required|string',
-            'message' => 'required|string',
-            'session' => 'nullable|string',
-            'delay' => 'nullable|integer|min:1000',
-        ]);
-
-        $result = $this->whatsapp->broadcast(
-            $request->phones,
+            $request->file_url,
             $request->message,
-            $request->session,
-            $request->delay ?? 2000
-        );
-
-        return response()->json($result);
+            $request->caption,
+            $request->mimetype,
+            $request->filename,
+            $request->session
+        ));
     }
 
     /**
-     * Cek status session
-     * GET /whatsapp/status/{session?}
+     * Cek status koneksi WhatsApp.
+     * GET /whatsapp/status
      */
-    public function status(string $session = 'default'): JsonResponse
+    public function status(): JsonResponse
     {
-        $result = $this->whatsapp->getSessionStatus($session);
-        return response()->json($result);
+        return $this->safeCall(fn () => $this->whatsapp->getStatus());
     }
 
     /**
-     * List semua session
+     * List semua session.
      * GET /whatsapp/sessions
      */
     public function sessions(): JsonResponse
     {
-        $result = $this->whatsapp->getSessions();
-        return response()->json($result);
+        return $this->safeCall(fn () => $this->whatsapp->getSessions());
     }
 
     /**
-     * Dapatkan QR Code
-     * GET /whatsapp/qr/{session}
+     * Trigger webhook order-status ke server.
+     * POST /whatsapp/webhook/order-status
      */
-    public function qrCode(string $session): JsonResponse
+    public function orderStatusWebhook(Request $request): JsonResponse
     {
-        $result = $this->whatsapp->getQRCode($session);
-        return response()->json($result);
+        $request->validate([
+            'order_id' => 'required|string',
+            'status' => 'required|string',
+            'nomor_client' => 'required|string',
+            'session' => 'nullable|string',
+        ]);
+
+        return $this->safeCall(fn () => $this->whatsapp->webhookOrderStatus(
+            $request->order_id,
+            $request->status,
+            $request->nomor_client,
+            $request->session
+        ));
     }
 
     /**
-     * List semua grup
-     * GET /whatsapp/groups/{session?}
+     * Broadcast ke banyak nomor — tidak didukung server.
+     * Iterasi sendText() di sisi Laravel, atau gunakan queue.
+     * POST /whatsapp/broadcast
      */
-    public function groups(string $session = 'default'): JsonResponse
+    public function broadcast(Request $request): JsonResponse
     {
-        $result = $this->whatsapp->getGroups($session);
-        return response()->json($result);
+        return $this->notSupported('broadcast');
     }
 
     /**
-     * Kirim pesan ke grup
+     * Kirim pesan ke grup — endpoint tidak tersedia di server.
      * POST /whatsapp/groups/send
      */
     public function sendToGroup(Request $request): JsonResponse
     {
-        $request->validate([
-            'group_id' => 'required|string',
-            'message' => 'required|string',
-            'session' => 'nullable|string',
-        ]);
-
-        $result = $this->whatsapp->sendToGroup(
-            $request->group_id,
-            $request->message,
-            $request->session
-        );
-
-        return response()->json($result);
+        return $this->notSupported('sendToGroup');
     }
 
     /**
-     * Cek nomor terdaftar di WhatsApp
+     * List semua grup — endpoint tidak tersedia di server.
+     * GET /whatsapp/groups/{session?}
+     */
+    public function groups(string $session = 'default'): JsonResponse
+    {
+        return $this->notSupported('getGroups');
+    }
+
+    /**
+     * Dapatkan QR Code — endpoint tidak tersedia. Scan QR lewat dashboard.
+     * GET /whatsapp/qr/{session}
+     */
+    public function qrCode(string $session): JsonResponse
+    {
+        return $this->notSupported('getQRCode');
+    }
+
+    /**
+     * Cek nomor terdaftar — endpoint tidak tersedia di server.
      * GET /whatsapp/check/{phone}
      */
     public function checkNumber(string $phone): JsonResponse
     {
-        $result = $this->whatsapp->isRegistered($phone);
-        return response()->json($result);
+        return $this->notSupported('isRegistered');
+    }
+
+    /**
+     * Bungkus call ke service: kalau service throw RuntimeException
+     * (method deprecated / tidak ada endpoint), balikin HTTP 501.
+     * Kalau server return error (4xx/5xx), service udah balikin
+     * array { success: false, ... } — teruskan apa adanya.
+     */
+    protected function safeCall(callable $fn): JsonResponse
+    {
+        try {
+            $result = $fn();
+            $status = is_array($result) && isset($result['status']) && is_int($result['status']) && $result['status'] >= 400
+                ? $result['status']
+                : 200;
+            return response()->json($result, $status);
+        } catch (RuntimeException $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage(),
+            ], 501);
+        }
+    }
+
+    protected function notSupported(string $method): JsonResponse
+    {
+        return response()->json([
+            'success' => false,
+            'error' => "WhatsAppService::{$method}() tidak didukung oleh server. Lihat LARAVEL-INTEGRATION.md untuk endpoint yang tersedia.",
+        ], 501);
     }
 }

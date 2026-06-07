@@ -25,6 +25,8 @@ import { saveMedia, saveMediaBase64, getMediaDir, getMediaPath, cleanupOldMedia,
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
+const publicDir = path.join(__dirname, 'public')
+const adminPublicDir = path.join(publicDir, 'admin')
 
 // Create exports directory
 const exportsDir = path.join(__dirname, 'data', 'exports')
@@ -154,12 +156,13 @@ app.get('/manifest.json', (req, res) => {
 		res.setHeader('Content-Type', 'application/manifest+json')
 		res.json(manifest)
 	} catch {
-		res.sendFile(path.join(__dirname, 'public', 'manifest.json'))
+		res.sendFile(path.join(publicDir, 'manifest.json'))
 	}
 })
 
 // Serve static files (now protected by middleware above)
-app.use(express.static('public'))
+app.use(express.static(publicDir))
+app.use(express.static(adminPublicDir))
 app.use('/api', express.static('api')) // Serve API folder
 app.use('/media', express.static(getMediaDir(), {
 	maxAge: '1d',
@@ -173,7 +176,7 @@ app.use('/media', express.static(getMediaDir(), {
 
 // Auth page routes
 app.get('/auth/login', (req, res) => {
-	res.sendFile(__dirname + '/public/auth/login.html')
+	res.sendFile(path.join(publicDir, 'auth', 'login.html'))
 })
 
 app.get('/auth/logout', (req, res) => {
@@ -1102,32 +1105,32 @@ app.get('/', (req, res) => {
 
 // User frontend routes
 app.get('/user/', (req, res) => {
-	res.sendFile(__dirname + '/public/user/index.html')
+	res.sendFile(path.join(publicDir, 'user', 'index.html'))
 })
 
 app.get('/user/connect', (req, res) => {
-	res.sendFile(__dirname + '/public/user/connect.html')
+	res.sendFile(path.join(publicDir, 'user', 'connect.html'))
 })
 
 app.get('/user/exports', (req, res) => {
-	res.sendFile(__dirname + '/public/user/exports.html')
+	res.sendFile(path.join(publicDir, 'user', 'exports.html'))
 })
 
 app.get('/user/export/:id', (req, res) => {
-	res.sendFile(__dirname + '/public/user/export-detail.html')
+	res.sendFile(path.join(publicDir, 'user', 'export-detail.html'))
 })
 
 // Serve user static assets
-app.use('/user/assets', express.static('public/user/assets'))
+app.use('/user/assets', express.static(path.join(publicDir, 'user', 'assets')))
 
 // ============================================
 // Member Portal Routes
 // ============================================
 app.get('/member/dashboard.html', authMiddleware, (req, res) => {
-	res.sendFile(__dirname + '/public/member/dashboard.html')
+	res.sendFile(path.join(publicDir, 'member', 'dashboard.html'))
 })
 app.get('/member/dashboard', (req, res) => res.redirect('/member/dashboard.html'))
-app.use('/member/assets', express.static('public/member/assets'))
+app.use('/member/assets', express.static(path.join(publicDir, 'member', 'assets')))
 
 // ============================================
 // NEW Frontend Routes (public/frontend)
@@ -1135,28 +1138,28 @@ app.use('/member/assets', express.static('public/member/assets'))
 
 // Frontend login page
 app.get('/frontend/', (req, res) => {
-	res.sendFile(__dirname + '/public/frontend/index.html')
+	res.sendFile(path.join(publicDir, 'frontend', 'index.html'))
 })
 
 app.get('/frontend/index.html', (req, res) => {
-	res.sendFile(__dirname + '/public/frontend/index.html')
+	res.sendFile(path.join(publicDir, 'frontend', 'index.html'))
 })
 
 // Frontend home page (after login)
 app.get('/frontend/home', (req, res) => {
-	res.sendFile(__dirname + '/public/frontend/home.html')
+	res.sendFile(path.join(publicDir, 'frontend', 'home.html'))
 })
 
 app.get('/frontend/home.html', (req, res) => {
-	res.sendFile(__dirname + '/public/frontend/home.html')
+	res.sendFile(path.join(publicDir, 'frontend', 'home.html'))
 })
 
 // Serve frontend static assets
-app.use('/frontend/assets', express.static('public/frontend/assets'))
+app.use('/frontend/assets', express.static(path.join(publicDir, 'frontend', 'assets')))
 
 // Dashboard route - Admin Dashboard
 app.get('/dashboard', (req, res) => {
-	res.sendFile(__dirname + '/public/index.html')
+	res.sendFile(path.join(adminPublicDir, 'index.html'))
 })
 
 // ============================================
@@ -5180,7 +5183,7 @@ app.get('/api/health', (req, res) => {
 // ============================================
 
 // Multer storage for settings uploads (logo, favicon)
-const settingsUploadDir = path.join(__dirname, 'public', 'uploads', 'settings')
+const settingsUploadDir = path.join(publicDir, 'uploads', 'settings')
 if (!fs.existsSync(settingsUploadDir)) fs.mkdirSync(settingsUploadDir, { recursive: true })
 
 const settingsStorage = multer.diskStorage({
