@@ -24,7 +24,11 @@ const S = {
     searchQuery: '',        // current search text
     editingMessage: null,
     isSending: false,
+    notifiedMessages: new Set(),
+    notificationAudio: null,
 };
+
+const NOTIFICATION_SOUND_URL = '/assets/media/soundreality-notification-tone-443095.mp3';
 
 const COLORS = [
     '#667eea','#f5576c','#4facfe','#43e97b','#fa709a','#a18cd1','#fad0c4','#ffecd2'
@@ -52,6 +56,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 2. Connect socket
     S.socket = io();
     setupSocketListeners();
+    setupNotificationSound();
 
     // 3. Load assignment notes (before sessions, so icons render on first paint)
     await loadAssignmentNotes();
@@ -236,11 +241,12 @@ function wireReportModal() {
 
 function renderSessionTabs() {
     const container = document.getElementById('session-tabs');
+    const mobileContainer = document.getElementById('session-tabs-mobile');
     // Admin: only show connected (aktif) sessions; worker/member: show all assigned
     const isAdmin = S.user && (S.user.role === 'adminwa' || S.user.role === 'admin');
     const visibleSessions = isAdmin ? S.sessions.filter(s => s.isConnected) : S.sessions;
 
-    container.innerHTML = visibleSessions.map(s => {
+    const html = visibleSessions.map(s => {
         const active = s.id === S.activeSession ? 'active' : '';
         const dotCls = s.isConnected ? 'online' : 'offline';
         const label = s.name || s.id;
@@ -251,7 +257,14 @@ function renderSessionTabs() {
         </div>`;
     }).join('');
 
-    container.querySelectorAll('.wa-tab').forEach(tab => {
+    if (container) container.innerHTML = html;
+    if (mobileContainer) {
+        const countClass = visibleSessions.length <= 3 ? `count-${visibleSessions.length || 1}` : 'scroll';
+        mobileContainer.className = `session-tabs-mobile ${countClass} md:hidden border-b border-slate-100 p-2`;
+        mobileContainer.innerHTML = html || '<div class="session-empty-mobile">Belum ada session</div>';
+    }
+
+    document.querySelectorAll('#session-tabs .wa-tab, #session-tabs-mobile .wa-tab').forEach(tab => {
         tab.addEventListener('click', () => selectSession(tab.dataset.sid));
     });
 }
@@ -355,7 +368,8 @@ function renderConversations(filter = '', activeFilter = S.currentFilter) {
         const unreadBadge = c.unread > 0 ? `<div class="conv-unread">${c.unread > 99 ? '99+' : c.unread}</div>` : '';
         const typeIcon = c.lastMessageType && c.lastMessageType !== 'text' ? '📎 ' : '';
         const lastMsg = c.lastMessage ? truncate(`${typeIcon}${c.lastMessage}`, 40) : '—';
-        const displayPhone = isGroup ? c.contact : maskPhone(phone);
+        const displayName = contactDisplayName(c.contact, c);
+        const subtitlePhone = isGroup ? c.contact : maskPhone(phone);
         const groupBadge = isGroup ? '<span class="group-badge">Grup</span>' : '';
         const workerBadge = renderWorkerBadges(c.assignedWorkers, isGroup);
         const noteData = S.assignmentNotes[c.contact];
@@ -365,12 +379,12 @@ function renderConversations(filter = '', activeFilter = S.currentFilter) {
             <div class="conv-ava" style="background:${color};">${initials}</div>
             <div class="conv-body">
                 <div class="conv-row1">
-                    <div class="conv-name">${escHtml(displayPhone)}${groupBadge}${noteIcon}${reportIcon}</div>
+                    <div class="conv-name">${escHtml(displayName)}${groupBadge}${noteIcon}${reportIcon}</div>
                     <div class="conv-time">${time}</div>
                 </div>
                 ${workerBadge}
                 <div class="conv-row2">
-                    <div class="conv-last">${escHtml(lastMsg)}</div>
+                    <div class="conv-last">${escHtml(subtitlePhone)}${lastMsg ? ' · ' + escHtml(lastMsg) : ''}</div>
                     ${unreadBadge}
                 </div>
             </div>
@@ -409,6 +423,68 @@ function renderWorkerBadges(workers, isGroup) {
     return `<div class="worker-badges">${badges}${more}</div>`;
 }
 
+function renderHeaderWorkerBadges(workers, isGroup) {
+    const container = document.getElementById('chat-hdr-workers');
+    if (!container) return;
+    if (isGroup) {
+        container.innerHTML = '';
+        container.classList.add('empty');
+        return;
+    }
+    const names = Array.isArray(workers) ? workers.filter(Boolean) : [];
+    if (names.length === 0) {
+        container.innerHTML = '<span class="hdr-worker-badge muted">Belum ditugaskan</span>';
+        container.classList.remove('empty');
+        return;
+    }
+    const badges = names.slice(0, 2).map(name => {
+        const first = String(name || '').trim().split(/\s+/)[0] || '';
+        return first ? `<span class="hdr-worker-badge">${escHtml(first)}</span>` : '';
+    }).join('');
+    const more = names.length > 2 ? `<span class="hdr-worker-badge more">+${names.length - 2}</span>` : '';
+    container.innerHTML = badges + more;
+    container.classList.toggle('empty', !(badges || more));
+}
+
+function getConversation(sessionId, contact) {
+    return S.conversations.find(c => c.sessionId === sessionId && c.contact === contact);
+}
+
+function fallbackClientName(contact) {
+    const digits = cleanPhone(contact);
+    return `Client-${(digits.slice(-2) || '00').padStart(2, '0')}`;
+}
+
+function normalizeContactName(name) {
+    const value = String(name || '').trim();
+    if (!value) return '';
+    if (/^(unknown|null|undefined|-|nomor)$/i.test(value)) return '';
+    return value;
+}
+
+function contactDisplayName(contact, source = {}) {
+    const isGroup = String(contact || '').includes('@g.us');
+    const name = normalizeContactName(source.displayName || source.name || source.pushName || source.contactName || source.username);
+    if (name) return name;
+    if (isGroup) return String(contact || '').replace('@g.us', '') || 'Grup';
+    return fallbackClientName(contact);
+}
+
+function updateChatHeader(contact, source = {}) {
+    const isGroup = String(contact || '').includes('@g.us');
+    const phone = cleanPhone(contact);
+    const displayName = contactDisplayName(contact, source);
+    const color = avatarColor(phone || contact);
+    const avatar = document.getElementById('chat-hdr-avatar');
+    if (avatar) {
+        avatar.style.background = isGroup ? '#047857' : color;
+        avatar.textContent = isGroup ? 'GR' : ((phone.slice(-2) || 'WA').padStart(2, '0'));
+    }
+    setText('chat-hdr-name', displayName);
+    setText('chat-hdr-phone', isPhoneVisible() ? contact : '***');
+    renderHeaderWorkerBadges(source.assignedWorkers || [], isGroup);
+}
+
 async function openChat(contact) {
     S.activeContact = contact;
     S.messages.clear();
@@ -421,12 +497,8 @@ async function openChat(contact) {
     showChatPanel();
 
     // Update header
-    const phone = cleanPhone(contact);
-    const color = avatarColor(phone);
-    document.getElementById('chat-hdr-avatar').style.background = color;
-    document.getElementById('chat-hdr-avatar').textContent = phone.slice(-2);
-    document.getElementById('chat-hdr-name').textContent = maskPhone(phone);
-    document.getElementById('chat-hdr-phone').textContent = isPhoneVisible() ? contact : '***';
+    const currentConversation = getConversation(S.activeSession, contact) || {};
+    updateChatHeader(contact, currentConversation);
 
     // Note icon in header
     const hdrNote = document.getElementById('chat-hdr-note');
@@ -447,6 +519,7 @@ async function openChat(contact) {
 
     // Show chat UI elements
     document.getElementById('chat-hdr').classList.remove('d-none');
+    document.getElementById('chat-msg-wrap')?.classList.remove('d-none');
     document.getElementById('chat-messages').classList.remove('d-none');
     document.getElementById('input-bar').classList.remove('d-none');
     document.getElementById('chat-empty').classList.add('d-none');
@@ -497,14 +570,21 @@ async function loadContactDetail(sessionId, contact) {
 
 function renderContactDetail(detail) {
     const isGroup = detail.isGroup || String(detail.contact || '').includes('@g.us');
-    const displayName = isGroup ? detail.contact : (detail.displayName || cleanPhone(detail.contact || ''));
+    const displayName = contactDisplayName(detail.contact, detail);
     const phone = detail.phone || detail.contact || '-';
     const initials = isGroup ? 'GR' : cleanPhone(phone).slice(-2) || 'WA';
+    const workers = Array.isArray(detail.assignedWorkers) ? detail.assignedWorkers : [];
+
+    if (detail.contact === S.activeContact) {
+        const conv = getConversation(S.activeSession, detail.contact) || {};
+        Object.assign(conv, { displayName: detail.displayName || conv.displayName, assignedWorkers: workers });
+        updateChatHeader(detail.contact, { ...conv, ...detail, assignedWorkers: workers });
+    }
 
     setText('detail-name', displayName || '-');
     setText('detail-phone', phone);
-    setText('detail-name-line', displayName || '-');
-    setText('detail-phone-line', phone);
+    setText('detail-name-line', displayName || 'Kontak');
+    setText('detail-phone-line', phone || detail.contact || '');
     const avatar = document.getElementById('detail-avatar');
     if (avatar) {
         avatar.textContent = initials;
@@ -515,10 +595,11 @@ function renderContactDetail(detail) {
     const note = document.getElementById('detail-note');
     if (note) {
         const summary = [
+            workers.length ? `Worker: ${workers.map(n => String(n).split(/\s+/)[0]).join(', ')}` : '',
             `Total pesan: ${detail.totalMessages || 0}`,
             `Media: ${detail.mediaCount || 0}`,
             `Dokumen: ${detail.docCount || 0}`
-        ].join('\n');
+        ].filter(Boolean).join('\n');
         note.textContent = detail.notes ? `${detail.notes}\n\n${summary}` : summary;
     }
 
@@ -526,15 +607,15 @@ function renderContactDetail(detail) {
     if (mediaList) {
         const mediaItems = detail.mediaItems || [];
         if (mediaItems.length === 0) {
-            mediaList.innerHTML = '<div class="detail-empty">Belum ada media/file pada percakapan ini.</div>';
+            mediaList.innerHTML = '<div class="detail-empty">Belum ada media pada chat ini.</div>';
         } else {
             mediaList.innerHTML = mediaItems.map(item => {
-                const icon = mediaIcon(item.message_type);
+                const thumb = renderDetailMediaThumb(item);
                 const title = item.filename || item.caption || item.content || item.message_type || 'Media';
                 const size = item.file_size ? formatBytes(item.file_size) : '';
                 const date = item.timestamp ? formatMsgTime(item.timestamp) : '';
                 return `<div class="detail-media-item" data-msgid="${escHtml(item.message_id || '')}">
-                    <span class="detail-media-thumb ${escHtml(item.message_type || 'file')}"><i class="bi ${icon}"></i></span>
+                    ${thumb}
                     <span class="detail-media-body">
                         <span class="detail-media-title">${escHtml(truncate(title, 36))}</span>
                         <span class="detail-media-meta">${escHtml(item.message_type || 'file')}${size ? ' • ' + escHtml(size) : ''}${date ? ' • ' + escHtml(date) : ''}</span>
@@ -570,11 +651,25 @@ function setText(id, text) {
 }
 
 function mediaIcon(type) {
+    if (type === 'link') return 'bi-link-45deg';
     if (type === 'image' || type === 'sticker') return 'bi-image-fill';
     if (type === 'video' || type === 'gif') return 'bi-play-circle-fill';
     if (type === 'audio' || type === 'voice' || type === 'ptt') return 'bi-volume-up-fill';
     if (type === 'document') return 'bi-file-earmark-text-fill';
     return 'bi-paperclip';
+}
+
+function renderDetailMediaThumb(item) {
+    const type = item.message_type || 'file';
+    const msgId = item.message_id || '';
+    const mediaSrc = item.media_url || (msgId ? `/api/member/media/${encodeURIComponent(msgId)}` : '');
+    if ((type === 'image' || type === 'sticker') && mediaSrc) {
+        return `<span class="detail-media-thumb ${escHtml(type)} image-thumb"><img src="${escHtml(mediaSrc)}" alt="" loading="lazy" onerror="this.remove();this.parentElement.innerHTML='<i class=&quot;bi ${mediaIcon(type)}&quot;></i>'"></span>`;
+    }
+    if (type === 'video' && mediaSrc) {
+        return `<span class="detail-media-thumb ${escHtml(type)} image-thumb"><video src="${escHtml(mediaSrc)}" muted preload="metadata"></video><i class="bi bi-play-fill media-play-mark"></i></span>`;
+    }
+    return `<span class="detail-media-thumb ${escHtml(type)}"><i class="bi ${mediaIcon(type)}"></i></span>`;
 }
 
 function formatBytes(bytes) {
@@ -610,6 +705,7 @@ function renderMessages() {
 
     if (msgs.length === 0) {
         container.innerHTML = '<div style="text-align:center;color:var(--wa-text2);padding:40px 20px;font-size:13px;">Belum ada pesan.</div>';
+        document.getElementById('sticky-date-label')?.classList.add('hidden');
         return;
     }
 
@@ -619,7 +715,7 @@ function renderMessages() {
     for (const m of msgs) {
         const date = formatDate(m.timestamp);
         if (date !== lastDate) {
-            html += `<div class="msg-day"><div class="msg-day-label">${date}</div></div>`;
+            html += `<div class="msg-day" data-date="${escHtml(date)}"><div class="msg-day-label">${escHtml(date)}</div></div>`;
             lastDate = date;
         }
 
@@ -700,7 +796,10 @@ function renderMessages() {
         if (displayTextForActions && !isDeleted) actionButtons.push(`<button class="msg-action-btn msg-copy-btn" type="button" title="Copy" data-text="${escHtml(displayTextForActions)}"><i class="bi bi-copy"></i></button>`);
         if (canDownload) actionButtons.push(`<button class="msg-action-btn msg-download-btn" type="button" title="Download" data-msgid="${escHtml(msgId)}"><i class="bi bi-download"></i></button>`);
         if (isNonWorker) actionButtons.push(`<button class="msg-action-btn msg-hide-btn" data-msgid="${escHtml(msgId)}" data-hidden="${isHidden ? '1' : '0'}" title="${isHidden ? 'Tampilkan kembali' : 'Sembunyikan dari worker'}"><i class="bi ${isHidden ? 'bi-eye-slash-fill' : 'bi-eye'}"></i></button>`);
-        const actionRail = actionButtons.length ? `<div class="msg-actions">${actionButtons.join('')}</div>` : '';
+        const actionRail = actionButtons.length ? `<div class="msg-action-wrap ${dir}">
+            <button class="msg-action-toggle" type="button" title="Aksi pesan"><i class="bi bi-three-dots"></i></button>
+            <div class="msg-actions">${actionButtons.join('')}</div>
+        </div>` : '';
         const hideBadge = (isHidden && isNonWorker) ? '<span class="msg-hidden-badge"><i class="bi bi-eye-slash me-1"></i>Disembunyikan</span>' : '';
         html += `<div class="msg-row ${dir}">`;
         html += `<div class="msg-bubble${isPending ? ' pending' : ''}${hiddenClass}" data-msgid="${escHtml(msgId || '')}">${actionRail}${body}${reactions}`;
@@ -710,6 +809,36 @@ function renderMessages() {
 
     container.innerHTML = html;
     wireMessageActions(container);
+    setupStickyDateLabel(container);
+}
+
+function setupStickyDateLabel(container) {
+    const label = document.getElementById('sticky-date-label');
+    if (!container || !label) return;
+    const update = () => updateStickyDateLabel(container, label);
+    container.removeEventListener('scroll', container._stickyDateHandler);
+    container._stickyDateHandler = update;
+    container.addEventListener('scroll', update, { passive: true });
+    requestAnimationFrame(update);
+}
+
+function updateStickyDateLabel(container, label) {
+    const days = Array.from(container.querySelectorAll('.msg-day'));
+    if (!days.length || container.classList.contains('d-none')) {
+        label.classList.add('hidden');
+        return;
+    }
+    const containerTop = container.getBoundingClientRect().top + 10;
+    let active = days[0].dataset.date || days[0].textContent.trim();
+    for (const day of days) {
+        if (day.getBoundingClientRect().top <= containerTop) {
+            active = day.dataset.date || day.textContent.trim();
+        } else {
+            break;
+        }
+    }
+    label.textContent = active;
+    label.classList.remove('hidden');
 }
 
 function parseReactionJson(value) {
@@ -736,6 +865,16 @@ function renderMessageReactions(value) {
 }
 
 function wireMessageActions(container) {
+    container.querySelectorAll('.msg-action-toggle').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const wrap = btn.closest('.msg-action-wrap');
+            document.querySelectorAll('.msg-action-wrap.open').forEach(el => {
+                if (el !== wrap) el.classList.remove('open');
+            });
+            wrap?.classList.toggle('open');
+        });
+    });
     container.querySelectorAll('.msg-reaction-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -930,7 +1069,12 @@ async function openForwardPrompt(data) {
 
 function scrollToBottom() {
     const c = document.getElementById('chat-messages');
-    requestAnimationFrame(() => { c.scrollTop = c.scrollHeight; });
+    if (!c) return;
+    requestAnimationFrame(() => {
+        c.scrollTop = c.scrollHeight;
+        const label = document.getElementById('sticky-date-label');
+        if (label) updateStickyDateLabel(c, label);
+    });
 }
 
 // ─── Hide/Unhide Messages (Admin & Member) ────────────────────
@@ -1170,6 +1314,43 @@ function sendMediaMessage() {
 }
 
 // ─── Socket Listeners ─────────────────────────────────────────
+function setupNotificationSound() {
+    try {
+        S.notificationAudio = new Audio(NOTIFICATION_SOUND_URL);
+        S.notificationAudio.preload = 'auto';
+        const unlock = () => {
+            if (!S.notificationAudio) return;
+            S.notificationAudio.load();
+            document.removeEventListener('click', unlock);
+            document.removeEventListener('keydown', unlock);
+            document.removeEventListener('touchstart', unlock);
+        };
+        document.addEventListener('click', unlock, { once: true });
+        document.addEventListener('keydown', unlock, { once: true });
+        document.addEventListener('touchstart', unlock, { once: true, passive: true });
+    } catch (e) {
+        S.notificationAudio = null;
+    }
+}
+
+function trimNotificationDedup() {
+    if (S.notifiedMessages.size <= 500) return;
+    const keep = Array.from(S.notifiedMessages).slice(-250);
+    S.notifiedMessages = new Set(keep);
+}
+
+function playNotificationSound(messageId) {
+    if (!messageId || !S.notificationAudio) return;
+    try {
+        const audio = S.notificationAudio.cloneNode(true);
+        audio.volume = 0.78;
+        const playPromise = audio.play();
+        if (playPromise && typeof playPromise.catch === 'function') {
+            playPromise.catch(() => {});
+        }
+    } catch (e) {}
+}
+
 function setupSocketListeners() {
     const sock = S.socket;
 
@@ -1238,7 +1419,9 @@ function setupSocketListeners() {
         if (!S.sessions.find(s => s.id === data.sessionId)) return;
 
         const msgId = data.messageId || data.message_id || `in_${Date.now()}`;
-        if (S.messages.has(msgId)) return; // dedup
+        if (S.notifiedMessages.has(msgId) || S.messages.has(msgId)) return; // dedup
+        S.notifiedMessages.add(msgId);
+        trimNotificationDedup();
 
         const resolvedType = data.type || data.messageType || 'text';
         const msg = {
@@ -1256,6 +1439,8 @@ function setupSocketListeners() {
             filename: data.filename || null,
             remote_jid: data.remoteJid || data.from || data.phone || '',
             participant: data.participant || null,
+            displayName: data.displayName || data.pushName || '',
+            pushName: data.pushName || data.displayName || '',
             timestamp: data.timestamp || new Date().toISOString(),
             status: data.fromMe ? 'sent' : 'received',
         };
@@ -1272,7 +1457,11 @@ function setupSocketListeners() {
 
         // Update conversation list
         const previewText = msg.caption || msg.content || '';
-        upsertConversation(data.sessionId, contact, previewText, msg.message_type, msg.direction, msg.timestamp, !chatIsOpen);
+        upsertConversation(data.sessionId, contact, previewText, msg.message_type, msg.direction, msg.timestamp, !chatIsOpen, msg.displayName);
+        if (chatIsOpen && msg.displayName) {
+            updateChatHeader(contact, { ...(getConversation(data.sessionId, contact) || {}), displayName: msg.displayName });
+        }
+        if (!data.fromMe) playNotificationSound(msgId);
         if (!chatIsOpen && !data.fromMe) {
             S.unread[data.sessionId] = (S.unread[data.sessionId] || 0) + 1;
         }
@@ -1394,7 +1583,23 @@ function applyFilter(filter) {
         active.classList.remove('border-slate-200', 'bg-white', 'text-slate-600', 'font-bold');
         active.classList.add('border-emerald-400', 'bg-emerald-50', 'text-emerald-700', 'font-extrabold');
     }
+    document.querySelectorAll('#filter-menu-mobile [data-filter]').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.filter === filter);
+    });
     renderConversations(S.searchQuery);
+}
+
+function openContactDetailPanel() {
+    const panel = document.getElementById('contact-detail-panel');
+    if (!panel || !S.activeSession || !S.activeContact) return;
+    loadContactDetail(S.activeSession, S.activeContact);
+    if (window.matchMedia('(max-width: 820px)').matches) {
+        panel.classList.add('mobile-open');
+    }
+}
+
+function closeContactDetailPanel() {
+    document.getElementById('contact-detail-panel')?.classList.remove('mobile-open');
 }
 
 // ─── UI Wiring ────────────────────────────────────────────────
@@ -1438,10 +1643,25 @@ function wireUI() {
         const btn = document.getElementById(id);
         if (btn) btn.addEventListener('click', () => applyFilter(filter));
     });
+    document.getElementById('btn-filter-mobile')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        document.getElementById('filter-menu-mobile')?.classList.toggle('show');
+    });
+    document.querySelectorAll('#filter-menu-mobile [data-filter]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            applyFilter(btn.dataset.filter);
+            document.getElementById('filter-menu-mobile')?.classList.remove('show');
+        });
+    });
     applyFilter(S.currentFilter);
 
     // Back button (mobile)
     document.getElementById('btn-back').addEventListener('click', showConvPanel);
+    document.getElementById('chat-hdr-info')?.addEventListener('click', openContactDetailPanel);
+    document.getElementById('chat-hdr-avatar')?.addEventListener('click', openContactDetailPanel);
+    document.getElementById('btn-chat-detail')?.addEventListener('click', openContactDetailPanel);
+    document.getElementById('btn-close-contact-detail')?.addEventListener('click', closeContactDetailPanel);
 
     // Send text
     document.getElementById('btn-send').addEventListener('click', sendTextMessage);
@@ -1482,6 +1702,12 @@ function wireUI() {
         const reactionPicker = document.getElementById('reaction-picker');
         if (reactionPicker && !reactionPicker.contains(e.target) && !e.target.closest?.('.msg-reaction-btn')) {
             reactionPicker.classList.remove('show');
+        }
+        if (!e.target.closest?.('.msg-action-wrap')) {
+            document.querySelectorAll('.msg-action-wrap.open').forEach(el => el.classList.remove('open'));
+        }
+        if (!e.target.closest?.('.conv-search-row')) {
+            document.getElementById('filter-menu-mobile')?.classList.remove('show');
         }
     });
     document.getElementById('btn-voice')?.addEventListener('click', () => {
@@ -1545,9 +1771,12 @@ function closeMediaOverlay() {
 
 // ─── View helpers ─────────────────────────────────────────────
 function showConvPanel() {
+    closeContactDetailPanel();
     document.getElementById('conv-panel').classList.remove('mob-hide');
     document.getElementById('chat-panel').classList.add('mob-hide');
     document.getElementById('chat-hdr').classList.add('d-none');
+    document.getElementById('chat-msg-wrap')?.classList.add('d-none');
+    document.getElementById('sticky-date-label')?.classList.add('hidden');
 }
 function showChatPanel() {
     document.getElementById('conv-panel').classList.add('mob-hide');
@@ -1591,7 +1820,7 @@ window.downloadDoc = function (messageId) {
 };
 
 // Update or insert a conversation entry, then re-sort by recency
-function upsertConversation(sessionId, contact, content, msgType, direction, ts, incrementUnread = true) {
+function upsertConversation(sessionId, contact, content, msgType, direction, ts, incrementUnread = true, displayName = '') {
     // Ignore broadcast and newsletter JIDs
     if (/@broadcast$/i.test(contact) || /@newsletter$/i.test(contact)) return;
     const idx = S.conversations.findIndex(c => c.sessionId === sessionId && c.contact === contact);
@@ -1601,6 +1830,7 @@ function upsertConversation(sessionId, contact, content, msgType, direction, ts,
         c.lastMessageType = msgType || 'text';
         c.lastDirection = direction;
         c.lastTime = ts;
+        if (normalizeContactName(displayName)) c.displayName = displayName;
         c.isGroup = c.isGroup || /@g\.us$/i.test(contact);
         if (msgType && msgType !== 'text') {
             c.hasMedia = true;
@@ -1615,6 +1845,7 @@ function upsertConversation(sessionId, contact, content, msgType, direction, ts,
             lastMessageType: msgType || 'text',
             lastDirection: direction,
             lastTime: ts,
+            displayName: normalizeContactName(displayName),
             totalMessages: 1,
             unread: (direction === 'incoming' && incrementUnread) ? 1 : 0,
             isGroup: /@g\.us$/i.test(contact),

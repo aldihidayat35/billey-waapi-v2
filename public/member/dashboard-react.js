@@ -48,9 +48,9 @@
 
     function ChatList() {
         return h('aside', { id: 'conv-panel', className: 'wa-conv flex w-[378px] shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white' }, [
-            h('div', { key: 'mobile-tabs', id: 'session-tabs-mobile', className: 'md:hidden border-b border-slate-100 p-3 text-xs font-bold text-slate-500' }, 'Session aktif tampil di header desktop'),
+            h('div', { key: 'mobile-tabs', id: 'session-tabs-mobile', className: 'session-tabs-mobile md:hidden border-b border-slate-100 p-2' }),
             h('div', { key: 'head', className: 'border-b border-slate-100 p-5' }, [
-                h('div', { key: 'row', className: 'mb-5 flex items-center justify-between' }, [
+                h('div', { key: 'row', className: 'conv-title-row mb-5 flex items-center justify-between' }, [
                     h('div', { key: 'title' }, [
                         h('h2', { key: 'h', className: 'text-lg font-extrabold tracking-tight text-slate-950' }, 'Daftar Chat'),
                         h('p', { key: 'p', className: 'mt-1 text-xs font-semibold text-slate-500' }, 'Percakapan dari session yang ditugaskan')
@@ -59,9 +59,20 @@
                         h('i', { className: 'bi bi-three-dots-vertical' })
                     )
                 ]),
-                h('label', { key: 'search', className: 'flex h-12 items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 transition focus-within:border-emerald-300 focus-within:bg-white focus-within:ring-4 focus-within:ring-emerald-100' }, [
-                    h('i', { key: 'icon', className: 'bi bi-search text-slate-500' }),
-                    h('input', { key: 'input', id: 'conv-search-input', className: 'w-full bg-transparent text-sm font-semibold text-slate-800 outline-none placeholder:text-slate-400', type: 'text', placeholder: 'Cari nomor atau nama...' })
+                h('div', { key: 'searchrow', className: 'conv-search-row relative flex items-center gap-2' }, [
+                    h('label', { key: 'search', className: 'flex h-12 min-w-0 flex-1 items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 transition focus-within:border-emerald-300 focus-within:bg-white focus-within:ring-4 focus-within:ring-emerald-100' }, [
+                        h('i', { key: 'icon', className: 'bi bi-search text-slate-500' }),
+                        h('input', { key: 'input', id: 'conv-search-input', className: 'w-full bg-transparent text-sm font-semibold text-slate-800 outline-none placeholder:text-slate-400', type: 'text', placeholder: 'Cari nomor atau nama...' })
+                    ]),
+                    h('button', { key: 'filter', id: 'btn-filter-mobile', type: 'button', className: 'mobile-filter-btn hidden h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm', title: 'Filter chat' },
+                        h('i', { className: 'bi bi-funnel-fill' })
+                    ),
+                    h('div', { key: 'menu', id: 'filter-menu-mobile', className: 'mobile-filter-menu' }, [
+                        h('button', { key: 'all', type: 'button', 'data-filter': 'semua' }, 'Semua'),
+                        h('button', { key: 'client', type: 'button', 'data-filter': 'client' }, 'Client'),
+                        h('button', { key: 'unread', type: 'button', 'data-filter': 'unread' }, 'Belum Dibaca'),
+                        h('button', { key: 'grup', type: 'button', 'data-filter': 'grup' }, 'Grup')
+                    ])
                 ]),
                 h('div', { key: 'filters', id: 'conv-filter-tabs', className: 'mt-4 flex gap-2 overflow-x-auto' }, [
                     h('button', { key: 'all', type: 'button', id: 'filter-all', 'data-filter': 'all', className: 'conv-filter-btn rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600' }, 'Semua'),
@@ -94,13 +105,14 @@
                     h('i', { className: 'bi bi-arrow-left' })
                 ),
                 h('div', { key: 'avatar', id: 'chat-hdr-avatar', className: 'hdr-ava bg-emerald-500' }),
-                h('div', { key: 'info', className: 'hdr-info' }, [
+                h('div', { key: 'info', id: 'chat-hdr-info', className: 'hdr-info cursor-pointer' }, [
                     h('div', { key: 'name', id: 'chat-hdr-name', className: 'hdr-name truncate text-base font-extrabold text-slate-950' }, '-'),
                     h('div', { key: 'phone', id: 'chat-hdr-phone', className: 'hdr-sub mt-1 truncate text-sm font-semibold text-slate-500' }, '-')
                 ]),
                 h('span', { key: 'note', id: 'chat-hdr-note', className: 'note-icon-hdr d-none', title: 'Catatan penugasan' }, h('i', { className: 'bi bi-sticky-fill' })),
                 h('span', { key: 'report', id: 'chat-hdr-report', className: 'report-icon-hdr', title: 'Laporan' }, h('i', { className: 'bi bi-flag-fill' })),
-                h('button', { key: 'more', type: 'button', className: 'desktop-only flex h-10 w-10 items-center justify-center rounded-xl bg-slate-50 text-slate-500' },
+                h('div', { key: 'workers', id: 'chat-hdr-workers', className: 'hdr-worker-badges' }),
+                h('button', { key: 'more', id: 'btn-chat-detail', type: 'button', className: 'desktop-only flex h-10 w-10 items-center justify-center rounded-xl bg-slate-50 text-slate-500' },
                     h('i', { className: 'bi bi-three-dots-vertical' })
                 )
             ]),
@@ -114,7 +126,10 @@
                     h('p', { key: 'copy', className: 'mt-2 text-sm font-medium leading-6 text-slate-500' }, 'Buka kontak dari daftar chat untuk melihat riwayat pesan, media, dan catatan pelanggan.')
                 ])
             ]),
-            h('div', { key: 'messages', id: 'chat-messages', className: 'chat-msgs chat-surface d-none' }),
+            h('div', { key: 'messagesWrap', id: 'chat-msg-wrap', className: 'chat-msg-wrap d-none relative flex min-h-0 flex-1' }, [
+                h('div', { key: 'sticky', id: 'sticky-date-label', className: 'sticky-date-label hidden' }, 'Hari ini'),
+                h('div', { key: 'messages', id: 'chat-messages', className: 'chat-msgs chat-surface d-none' })
+            ]),
             h('div', { key: 'input', id: 'input-bar', className: 'chat-input d-none relative shrink-0 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur' }, [
                 h(AttachmentMenu, { key: 'menu' }),
                 h('div', { key: 'editbar', id: 'edit-bar', className: 'edit-bar hidden' }, [
@@ -127,8 +142,8 @@
                 ]),
                 h('div', { key: 'row', className: 'composer-row' }, [
                     h('div', { key: 'tools', className: 'composer-tools' }, [
-                        h('button', { key: 'attach', id: 'btn-attach', type: 'button', className: 'composer-btn', title: 'Lampirkan file' },
-                            h('i', { className: 'bi bi-paperclip' })
+                        h('button', { key: 'attach', id: 'btn-attach', type: 'button', className: 'composer-btn', title: 'Tambah lampiran' },
+                            h('i', { className: 'bi bi-plus-lg' })
                         ),
                         h('button', { key: 'tpl', id: 'btn-template', type: 'button', className: 'composer-btn accent-amber', title: 'Template Chat' },
                             h('i', { className: 'bi bi-lightning-charge-fill' })
@@ -177,7 +192,10 @@
 
     function ContactDetailPanel() {
         return h('aside', { id: 'contact-detail-panel', className: 'contact-panel hidden w-[386px] shrink-0 overflow-y-auto border-l border-slate-200 bg-white p-5 xl:block' }, [
-            h('h2', { key: 'title', className: 'mb-5 text-lg font-extrabold tracking-tight text-slate-950' }, 'Detail Kontak'),
+            h('div', { key: 'top', className: 'detail-top mb-5 flex items-center justify-between gap-3' }, [
+                h('h2', { key: 'title', className: 'm-0 text-lg font-extrabold tracking-tight text-slate-950' }, 'Detail Kontak'),
+                h('button', { key: 'close', id: 'btn-close-contact-detail', type: 'button', className: 'detail-close-btn hidden h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-600' }, h('i', { className: 'bi bi-x-lg' }))
+            ]),
             h('section', { key: 'info', className: 'detail-card' }, [
                 h('div', { key: 'head', className: 'mb-4 flex items-center gap-3' }, [
                     h('div', { key: 'ava', id: 'detail-avatar', className: 'flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-sm font-extrabold text-white' }, 'WA'),

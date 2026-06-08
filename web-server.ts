@@ -780,9 +780,17 @@ app.get('/api/member/conversations', authMiddleware, (req, res) => {
 				  AND (wa.start_datetime IS NULL OR wa.start_datetime <= datetime('now', 'localtime'))
 				ORDER BY u.name ASC
 			`).all(r.session_id, r.contact).map((row: any) => row.name).filter(Boolean)
+			const contactNameRow = db.prepare(`
+				SELECT sender_name
+				FROM auto_forward_tokens
+				WHERE session_id = ? AND sender_number = ? AND sender_name IS NOT NULL AND sender_name != ''
+				ORDER BY updated_at DESC
+				LIMIT 1
+			`).get(r.session_id, r.contact) as any
 			return {
 				sessionId: r.session_id,
 				contact: r.contact,
+				displayName: contactNameRow?.sender_name || '',
 				lastMessage: lastMsg?.is_deleted ? 'Pesan ini telah dihapus' : (lastMsg?.caption || lastMsg?.content || ''),
 				lastMessageType: lastMsg?.message_type || 'text',
 				lastDirection: lastMsg?.direction || 'incoming',
@@ -1060,15 +1068,43 @@ app.get('/api/member/contact-detail/:sessionId/:contact', authMiddleware, (req, 
 
 		const mediaItems = db.prepare(`
 			SELECT message_id, message_type, content, caption, media_url, filename, file_size, mimetype, timestamp
-			FROM message_logs
-			WHERE session_id = ? AND (from_number = ? OR to_number = ?)
-			  AND is_deleted != 1
-			  AND (message_type IN ('image', 'video', 'document', 'audio', 'voice', 'ptt', 'sticker')
-			       OR (media_url IS NOT NULL AND media_url != '')
-			       OR (media_data IS NOT NULL AND media_data != ''))
+			FROM (
+				SELECT message_id, message_type, content, caption, media_url, filename, file_size, mimetype, timestamp
+				FROM message_logs
+				WHERE session_id = ? AND (from_number = ? OR to_number = ?)
+				  AND is_deleted != 1
+				  AND (message_type IN ('image', 'video', 'document', 'audio', 'voice', 'ptt', 'sticker')
+				       OR (media_url IS NOT NULL AND media_url != '')
+				       OR (media_data IS NOT NULL AND media_data != ''))
+				UNION ALL
+				SELECT message_id, 'link' as message_type, content, caption, media_url, filename, file_size, mimetype, timestamp
+				FROM message_logs
+				WHERE session_id = ? AND (from_number = ? OR to_number = ?)
+				  AND is_deleted != 1
+				  AND ((content LIKE '%http://%' OR content LIKE '%https://%')
+				       OR (caption LIKE '%http://%' OR caption LIKE '%https://%'))
+			)
 			ORDER BY timestamp DESC
-			LIMIT 8
-		`).all(sessionId, cleanJid, cleanJid) as any[]
+			LIMIT 12
+		`).all(sessionId, cleanJid, cleanJid, sessionId, cleanJid, cleanJid) as any[]
+
+		const assignedWorkers = db.prepare(`
+			SELECT u.name
+			FROM worker_assignments wa
+			JOIN users u ON u.id = wa.worker_id
+			WHERE wa.session_id = ? AND wa.contact = ?
+			  AND (wa.end_datetime IS NULL OR wa.end_datetime >= datetime('now', 'localtime'))
+			  AND (wa.start_datetime IS NULL OR wa.start_datetime <= datetime('now', 'localtime'))
+			ORDER BY u.name ASC
+		`).all(sessionId, cleanJid).map((row: any) => row.name).filter(Boolean)
+
+		const contactNameRow = db.prepare(`
+			SELECT sender_name
+			FROM auto_forward_tokens
+			WHERE session_id = ? AND sender_number = ? AND sender_name IS NOT NULL AND sender_name != ''
+			ORDER BY updated_at DESC
+			LIMIT 1
+		`).get(sessionId, cleanJid) as any
 
 		const activity = db.prepare(`
 			SELECT message_type, direction, status, timestamp, is_deleted, is_edited
@@ -1112,8 +1148,9 @@ app.get('/api/member/contact-detail/:sessionId/:contact', authMiddleware, (req, 
 			notes: notes?.notes || '',
 			priority: notes?.priority || null,
 			isGroup: contact.includes('@g.us'),
-			displayName: contact.includes('@g.us') ? contact.replace('@g.us', '') : contact.replace('@s.whatsapp.net', ''),
+			displayName: contactNameRow?.sender_name || (contact.includes('@g.us') ? contact.replace('@g.us', '') : ''),
 			phone: contact,
+			assignedWorkers,
 			mediaItems,
 			activity,
 		})

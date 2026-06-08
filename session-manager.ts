@@ -1313,6 +1313,8 @@ export class SessionManager {
 						timestamp: timestamp,
 						fromMe: fromMe,
 						messageId: messageId,
+						pushName: msg.pushName || '',
+						displayName: msg.pushName || '',
 						participant: msg.key.participant,
 						originalJid: msg.key.remoteJid,
 						mediaUrl: mediaUrl || null, // File URL for media
