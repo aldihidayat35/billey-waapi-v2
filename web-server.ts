@@ -1118,13 +1118,19 @@ app.get('/api/member/contact-detail/:sessionId/:contact', authMiddleware, (req, 
 		const mediaCount = db.prepare(`
 			SELECT COUNT(*) as total FROM message_logs
 			WHERE session_id = ? AND (from_number = ? OR to_number = ?)
-			  AND ((media_url IS NOT NULL AND media_url != '') OR (media_data IS NOT NULL AND media_data != ''))
+			  AND is_deleted != 1
+			  AND (message_type IN ('image', 'video', 'document', 'audio', 'voice', 'ptt', 'sticker')
+			       OR (media_url IS NOT NULL AND media_url != '')
+			       OR (media_data IS NOT NULL AND media_data != '')
+			       OR ((content LIKE '%http://%' OR content LIKE '%https://%')
+			           OR (caption LIKE '%http://%' OR caption LIKE '%https://%')))
 		`).get(sessionId, cleanJid, cleanJid) as any
 
 		// Count document messages
 		const docCount = db.prepare(`
 			SELECT COUNT(*) as total FROM message_logs
 			WHERE session_id = ? AND (from_number = ? OR to_number = ?)
+			  AND is_deleted != 1
 			  AND message_type = 'document'
 		`).get(sessionId, cleanJid, cleanJid) as any
 

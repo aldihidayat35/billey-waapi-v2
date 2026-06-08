@@ -8,8 +8,19 @@
             type: 'button',
             style,
             onClick,
-            className: `inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 ${className}`
+            className: `topbar-action-btn inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 ${className}`
         }, h('i', { className: `bi ${icon}` }));
+    }
+
+    function MobileMenuItem({ id, icon, label, className = '' }) {
+        return h('button', {
+            id,
+            type: 'button',
+            className: `mobile-top-menu-item ${className}`
+        }, [
+            h('i', { key: 'i', className: `bi ${icon}` }),
+            h('span', { key: 's' }, label)
+        ]);
     }
 
     function TopBar() {
@@ -19,8 +30,8 @@
                     h('i', { className: 'bi bi-whatsapp' })
                 ),
                 h('div', { key: 'text', className: 'min-w-0' }, [
-                    h('div', { key: 'title', className: 'truncate text-xl font-extrabold tracking-tight text-slate-950 md:text-2xl' }, 'Message Center'),
-                    h('div', { key: 'sub', className: 'hidden text-xs font-semibold text-slate-500 sm:block' }, 'WhatsApp API member workspace')
+                    h('div', { key: 'title', id: 'app-title', className: 'truncate text-xl font-extrabold tracking-tight text-slate-950 md:text-2xl' }, 'Billey WA'),
+                    h('div', { key: 'sub', id: 'app-subtitle', className: 'hidden text-xs font-semibold text-slate-500 sm:block' }, 'WhatsApp API member workspace')
                 ])
             ]),
             h('div', { key: 'sessions', id: 'session-tabs', className: 'wa-tabs mx-auto hidden md:flex' }),
@@ -28,11 +39,11 @@
                 h('span', { key: 'dot', className: 'h-3 w-3 rounded-full bg-emerald-500 shadow-[0_0_0_6px_rgba(16,185,129,.14)]' }),
                 'Connected'
             ]),
-            h('div', { key: 'actions', className: 'ml-auto flex items-center gap-2' }, [
+            h('div', { key: 'actions', className: 'topbar-actions ml-auto flex items-center gap-2' }, [
                 IconButton({ key: 'admin-dashboard', id: 'btn-admin-dashboard', icon: 'bi-house-door-fill', title: 'Dashboard Admin', style: { display: 'none' }, onClick: () => { location.href = '/'; } }),
                 IconButton({ key: 'admin-penugasan', id: 'btn-admin-penugasan', icon: 'bi-person-check-fill', title: 'Penugasan Worker', style: { display: 'none' }, onClick: () => { location.href = '/penugasan.html'; } }),
-                IconButton({ key: 'refresh', id: 'btn-refresh', icon: 'bi-arrow-clockwise', title: 'Refresh', className: 'desktop-only' }),
-                IconButton({ key: 'read-all', id: 'btn-read-all', icon: 'bi-check2-all', title: 'Tandai semua dibaca', className: 'desktop-only' }),
+                IconButton({ key: 'refresh', id: 'btn-refresh', icon: 'bi-arrow-clockwise', title: 'Refresh' }),
+                IconButton({ key: 'read-all', id: 'btn-read-all', icon: 'bi-check2-all', title: 'Tandai semua dibaca' }),
                 IconButton({ key: 'pwa', id: 'btn-pwa-install', icon: 'bi-download', title: 'Install Aplikasi', style: { display: 'none' } }),
                 h('div', { key: 'profile', className: 'desktop-only ml-1 hidden items-center gap-3 rounded-2xl border border-slate-200 bg-white py-1.5 pl-1.5 pr-3 shadow-sm lg:flex' }, [
                     h('div', { key: 'avatar', className: 'flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-slate-200 to-slate-300 text-sm font-extrabold text-slate-700' },
@@ -41,7 +52,21 @@
                     h('span', { key: 'name', id: 'topbar-name', className: 'max-w-[150px] truncate text-sm font-extrabold text-slate-900' }, 'Admin'),
                     h('i', { key: 'chev', className: 'bi bi-chevron-down text-xs text-slate-500' })
                 ]),
-                IconButton({ key: 'logout', id: 'btn-logout', icon: 'bi-box-arrow-right', title: 'Keluar' })
+                IconButton({ key: 'logout', id: 'btn-logout', icon: 'bi-box-arrow-right', title: 'Keluar', className: 'desktop-logout' }),
+                h('div', { key: 'mobile-menu', className: 'mobile-top-menu-wrap' }, [
+                    h('button', { key: 'toggle', id: 'btn-mobile-top-menu', type: 'button', className: 'mobile-top-menu-btn', title: 'Menu' },
+                        h('i', { className: 'bi bi-three-dots-vertical' })
+                    ),
+                    h('div', { key: 'panel', id: 'mobile-top-menu', className: 'mobile-top-menu' }, [
+                        h(MobileMenuItem, { key: 'home', id: 'btn-mobile-home', icon: 'bi-house-door-fill', label: 'Dashboard', className: 'hidden' }),
+                        h(MobileMenuItem, { key: 'assign', id: 'btn-mobile-assignment', icon: 'bi-person-check-fill', label: 'Penugasan', className: 'hidden' }),
+                        h(MobileMenuItem, { key: 'sessions', id: 'btn-mobile-sessions', icon: 'bi-phone-fill', label: 'Pilih session' }),
+                        h(MobileMenuItem, { key: 'refresh', id: 'btn-mobile-refresh', icon: 'bi-arrow-clockwise', label: 'Refresh' }),
+                        h(MobileMenuItem, { key: 'read', id: 'btn-mobile-read-all', icon: 'bi-check2-all', label: 'Tandai dibaca' }),
+                        h(MobileMenuItem, { key: 'install', id: 'btn-mobile-pwa-install', icon: 'bi-download', label: 'Install aplikasi' }),
+                        h(MobileMenuItem, { key: 'logout', id: 'btn-mobile-logout', icon: 'bi-box-arrow-right', label: 'Keluar', className: 'danger' })
+                    ])
+                ])
             ])
         ]);
     }

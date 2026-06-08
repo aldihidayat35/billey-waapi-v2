@@ -26,16 +26,29 @@ const S = {
     isSending: false,
     notifiedMessages: new Set(),
     notificationAudio: null,
+    mutedChats: new Set(),
 };
 
 const NOTIFICATION_SOUND_URL = '/assets/media/soundreality-notification-tone-443095.mp3';
+const MUTED_CHATS_STORAGE_KEY = 'member_muted_chats_v1';
 
 const COLORS = [
     '#667eea','#f5576c','#4facfe','#43e97b','#fa709a','#a18cd1','#fad0c4','#ffecd2'
 ];
 
+function applyAppSettingsBranding(settings) {
+    const appName = String(settings?.app_name || 'Billey WA').trim() || 'Billey WA';
+    const title = document.getElementById('app-title');
+    if (title) title.textContent = appName;
+    const subtitle = document.getElementById('app-subtitle');
+    if (subtitle && settings?.app_tagline) subtitle.textContent = settings.app_tagline;
+    document.title = `${appName} - Member Dashboard`;
+}
+
 // ─── Init ─────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
+    loadMutedChats();
+
     // 1. Load user info
     try {
         const r = await fetch('/api/auth/me');
@@ -43,6 +56,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!d.success) { window.location.href = '/auth/login'; return; }
         S.user = d.user;
         document.getElementById('topbar-name').textContent = d.user.name;
+        applyAppSettingsBranding(window.APP_SETTINGS);
+        document.addEventListener('components-loaded', () => applyAppSettingsBranding(window.APP_SETTINGS));
 
         // Show admin-only navigation buttons in topbar
         if (d.user.role === 'adminwa' || d.user.role === 'admin') {
@@ -50,6 +65,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             const btnTugas = document.getElementById('btn-admin-penugasan');
             if (btnDash) btnDash.style.display = '';
             if (btnTugas) btnTugas.style.display = '';
+            document.getElementById('btn-mobile-home')?.classList.remove('hidden');
+            document.getElementById('btn-mobile-assignment')?.classList.remove('hidden');
+        } else {
+            document.getElementById('btn-mobile-home')?.classList.add('hidden');
+            document.getElementById('btn-mobile-assignment')?.classList.add('hidden');
         }
     } catch { window.location.href = '/auth/login'; return; }
 
@@ -369,27 +389,37 @@ function renderConversations(filter = '', activeFilter = S.currentFilter) {
         const typeIcon = c.lastMessageType && c.lastMessageType !== 'text' ? '📎 ' : '';
         const lastMsg = c.lastMessage ? truncate(`${typeIcon}${c.lastMessage}`, 40) : '—';
         const displayName = contactDisplayName(c.contact, c);
-        const subtitlePhone = isGroup ? c.contact : maskPhone(phone);
+        const subtitlePhone = conversationPhoneLabel(c.contact, isGroup);
         const groupBadge = isGroup ? '<span class="group-badge">Grup</span>' : '';
         const workerBadge = renderWorkerBadges(c.assignedWorkers, isGroup);
         const noteData = S.assignmentNotes[c.contact];
         const noteIcon = noteData ? `<span class="note-icon note-${noteData.priority}" data-note-contact="${c.contact}" title="Catatan penugasan"><i class="bi bi-sticky-fill"></i></span>` : '';
         const reportIcon = `<span class="report-icon" data-report-contact="${c.contact}" title="Laporan"><i class="bi bi-flag-fill"></i></span>`;
+        const muted = isChatMuted(c.sessionId || S.activeSession, c.contact);
+        const muteTitle = muted ? 'Aktifkan suara chat' : 'Mute chat';
+        const muteIcon = muted ? 'bi-volume-mute-fill' : 'bi-volume-up-fill';
+        const muteBtn = `<button class="conv-mute-btn ${muted ? 'muted' : ''}" type="button" data-mute-contact="${escHtml(c.contact)}" data-mute-session="${escHtml(c.sessionId || S.activeSession || '')}" title="${muteTitle}" aria-label="${muteTitle}"><i class="bi ${muteIcon}"></i></button>`;
         return `<div class="conv-item ${active}" data-contact="${c.contact}">
             <div class="conv-ava" style="background:${color};">${initials}</div>
             <div class="conv-body">
                 <div class="conv-row1">
-                    <div class="conv-name">${escHtml(displayName)}${groupBadge}${noteIcon}${reportIcon}</div>
+                    <div class="conv-title-line">
+                        <span class="conv-name">${escHtml(displayName)}</span>
+                        <span class="conv-phone">${escHtml(subtitlePhone)}</span>
+                    </div>
                     <div class="conv-time">${time}</div>
                 </div>
-                ${workerBadge}
+                <div class="conv-status-row">${workerBadge}${groupBadge}${noteIcon}${reportIcon}</div>
                 <div class="conv-row2">
-                    <div class="conv-last">${escHtml(subtitlePhone)}${lastMsg ? ' · ' + escHtml(lastMsg) : ''}</div>
+                    <div class="conv-last">${escHtml(lastMsg)}</div>
+                    ${muteBtn}
                     ${unreadBadge}
                 </div>
             </div>
         </div>`;
     }).join('');
+
+    decorateConversationRows(list, items);
 
     list.querySelectorAll('.conv-item').forEach(el => {
         el.addEventListener('click', () => openChat(el.dataset.contact));
@@ -406,9 +436,43 @@ function renderConversations(filter = '', activeFilter = S.currentFilter) {
             openReportModal(el.dataset.reportContact);
         });
     });
+    list.querySelectorAll('.conv-mute-btn[data-mute-contact]').forEach(el => {
+        el.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleChatMute(el.dataset.muteSession || S.activeSession, el.dataset.muteContact);
+        });
+    });
 }
 
 // ─── Chat ─────────────────────────────────────────────────────
+function decorateConversationRows(list, items) {
+    if (!list) return;
+    const rows = Array.from(list.querySelectorAll('.conv-item'));
+    rows.forEach((row, idx) => {
+        const c = items[idx];
+        if (!c) return;
+        const typeIcon = c.lastMessageType && c.lastMessageType !== 'text' ? '📎 ' : '';
+        const preview = c.lastMessage ? truncate(`${typeIcon}${c.lastMessage}`, 40) : '-';
+        const last = row.querySelector('.conv-last');
+        if (last) last.textContent = preview;
+
+        const row2 = row.querySelector('.conv-row2');
+        if (!row2 || row2.querySelector('.conv-mute-btn')) return;
+        const muted = isChatMuted(c.sessionId || S.activeSession, c.contact);
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `conv-mute-btn ${muted ? 'muted' : ''}`;
+        btn.dataset.muteContact = c.contact || '';
+        btn.dataset.muteSession = c.sessionId || S.activeSession || '';
+        btn.title = muted ? 'Aktifkan suara chat' : 'Mute chat';
+        btn.setAttribute('aria-label', btn.title);
+        btn.innerHTML = `<i class="bi ${muted ? 'bi-volume-mute-fill' : 'bi-volume-up-fill'}"></i>`;
+        const unread = row2.querySelector('.conv-unread');
+        row2.insertBefore(btn, unread || null);
+    });
+}
+
 function renderWorkerBadges(workers, isGroup) {
     if (isGroup) return '';
     const names = Array.isArray(workers) ? workers.filter(Boolean) : [];
@@ -452,7 +516,7 @@ function getConversation(sessionId, contact) {
 
 function fallbackClientName(contact) {
     const digits = cleanPhone(contact);
-    return `Client-${(digits.slice(-2) || '00').padStart(2, '0')}`;
+    return `Client-${(digits.slice(-4) || '0000').padStart(4, '0')}`;
 }
 
 function normalizeContactName(name) {
@@ -481,7 +545,7 @@ function updateChatHeader(contact, source = {}) {
         avatar.textContent = isGroup ? 'GR' : ((phone.slice(-2) || 'WA').padStart(2, '0'));
     }
     setText('chat-hdr-name', displayName);
-    setText('chat-hdr-phone', isPhoneVisible() ? contact : '***');
+    setText('chat-hdr-phone', conversationPhoneLabel(contact, isGroup));
     renderHeaderWorkerBadges(source.assignedWorkers || [], isGroup);
 }
 
@@ -614,17 +678,23 @@ function renderContactDetail(detail) {
                 const title = item.filename || item.caption || item.content || item.message_type || 'Media';
                 const size = item.file_size ? formatBytes(item.file_size) : '';
                 const date = item.timestamp ? formatMsgTime(item.timestamp) : '';
-                return `<div class="detail-media-item" data-msgid="${escHtml(item.message_id || '')}">
+                const linkUrl = item.message_type === 'link' ? extractFirstUrl(item.content || item.caption || '') : '';
+                const canDownload = item.message_id && item.message_type !== 'link';
+                return `<div class="detail-media-item" data-msgid="${escHtml(item.message_id || '')}" data-link="${escHtml(linkUrl)}">
                     ${thumb}
                     <span class="detail-media-body">
                         <span class="detail-media-title">${escHtml(truncate(title, 36))}</span>
                         <span class="detail-media-meta">${escHtml(item.message_type || 'file')}${size ? ' • ' + escHtml(size) : ''}${date ? ' • ' + escHtml(date) : ''}</span>
                     </span>
-                    <i class="bi bi-download detail-media-download"></i>
+                    ${canDownload ? '<i class="bi bi-download detail-media-download"></i>' : linkUrl ? '<i class="bi bi-box-arrow-up-right detail-media-download"></i>' : ''}
                 </div>`;
             }).join('');
             mediaList.querySelectorAll('.detail-media-item').forEach(el => {
                 el.addEventListener('click', () => {
+                    if (el.dataset.link) {
+                        window.open(el.dataset.link, '_blank', 'noopener,noreferrer');
+                        return;
+                    }
                     const msgId = el.dataset.msgid;
                     if (msgId) window.downloadDoc(msgId);
                 });
@@ -701,6 +771,7 @@ async function reloadActiveChat() {
 
 function renderMessages() {
     const container = document.getElementById('chat-messages');
+    closeMessageActionMenu();
     const msgs = Array.from(S.messages.values()).sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
     if (msgs.length === 0) {
@@ -788,17 +859,9 @@ function renderMessages() {
         const reactions = renderMessageReactions(m.reaction_json);
         const displayTextForActions = (m.message_type !== 'text') ? (m.caption || m.content || '') : (m.content || '');
         const canDownload = !isDeleted && hasMedia && msgId;
-        const actionPayload = `data-msgid="${escHtml(msgId || '')}" data-remotejid="${escHtml(remoteJid)}" data-fromme="${dir === 'out' ? '1' : '0'}" data-participant="${escHtml(participant)}"`;
-        const actionButtons = [];
-        if (msgId && !isPending) actionButtons.push(`<button class="msg-action-btn msg-reaction-btn" type="button" title="Reaction" ${actionPayload}><i class="bi bi-emoji-smile"></i></button>`);
-        if (msgId && !isPending && !isDeleted && dir === 'out') actionButtons.push(`<button class="msg-action-btn msg-edit-btn" type="button" title="Edit" ${actionPayload}><i class="bi bi-pencil"></i></button>`);
-        if (msgId && !isPending && !isDeleted) actionButtons.push(`<button class="msg-action-btn msg-forward-btn" type="button" title="Forward" ${actionPayload}><i class="bi bi-forward-fill"></i></button>`);
-        if (displayTextForActions && !isDeleted) actionButtons.push(`<button class="msg-action-btn msg-copy-btn" type="button" title="Copy" data-text="${escHtml(displayTextForActions)}"><i class="bi bi-copy"></i></button>`);
-        if (canDownload) actionButtons.push(`<button class="msg-action-btn msg-download-btn" type="button" title="Download" data-msgid="${escHtml(msgId)}"><i class="bi bi-download"></i></button>`);
-        if (isNonWorker) actionButtons.push(`<button class="msg-action-btn msg-hide-btn" data-msgid="${escHtml(msgId)}" data-hidden="${isHidden ? '1' : '0'}" title="${isHidden ? 'Tampilkan kembali' : 'Sembunyikan dari worker'}"><i class="bi ${isHidden ? 'bi-eye-slash-fill' : 'bi-eye'}"></i></button>`);
-        const actionRail = actionButtons.length ? `<div class="msg-action-wrap ${dir}">
-            <button class="msg-action-toggle" type="button" title="Aksi pesan"><i class="bi bi-three-dots"></i></button>
-            <div class="msg-actions">${actionButtons.join('')}</div>
+        const actionPayload = `data-msgid="${escHtml(msgId || '')}" data-remotejid="${escHtml(remoteJid)}" data-fromme="${dir === 'out' ? '1' : '0'}" data-participant="${escHtml(participant)}" data-dir="${dir}"`;
+        const actionRail = msgId && !isPending ? `<div class="msg-action-wrap ${dir}">
+            <button class="msg-action-toggle" type="button" title="Aksi pesan" ${actionPayload}><i class="bi bi-three-dots"></i></button>
         </div>` : '';
         const hideBadge = (isHidden && isNonWorker) ? '<span class="msg-hidden-badge"><i class="bi bi-eye-slash me-1"></i>Disembunyikan</span>' : '';
         html += `<div class="msg-row ${dir}">`;
@@ -819,6 +882,10 @@ function setupStickyDateLabel(container) {
     container.removeEventListener('scroll', container._stickyDateHandler);
     container._stickyDateHandler = update;
     container.addEventListener('scroll', update, { passive: true });
+    if (!container._closeActionMenuHandler) {
+        container._closeActionMenuHandler = () => closeMessageActionMenu();
+        container.addEventListener('scroll', container._closeActionMenuHandler, { passive: true });
+    }
     requestAnimationFrame(update);
 }
 
@@ -868,48 +935,121 @@ function wireMessageActions(container) {
     container.querySelectorAll('.msg-action-toggle').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
-            const wrap = btn.closest('.msg-action-wrap');
-            document.querySelectorAll('.msg-action-wrap.open').forEach(el => {
-                if (el !== wrap) el.classList.remove('open');
-            });
-            wrap?.classList.toggle('open');
+            openMessageActionMenu(btn);
         });
     });
-    container.querySelectorAll('.msg-reaction-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            openReactionPicker(btn);
+}
+
+function closeMessageActionMenu() {
+    document.getElementById('message-action-menu')?.remove();
+    document.querySelectorAll('.msg-action-toggle.active').forEach(btn => btn.classList.remove('active'));
+}
+
+function getMessageActionContext(anchor) {
+    const msgId = anchor.dataset.msgid;
+    const msg = S.messages.get(msgId);
+    if (!msg) return null;
+    const dir = msg.direction === 'outgoing' ? 'out' : 'in';
+    const isDeleted = msg.is_deleted === true || msg.is_deleted === 1 || msg.status === 'deleted';
+    const hasMedia = !!(msg.media_url || msg.media_data || msg.has_media);
+    const text = (msg.message_type !== 'text') ? (msg.caption || msg.content || '') : (msg.content || '');
+    const remoteJid = msg.remote_jid || (dir === 'out' ? msg.to_number : msg.from_number) || S.activeContact || anchor.dataset.remotejid || '';
+    return {
+        msg,
+        msgId,
+        dir,
+        isDeleted,
+        hasMedia,
+        text,
+        remoteJid,
+        fromMe: dir === 'out',
+        participant: msg.participant || anchor.dataset.participant || '',
+        isHidden: msg.is_hidden === true || msg.is_hidden === 1,
+        isNonWorker: S.user && S.user.role !== 'worker',
+    };
+}
+
+function buildMessageActionItems(ctx) {
+    const common = `data-msgid="${escHtml(ctx.msgId)}" data-remotejid="${escHtml(ctx.remoteJid)}" data-fromme="${ctx.fromMe ? '1' : '0'}" data-participant="${escHtml(ctx.participant)}"`;
+    const items = [];
+    items.push({ action: 'reaction', className: 'action-menu-reaction', icon: 'bi-emoji-smile', label: 'Reaction', attrs: common });
+    if (!ctx.isDeleted && ctx.fromMe) {
+        items.push({ action: 'edit', className: 'action-menu-edit', icon: 'bi-pencil', label: 'Edit', attrs: common });
+    }
+    if (!ctx.isDeleted) {
+        items.push({ action: 'forward', className: 'action-menu-forward', icon: 'bi-forward-fill', label: 'Forward', attrs: common });
+    }
+    if (ctx.text && !ctx.isDeleted) {
+        items.push({ action: 'copy', className: 'action-menu-copy', icon: 'bi-copy', label: 'Copy', attrs: `data-text="${escHtml(ctx.text)}"` });
+    }
+    if (!ctx.isDeleted && ctx.hasMedia) {
+        items.push({ action: 'download', className: 'action-menu-download', icon: 'bi-download', label: 'Download', attrs: `data-msgid="${escHtml(ctx.msgId)}"` });
+    }
+    if (ctx.isNonWorker) {
+        items.push({
+            action: 'hide',
+            className: 'action-menu-hide',
+            icon: ctx.isHidden ? 'bi-eye-slash-fill' : 'bi-eye',
+            label: ctx.isHidden ? 'Tampilkan' : 'Sembunyikan',
+            attrs: `data-msgid="${escHtml(ctx.msgId)}" data-hidden="${ctx.isHidden ? '1' : '0'}"`,
         });
-    });
-    container.querySelectorAll('.msg-edit-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            startEditMessage(btn.dataset);
-        });
-    });
-    container.querySelectorAll('.msg-forward-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            openForwardPrompt(btn.dataset);
-        });
-    });
-    container.querySelectorAll('.msg-copy-btn').forEach(btn => {
+    }
+    return items;
+}
+
+function openMessageActionMenu(anchor) {
+    const ctx = getMessageActionContext(anchor);
+    if (!ctx) return;
+    const alreadyOpen = document.getElementById('message-action-menu')?.dataset.msgid === ctx.msgId;
+    closeMessageActionMenu();
+    if (alreadyOpen) return;
+
+    const items = buildMessageActionItems(ctx);
+    if (!items.length) return;
+
+    const menu = document.createElement('div');
+    menu.id = 'message-action-menu';
+    menu.className = `message-action-menu ${ctx.dir}`;
+    menu.dataset.msgid = ctx.msgId;
+    menu.innerHTML = items.map(item => `
+        <button class="message-action-menu-item ${item.className}" type="button" data-action="${item.action}" ${item.attrs}>
+            <i class="bi ${item.icon}"></i><span>${escHtml(item.label)}</span>
+        </button>
+    `).join('');
+    document.body.appendChild(menu);
+
+    const rect = anchor.getBoundingClientRect();
+    const gap = 10;
+    const width = menu.offsetWidth || 190;
+    const height = menu.offsetHeight || 44;
+    let left = ctx.dir === 'out' ? rect.left - width - gap : rect.right + gap;
+    if (left < 8) left = Math.min(window.innerWidth - width - 8, rect.left);
+    if (left + width > window.innerWidth - 8) left = Math.max(8, rect.right - width);
+    let top = rect.top - 4;
+    if (top + height > window.innerHeight - 8) top = Math.max(8, window.innerHeight - height - 8);
+    menu.style.left = `${Math.round(left)}px`;
+    menu.style.top = `${Math.round(top)}px`;
+    requestAnimationFrame(() => menu.classList.add('show'));
+    anchor.classList.add('active');
+
+    menu.querySelectorAll('button[data-action]').forEach(btn => {
         btn.addEventListener('click', async (e) => {
             e.stopPropagation();
-            await navigator.clipboard?.writeText(btn.dataset.text || '');
-            Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Pesan disalin', timer: 1500, showConfirmButton: false });
-        });
-    });
-    container.querySelectorAll('.msg-download-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            window.downloadDoc(btn.dataset.msgid);
-        });
-    });
-    container.querySelectorAll('.msg-hide-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            toggleHideMsg(btn);
+            const action = btn.dataset.action;
+            if (action === 'reaction') {
+                openReactionPicker(btn);
+                closeMessageActionMenu();
+                return;
+            }
+            closeMessageActionMenu();
+            if (action === 'edit') return startEditMessage(btn.dataset);
+            if (action === 'forward') return openForwardPrompt(btn.dataset);
+            if (action === 'copy') {
+                await navigator.clipboard?.writeText(btn.dataset.text || '');
+                return Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Pesan disalin', timer: 1500, showConfirmButton: false });
+            }
+            if (action === 'download') return window.downloadDoc(btn.dataset.msgid);
+            if (action === 'hide') return toggleHideMsg(btn);
         });
     });
 }
@@ -1098,6 +1238,10 @@ async function toggleHideMsg(btn) {
             if (msg) msg.is_hidden = !isHidden;
             // Re-render the bubble inline
             const bubble = btn.closest('.msg-bubble');
+            if (!bubble) {
+                renderMessages();
+                return;
+            }
             if (bubble) {
                 if (!isHidden) {
                     bubble.classList.add('msg-hidden');
@@ -1339,8 +1483,9 @@ function trimNotificationDedup() {
     S.notifiedMessages = new Set(keep);
 }
 
-function playNotificationSound(messageId) {
+function playNotificationSound(messageId, sessionId, contact) {
     if (!messageId || !S.notificationAudio) return;
+    if (isChatMuted(sessionId || S.activeSession, contact)) return;
     try {
         const audio = S.notificationAudio.cloneNode(true);
         audio.volume = 0.78;
@@ -1461,7 +1606,7 @@ function setupSocketListeners() {
         if (chatIsOpen && msg.displayName) {
             updateChatHeader(contact, { ...(getConversation(data.sessionId, contact) || {}), displayName: msg.displayName });
         }
-        if (!data.fromMe) playNotificationSound(msgId);
+        if (!data.fromMe) playNotificationSound(msgId, data.sessionId, contact);
         if (!chatIsOpen && !data.fromMe) {
             S.unread[data.sessionId] = (S.unread[data.sessionId] || 0) + 1;
         }
@@ -1547,6 +1692,48 @@ function isChatOpen(sessionId, contact) {
     return c1 === c2;
 }
 
+function muteKey(sessionId, contact) {
+    return `${sessionId || ''}::${contact || ''}`;
+}
+
+function loadMutedChats() {
+    try {
+        const raw = localStorage.getItem(MUTED_CHATS_STORAGE_KEY);
+        const values = JSON.parse(raw || '[]');
+        S.mutedChats = new Set(Array.isArray(values) ? values.filter(Boolean) : []);
+    } catch {
+        S.mutedChats = new Set();
+    }
+}
+
+function saveMutedChats() {
+    try {
+        localStorage.setItem(MUTED_CHATS_STORAGE_KEY, JSON.stringify(Array.from(S.mutedChats)));
+    } catch {}
+}
+
+function isChatMuted(sessionId, contact) {
+    return S.mutedChats.has(muteKey(sessionId, contact));
+}
+
+function toggleChatMute(sessionId, contact) {
+    if (!sessionId || !contact) return;
+    const key = muteKey(sessionId, contact);
+    const nextMuted = !S.mutedChats.has(key);
+    if (nextMuted) S.mutedChats.add(key);
+    else S.mutedChats.delete(key);
+    saveMutedChats();
+    renderConversations(S.searchQuery);
+    Swal.fire({
+        toast: true,
+        position: 'top-end',
+        icon: nextMuted ? 'info' : 'success',
+        title: nextMuted ? 'Chat dimute' : 'Suara chat aktif',
+        timer: 1500,
+        showConfirmButton: false
+    });
+}
+
 // ─── Unread Count ─────────────────────────────────────────────
 async function loadUnread() {
     try {
@@ -1621,6 +1808,37 @@ function wireUI() {
     // PWA Install
     const pwaBtn = document.getElementById('btn-pwa-install');
     if (pwaBtn) pwaBtn.addEventListener('click', () => PWAInstall.promptInstall());
+
+    // Mobile topbar dropdown
+    const mobileTopMenu = document.getElementById('mobile-top-menu');
+    document.getElementById('btn-mobile-top-menu')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        mobileTopMenu?.classList.toggle('show');
+    });
+    document.getElementById('btn-mobile-home')?.addEventListener('click', () => { window.location.href = '/'; });
+    document.getElementById('btn-mobile-assignment')?.addEventListener('click', () => { window.location.href = '/penugasan.html'; });
+    document.getElementById('btn-mobile-refresh')?.addEventListener('click', () => location.reload());
+    document.getElementById('btn-mobile-read-all')?.addEventListener('click', () => {
+        mobileTopMenu?.classList.remove('show');
+        readAllConversations();
+    });
+    document.getElementById('btn-mobile-pwa-install')?.addEventListener('click', () => {
+        mobileTopMenu?.classList.remove('show');
+        window.PWAInstall?.promptInstall?.();
+    });
+    document.getElementById('btn-mobile-sessions')?.addEventListener('click', () => {
+        mobileTopMenu?.classList.remove('show');
+        showConvPanel();
+        const tabs = document.getElementById('session-tabs-mobile');
+        tabs?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+        tabs?.classList.add('session-pulse');
+        setTimeout(() => tabs?.classList.remove('session-pulse'), 900);
+    });
+    document.getElementById('btn-mobile-logout')?.addEventListener('click', async () => {
+        mobileTopMenu?.classList.remove('show');
+        await fetch('/api/auth/logout', { method: 'POST' });
+        window.location.href = '/auth/login';
+    });
 
     // Search conversations
     const searchInput = document.getElementById('conv-search-input');
@@ -1700,14 +1918,17 @@ function wireUI() {
             attachMenu.classList.remove('show');
         }
         const reactionPicker = document.getElementById('reaction-picker');
-        if (reactionPicker && !reactionPicker.contains(e.target) && !e.target.closest?.('.msg-reaction-btn')) {
+        if (reactionPicker && !reactionPicker.contains(e.target) && !e.target.closest?.('[data-action="reaction"], .msg-reaction-btn')) {
             reactionPicker.classList.remove('show');
         }
-        if (!e.target.closest?.('.msg-action-wrap')) {
-            document.querySelectorAll('.msg-action-wrap.open').forEach(el => el.classList.remove('open'));
+        if (!e.target.closest?.('.message-action-menu') && !e.target.closest?.('.msg-action-toggle')) {
+            closeMessageActionMenu();
         }
         if (!e.target.closest?.('.conv-search-row')) {
             document.getElementById('filter-menu-mobile')?.classList.remove('show');
+        }
+        if (!e.target.closest?.('.mobile-top-menu-wrap')) {
+            document.getElementById('mobile-top-menu')?.classList.remove('show');
         }
     });
     document.getElementById('btn-voice')?.addEventListener('click', () => {
@@ -1899,6 +2120,14 @@ function maskPhone(phone) {
 }
 
 // ─── Utilities ────────────────────────────────────────────────
+function conversationPhoneLabel(contact, isGroup = false) {
+    if (isGroup || String(contact || '').includes('@g.us')) return String(contact || '') || '-';
+    const phone = cleanPhone(contact);
+    if (!phone) return '-';
+    if (isPhoneVisible()) return phone;
+    return `**** ${phone.slice(-4) || phone}`;
+}
+
 function cleanPhone(jid) {
     if (!jid) return '';
     return jid.replace(/@s\.whatsapp\.net$/i, '').replace(/@.*$/, '').replace(/[^0-9]/g, '');
@@ -1923,11 +2152,16 @@ function escHtml(str) {
     return d.innerHTML;
 }
 
-function renderLinkPreview(text) {
+function extractFirstUrl(text) {
     const match = String(text || '').match(/https?:\/\/[^\s]+/i);
-    if (!match) return '';
+    return match ? match[0] : '';
+}
+
+function renderLinkPreview(text) {
+    const href = extractFirstUrl(text);
+    if (!href) return '';
     try {
-        const url = new URL(match[0]);
+        const url = new URL(href);
         return `<a class="msg-link-preview" href="${escHtml(url.href)}" target="_blank" rel="noopener noreferrer">
             <span class="msg-link-icon"><i class="bi bi-link-45deg"></i></span>
             <span class="msg-link-body">
