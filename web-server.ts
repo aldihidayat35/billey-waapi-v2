@@ -3,7 +3,7 @@ import { createServer } from 'http'
 import { Server as SocketIO } from 'socket.io'
 import { SessionManager } from './session-manager'
 import { logger as activityLogger } from './logger'
-import { messageLogDb, sessionLogDb, chatTemplateDb, groupExportDb, autoReplyDb, autoReplyLogDb, autoReplyCooldownDb, autoForwardConfigDb, autoForwardTokenDb, autoForwardLogDb, db, dbMaintenance, memberSessionDb, startMediaAutoCleanup, fcmTokenDb, notificationDb, appSettingDb } from './database.js'
+import { messageLogDb, messageMutationDb, sessionLogDb, chatTemplateDb, groupExportDb, autoReplyDb, autoReplyLogDb, autoReplyCooldownDb, autoForwardConfigDb, autoForwardTokenDb, autoForwardLogDb, db, dbMaintenance, memberSessionDb, startMediaAutoCleanup, fcmTokenDb, notificationDb, appSettingDb } from './database.js'
 import * as fs from 'fs'
 import * as path from 'path'
 import { fileURLToPath } from 'url'
@@ -358,7 +358,7 @@ app.get('/api/users/:id', adminOrApiKeyMiddleware, (req, res) => {
 // Create user
 app.post('/api/users', adminOrApiKeyMiddleware, (req, res) => {
 	try {
-		const { name, email, password, role, status, phone_visible } = req.body
+		const { name, email, password, role, status, phone_visible, whatsapp_number } = req.body
 
 		if (!name || !email || !password) {
 			return res.status(400).json({ 
@@ -374,7 +374,7 @@ app.post('/api/users', adminOrApiKeyMiddleware, (req, res) => {
 			})
 		}
 
-		const result = userDb.create({ name, email, password, role, status, phone_visible: phone_visible !== undefined ? Number(phone_visible) : 1 })
+		const result = userDb.create({ name, email, password, role, status, phone_visible: phone_visible !== undefined ? Number(phone_visible) : 1, whatsapp_number: whatsapp_number || undefined })
 		
 		if (result.success) {
 			const newUser = userDb.getById(result.id!)
@@ -406,9 +406,9 @@ app.post('/api/users', adminOrApiKeyMiddleware, (req, res) => {
 app.put('/api/users/:id', adminOrApiKeyMiddleware, (req, res) => {
 	try {
 		const id = parseInt(req.params.id)
-		const { name, email, role, status, phone_visible } = req.body
+		const { name, email, role, status, phone_visible, whatsapp_number } = req.body
 
-		const result = userDb.update(id, { name, email, role, status, phone_visible: phone_visible !== undefined ? Number(phone_visible) : undefined })
+		const result = userDb.update(id, { name, email, role, status, phone_visible: phone_visible !== undefined ? Number(phone_visible) : undefined, whatsapp_number: whatsapp_number || undefined })
 		
 		if (result.success) {
 			const updatedUser = userDb.getById(id)
@@ -759,19 +759,42 @@ app.get('/api/member/conversations', authMiddleware, (req, res) => {
 		// Get latest message per conversation
 		const conversations = filteredRows.map(r => {
 			const lastMsg = db.prepare(`
-				SELECT content, caption, message_type, direction, timestamp FROM message_logs
+				SELECT content, caption, message_type, direction, timestamp, is_deleted, is_edited
+				FROM message_logs
 				WHERE session_id = ? AND (from_number = ? OR to_number = ?)
 				ORDER BY timestamp DESC LIMIT 1
 			`).get(r.session_id, r.contact, r.contact) as any
+			const mediaStats = db.prepare(`
+				SELECT COUNT(*) as total FROM message_logs
+				WHERE session_id = ? AND (from_number = ? OR to_number = ?)
+				  AND (message_type IN ('image', 'video', 'document', 'audio', 'voice', 'ptt', 'sticker')
+				       OR (media_url IS NOT NULL AND media_url != '')
+				       OR (media_data IS NOT NULL AND media_data != ''))
+			`).get(r.session_id, r.contact, r.contact) as any
+			const assignedWorkers = db.prepare(`
+				SELECT u.name
+				FROM worker_assignments wa
+				JOIN users u ON u.id = wa.worker_id
+				WHERE wa.session_id = ? AND wa.contact = ?
+				  AND (wa.end_datetime IS NULL OR wa.end_datetime >= datetime('now', 'localtime'))
+				  AND (wa.start_datetime IS NULL OR wa.start_datetime <= datetime('now', 'localtime'))
+				ORDER BY u.name ASC
+			`).all(r.session_id, r.contact).map((row: any) => row.name).filter(Boolean)
 			return {
 				sessionId: r.session_id,
 				contact: r.contact,
-				lastMessage: lastMsg?.caption || lastMsg?.content || '',
+				lastMessage: lastMsg?.is_deleted ? 'Pesan ini telah dihapus' : (lastMsg?.caption || lastMsg?.content || ''),
 				lastMessageType: lastMsg?.message_type || 'text',
 				lastDirection: lastMsg?.direction || 'incoming',
 				lastTime: r.last_time,
 				totalMessages: r.total_messages,
 				unread: r.unread,
+				isGroup: String(r.contact).includes('@g.us'),
+				hasMedia: (mediaStats?.total || 0) > 0,
+				mediaCount: mediaStats?.total || 0,
+				isEdited: !!lastMsg?.is_edited,
+				isDeleted: !!lastMsg?.is_deleted,
+				assignedWorkers,
 			}
 		})
 		res.json({ success: true, conversations })
@@ -802,6 +825,8 @@ app.get('/api/member/messages/:sessionId/:contact', authMiddleware, (req, res) =
 				SELECT id, message_id, session_id, direction, from_number, to_number,
 					message_type, content, caption, media_url, filename, file_size, mimetype,
 					timestamp, status, source, created_at, updated_at,
+					remote_jid, participant, is_deleted, deleted_at, deleted_by,
+					is_edited, edited_at, original_message, edited_message, reaction_json,
 					CASE WHEN (media_url IS NOT NULL AND media_url != '') 
 					     OR (media_data IS NOT NULL AND media_data != '') THEN 1 ELSE 0 END AS has_media
 				FROM message_logs
@@ -1008,6 +1033,198 @@ app.post('/api/member/read-all', authMiddleware, (req, res) => {
 		}
 		res.json({ success: true, updated })
 	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// ============================================
+// Get contact detail with message/media counts
+// ============================================
+app.get('/api/member/contact-detail/:sessionId/:contact', authMiddleware, (req, res) => {
+	try {
+		const user = req.user!
+		const { sessionId, contact } = req.params
+		if (!userOwnsSession(user.id, sessionId, user.role)) {
+			return res.status(403).json({ success: false, error: 'Anda tidak memiliki akses ke session ini' })
+		}
+		if (user.role === 'worker' && !workerAssignmentDb.hasAccess(user.id, sessionId, contact)) {
+			return res.status(403).json({ success: false, error: 'Anda tidak memiliki akses ke kontak ini' })
+		}
+		const cleanJid = contact
+
+		// Count total messages in this conversation
+		const totalMsg = db.prepare(`
+			SELECT COUNT(*) as total FROM message_logs
+			WHERE session_id = ? AND (from_number = ? OR to_number = ?)
+		`).get(sessionId, cleanJid, cleanJid) as any
+
+		const mediaItems = db.prepare(`
+			SELECT message_id, message_type, content, caption, media_url, filename, file_size, mimetype, timestamp
+			FROM message_logs
+			WHERE session_id = ? AND (from_number = ? OR to_number = ?)
+			  AND is_deleted != 1
+			  AND (message_type IN ('image', 'video', 'document', 'audio', 'voice', 'ptt', 'sticker')
+			       OR (media_url IS NOT NULL AND media_url != '')
+			       OR (media_data IS NOT NULL AND media_data != ''))
+			ORDER BY timestamp DESC
+			LIMIT 8
+		`).all(sessionId, cleanJid, cleanJid) as any[]
+
+		const activity = db.prepare(`
+			SELECT message_type, direction, status, timestamp, is_deleted, is_edited
+			FROM message_logs
+			WHERE session_id = ? AND (from_number = ? OR to_number = ?)
+			ORDER BY timestamp DESC
+			LIMIT 8
+		`).all(sessionId, cleanJid, cleanJid) as any[]
+
+		// Count media messages (has media_url or media_data)
+		const mediaCount = db.prepare(`
+			SELECT COUNT(*) as total FROM message_logs
+			WHERE session_id = ? AND (from_number = ? OR to_number = ?)
+			  AND ((media_url IS NOT NULL AND media_url != '') OR (media_data IS NOT NULL AND media_data != ''))
+		`).get(sessionId, cleanJid, cleanJid) as any
+
+		// Count document messages
+		const docCount = db.prepare(`
+			SELECT COUNT(*) as total FROM message_logs
+			WHERE session_id = ? AND (from_number = ? OR to_number = ?)
+			  AND message_type = 'document'
+		`).get(sessionId, cleanJid, cleanJid) as any
+
+		// Get latest message timestamp
+		const latest = db.prepare(`
+			SELECT timestamp FROM message_logs
+			WHERE session_id = ? AND (from_number = ? OR to_number = ?)
+			ORDER BY timestamp DESC LIMIT 1
+		`).get(sessionId, cleanJid, cleanJid) as any
+
+		// Get assignment notes if any
+		const notes = workerAssignmentDb.getByContact(contact)
+
+		res.json({
+			success: true,
+			contact,
+			totalMessages: totalMsg?.total || 0,
+			mediaCount: mediaCount?.total || 0,
+			docCount: docCount?.total || 0,
+			lastSeen: latest?.timestamp || null,
+			notes: notes?.notes || '',
+			priority: notes?.priority || null,
+			isGroup: contact.includes('@g.us'),
+			displayName: contact.includes('@g.us') ? contact.replace('@g.us', '') : contact.replace('@s.whatsapp.net', ''),
+			phone: contact,
+			mediaItems,
+			activity,
+		})
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Forward a message from member dashboard with worker assignment validation
+app.post('/api/member/forward-message', authMiddleware, async (req, res) => {
+	try {
+		const user = req.user!
+		const { sessionId, contact, messageId, to } = req.body || {}
+		if (!sessionId || !contact || !messageId || !to) {
+			return res.status(400).json({ success: false, error: 'sessionId, contact, messageId, dan tujuan wajib diisi' })
+		}
+		if (!userOwnsSession(user.id, sessionId, user.role)) {
+			return res.status(403).json({ success: false, error: 'Anda tidak memiliki akses ke session ini' })
+		}
+		if (user.role === 'worker' && !workerAssignmentDb.hasAccess(user.id, sessionId, contact)) {
+			return res.status(403).json({ success: false, error: 'Worker hanya bisa forward pesan dari client yang ditugaskan' })
+		}
+
+		const row = db.prepare(`
+			SELECT *
+			FROM message_logs
+			WHERE session_id = ? AND message_id = ? AND (from_number = ? OR to_number = ?)
+			LIMIT 1
+		`).get(sessionId, messageId, contact, contact) as any
+		if (!row) {
+			return res.status(404).json({ success: false, error: 'Pesan tidak ditemukan atau bukan bagian dari chat ini' })
+		}
+		if (row.is_deleted) {
+			return res.status(400).json({ success: false, error: 'Pesan yang sudah dihapus tidak bisa diforward' })
+		}
+
+		const text = row.caption || row.content || ''
+		let result: any
+		let forwardedType = row.message_type || 'text'
+		let mediaBuffer: Buffer | null = null
+		if (row.media_data) {
+			mediaBuffer = Buffer.from(row.media_data, 'base64')
+		} else if (row.media_url) {
+			const mediaPath = getMediaPath(row.media_url)
+			if (mediaPath) mediaBuffer = fs.readFileSync(mediaPath)
+		}
+
+		if (mediaBuffer && row.message_type === 'image') {
+			result = await sessionManager.sendImage(sessionId, to, mediaBuffer, text || undefined, row.mimetype || undefined, row.filename || undefined)
+			forwardedType = 'image'
+		} else if (mediaBuffer && row.message_type === 'video') {
+			result = await sessionManager.sendVideo(sessionId, to, mediaBuffer, text || undefined, row.mimetype || undefined, row.filename || undefined)
+			forwardedType = 'video'
+		} else if (mediaBuffer && row.message_type !== 'text') {
+			result = await sessionManager.sendDocument(sessionId, to, mediaBuffer, row.mimetype || 'application/octet-stream', row.filename || 'forwarded-file', text || undefined)
+			forwardedType = row.message_type || 'document'
+		} else if (text) {
+			result = await sessionManager.sendMessage(sessionId, to, text)
+			forwardedType = 'text'
+		} else {
+			return res.status(400).json({ success: false, error: 'Konten pesan tidak tersedia untuk diforward' })
+		}
+
+		const targetJid = String(to).includes('@') ? String(to) : `${String(to).replace(/[^0-9]/g, '')}@s.whatsapp.net`
+		const forwardedMessageId = result?.key?.id || `fwd_${Date.now()}`
+		let forwardedMediaUrl: string | undefined
+		if (mediaBuffer) {
+			try {
+				forwardedMediaUrl = saveMedia(sessionId, forwardedMessageId, mediaBuffer, row.mimetype || undefined, row.filename || undefined)
+			} catch (saveErr) {
+				console.error('⚠️ Forward media save failed:', saveErr)
+			}
+		}
+		try {
+			messageLogDb.insert({
+				message_id: forwardedMessageId,
+				session_id: sessionId,
+				direction: 'outgoing',
+				from_number: sessionId,
+				to_number: targetJid,
+				remote_jid: targetJid,
+				message_type: forwardedType,
+				content: forwardedType === 'text' ? text : '',
+				caption: forwardedType !== 'text' ? text : '',
+				media_url: forwardedMediaUrl,
+				mimetype: row.mimetype || undefined,
+				filename: row.filename || undefined,
+				file_size: mediaBuffer?.length || undefined,
+				timestamp: new Date().toISOString(),
+				status: 'sent',
+				source: 'ui'
+			})
+		} catch (dbErr) {
+			console.error('⚠️ Forward member log failed:', dbErr)
+		}
+
+		io.emit('message-sent', {
+			success: true,
+			sessionId,
+			to: targetJid,
+			messageContent: forwardedType === 'text' ? text : '',
+			caption: forwardedType !== 'text' ? text : '',
+			filename: row.filename || '',
+			messageId: forwardedMessageId,
+			mediaType: forwardedType,
+			mediaUrl: forwardedMediaUrl || null
+		})
+
+		res.json({ success: true, messageId: forwardedMessageId, to: targetJid, type: forwardedType })
+	} catch (error: any) {
+		console.error('[/api/member/forward-message]', error.message)
 		res.status(500).json({ success: false, error: error.message })
 	}
 })
@@ -1377,6 +1594,7 @@ app.post('/api/wa/forward', apiKeyMiddleware, upload.single('file'), async (req:
 					direction: 'outgoing',
 					from_number: sid,
 					to_number: jid,
+					remote_jid: jid,
 					message_type: isImage ? 'image' : isVideo ? 'video' : 'document',
 					content: (!isImage && !isVideo) ? (message || '') : '',
 					caption: (isImage || isVideo) ? (caption || '') : undefined,
@@ -1631,7 +1849,7 @@ app.post('/api/chat/send-media', authMiddleware, upload.single('file'), async (r
 		}
 
 		const messageId = result?.key?.id || `${mediaType}_${Date.now()}`
-		const jid = phone.includes('@s.whatsapp.net') ? phone : `${phone.replace(/[^0-9]/g, '')}@s.whatsapp.net`
+		const jid = phone.includes('@') ? phone : `${phone.replace(/[^0-9]/g, '')}@s.whatsapp.net`
 
 		// Save media to file system
 		let mediaUrl: string | null = null
@@ -1649,6 +1867,7 @@ app.post('/api/chat/send-media', authMiddleware, upload.single('file'), async (r
 				direction: 'outgoing',
 				from_number: sid,
 				to_number: jid,
+				remote_jid: jid,
 				message_type: mediaType,
 				content: '',
 				caption: caption || '',
@@ -2090,7 +2309,7 @@ io.on('connection', (socket) => {
 	// Send message
 	socket.on('send-message', async (data: { sessionId: string, phone: string, message: string, messageContent?: string, tempId?: string }) => {
 		try {
-			const jid = data.phone.includes('@s.whatsapp.net') ? data.phone : `${data.phone.replace(/[^0-9]/g, '')}@s.whatsapp.net`
+			const jid = data.phone.includes('@') ? data.phone : `${data.phone.replace(/[^0-9]/g, '')}@s.whatsapp.net`
 			
 			// Detect all template codes in the message (pattern: #CODE where CODE is alphanumeric/underscore)
 			const templatePattern = /#([A-Za-z0-9_]+)/g
@@ -2119,6 +2338,7 @@ io.on('connection', (socket) => {
 						direction: 'outgoing',
 						from_number: data.sessionId,
 						to_number: jid,
+						remote_jid: jid,
 						message_type: 'text',
 						content: data.message,
 						timestamp: new Date().toISOString(),
@@ -2181,6 +2401,7 @@ io.on('connection', (socket) => {
 										direction: 'outgoing',
 										from_number: data.sessionId,
 										to_number: jid,
+										remote_jid: jid,
 										message_type: 'image',
 										content: '',
 										caption: template.content,
@@ -2218,6 +2439,7 @@ io.on('connection', (socket) => {
 									direction: 'outgoing',
 									from_number: data.sessionId,
 									to_number: jid,
+									remote_jid: jid,
 									message_type: 'text',
 									content: template.content,
 									timestamp: new Date().toISOString(),
@@ -2269,6 +2491,7 @@ io.on('connection', (socket) => {
 					direction: 'outgoing',
 					from_number: data.sessionId,
 					to_number: jid,
+					remote_jid: jid,
 					message_type: 'text',
 					content: data.message,
 					timestamp: new Date().toISOString(),
@@ -2297,6 +2520,76 @@ io.on('connection', (socket) => {
 				tempId: data.tempId,
 				error: error.message 
 			})
+		}
+	})
+
+	socket.on('send-reaction', async (data: { sessionId: string, remoteJid: string, messageId: string, fromMe?: boolean, participant?: string | null, emoji: string }) => {
+		try {
+			if (!data.sessionId || !data.remoteJid || !data.messageId) {
+				throw new Error('sessionId, remoteJid, dan messageId wajib diisi')
+			}
+			const key = {
+				remoteJid: data.remoteJid,
+				id: data.messageId,
+				fromMe: !!data.fromMe,
+				participant: data.participant || undefined
+			}
+			await sessionManager.sendReaction(data.sessionId, data.remoteJid, key, data.emoji || '')
+			const updated = messageMutationDb.updateReaction(
+				data.sessionId,
+				data.remoteJid,
+				data.messageId,
+				{
+					emoji: data.emoji || '',
+					fromMe: true,
+					sender: data.sessionId,
+					participant: data.participant || null,
+					timestamp: new Date().toISOString()
+				},
+				data.fromMe,
+				data.participant || null
+			)
+			const payload = {
+				sessionId: data.sessionId,
+				remoteJid: data.remoteJid,
+				messageId: data.messageId,
+				reaction: updated?.reaction_json ? JSON.parse(updated.reaction_json) : [],
+				updatedMessage: updated
+			}
+			socket.emit('message.reaction.updated', payload)
+			const authorizedSockets = getAuthorizedSocketIds(data.sessionId, data.remoteJid)
+			for (const sid of authorizedSockets) io.to(sid).emit('message.reaction.updated', payload)
+		} catch (error: any) {
+			socket.emit('send-error', { messageId: data.messageId, error: error.message })
+		}
+	})
+
+	socket.on('edit-message', async (data: { sessionId: string, remoteJid: string, messageId: string, fromMe?: boolean, participant?: string | null, text: string }) => {
+		try {
+			if (!data.sessionId || !data.remoteJid || !data.messageId || !data.text?.trim()) {
+				throw new Error('sessionId, remoteJid, messageId, dan text wajib diisi')
+			}
+			const key = {
+				remoteJid: data.remoteJid,
+				id: data.messageId,
+				fromMe: data.fromMe !== false,
+				participant: data.participant || undefined
+			}
+			await sessionManager.editMessage(data.sessionId, data.remoteJid, key, data.text.trim())
+			const updated = messageMutationDb.markEdited(data.sessionId, data.remoteJid, data.messageId, data.text.trim(), data.fromMe, data.participant || null)
+			const payload = {
+				sessionId: data.sessionId,
+				remoteJid: data.remoteJid,
+				messageId: data.messageId,
+				isEdited: true,
+				updatedText: data.text.trim(),
+				updatedMessage: updated
+			}
+			socket.emit('message.edited', payload)
+			const authorizedSockets = getAuthorizedSocketIds(data.sessionId, data.remoteJid)
+			for (const sid of authorizedSockets) io.to(sid).emit('message.edited', payload)
+		} catch (error: any) {
+			socket.emit('send-error', { messageId: data.messageId, error: error.message })
 		}
 	})
 
@@ -2347,6 +2640,7 @@ io.on('connection', (socket) => {
 					direction: 'outgoing',
 					from_number: data.sessionId,
 					to_number: jid,
+					remote_jid: jid,
 					message_type: 'image',
 					content: '',
 					caption: data.caption || '',
@@ -2414,6 +2708,7 @@ io.on('connection', (socket) => {
 					direction: 'outgoing',
 					from_number: data.sessionId,
 					to_number: jid,
+					remote_jid: jid,
 					message_type: 'video',
 					content: '',
 					caption: data.caption || '',
@@ -2481,6 +2776,7 @@ io.on('connection', (socket) => {
 					direction: 'outgoing',
 					from_number: data.sessionId,
 					to_number: jid,
+					remote_jid: jid,
 					message_type: 'document',
 					content: '',
 					caption: data.caption || '',

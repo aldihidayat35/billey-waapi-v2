@@ -20,6 +20,10 @@ const S = {
     _conversationsLoaded: false,   // Track if initial load done
     assignmentNotes: {},    // contact → { notes, priority }
     adminPhone: '',         // admin phone for report feature
+    currentFilter: 'client', // 'semua' | 'client' | 'unread' | 'grup' | 'media'
+    searchQuery: '',        // current search text
+    editingMessage: null,
+    isSending: false,
 };
 
 const COLORS = [
@@ -303,29 +307,57 @@ async function loadConversations(silent = false) {
     }
 }
 
-function renderConversations(filter = '') {
+function renderConversations(filter = '', activeFilter = S.currentFilter) {
     const list = document.getElementById('conv-list');
     let items = S.conversations;
+    activeFilter = activeFilter === 'all' ? 'semua' : activeFilter === 'group' ? 'grup' : activeFilter;
+
+    // Apply category filter first
+    if (activeFilter === 'client') {
+        items = items.filter(c => !(c.isGroup || String(c.contact || '').includes('@g.us')));
+    } else if (activeFilter === 'unread') {
+        items = items.filter(c => c.unread > 0);
+    } else if (activeFilter === 'grup' || activeFilter === 'group') {
+        items = items.filter(c => c.isGroup || c.contact.includes('@g.us'));
+    } else if (activeFilter === 'media') {
+        items = items.filter(c => c.hasMedia || c.mediaCount > 0);
+    }
+    // 'semua' → show all, no filter applied
+
+    // Then apply search filter on top
     if (filter) {
         const f = filter.toLowerCase();
-        items = items.filter(c => cleanPhone(c.contact).includes(f) || (c.lastMessage || '').toLowerCase().includes(f));
+        items = items.filter(c =>
+            cleanPhone(c.contact).includes(f) ||
+            String(c.contact || '').toLowerCase().includes(f) ||
+            (c.lastMessage || '').toLowerCase().includes(f) ||
+            (Array.isArray(c.assignedWorkers) ? c.assignedWorkers.join(' ').toLowerCase().includes(f) : false)
+        );
     }
 
     if (items.length === 0) {
-        list.innerHTML = `<div class="conv-empty"><i class="bi bi-chat-left-dots"></i><p>Belum ada percakapan</p></div>`;
+        let emptyMsg = 'Belum ada percakapan';
+        if (activeFilter === 'client') emptyMsg = 'Belum ada chat client';
+        else if (activeFilter === 'unread') emptyMsg = 'Tidak ada chat yang belum dibaca';
+        else if (activeFilter === 'grup' || activeFilter === 'group') emptyMsg = 'Tidak ada grup';
+        else if (filter) emptyMsg = 'Pencarian tidak ditemukan';
+        list.innerHTML = `<div class="conv-empty"><i class="bi bi-chat-left-dots"></i><p>${emptyMsg}</p></div>`;
         return;
     }
 
     list.innerHTML = items.map(c => {
         const phone = cleanPhone(c.contact);
         const color = avatarColor(phone);
-        const initials = phone.slice(-2);
+        const isGroup = c.isGroup || c.contact.includes('@g.us');
+        const initials = isGroup ? 'GR' : phone.slice(-2);
         const active = c.contact === S.activeContact ? 'active' : '';
         const time = formatTime(c.lastTime);
         const unreadBadge = c.unread > 0 ? `<div class="conv-unread">${c.unread > 99 ? '99+' : c.unread}</div>` : '';
         const typeIcon = c.lastMessageType && c.lastMessageType !== 'text' ? '📎 ' : '';
         const lastMsg = c.lastMessage ? truncate(`${typeIcon}${c.lastMessage}`, 40) : '—';
-        const displayPhone = maskPhone(phone);
+        const displayPhone = isGroup ? c.contact : maskPhone(phone);
+        const groupBadge = isGroup ? '<span class="group-badge">Grup</span>' : '';
+        const workerBadge = renderWorkerBadges(c.assignedWorkers, isGroup);
         const noteData = S.assignmentNotes[c.contact];
         const noteIcon = noteData ? `<span class="note-icon note-${noteData.priority}" data-note-contact="${c.contact}" title="Catatan penugasan"><i class="bi bi-sticky-fill"></i></span>` : '';
         const reportIcon = `<span class="report-icon" data-report-contact="${c.contact}" title="Laporan"><i class="bi bi-flag-fill"></i></span>`;
@@ -333,9 +365,10 @@ function renderConversations(filter = '') {
             <div class="conv-ava" style="background:${color};">${initials}</div>
             <div class="conv-body">
                 <div class="conv-row1">
-                    <div class="conv-name">${escHtml(displayPhone)}${noteIcon}${reportIcon}</div>
+                    <div class="conv-name">${escHtml(displayPhone)}${groupBadge}${noteIcon}${reportIcon}</div>
                     <div class="conv-time">${time}</div>
                 </div>
+                ${workerBadge}
                 <div class="conv-row2">
                     <div class="conv-last">${escHtml(lastMsg)}</div>
                     ${unreadBadge}
@@ -362,6 +395,20 @@ function renderConversations(filter = '') {
 }
 
 // ─── Chat ─────────────────────────────────────────────────────
+function renderWorkerBadges(workers, isGroup) {
+    if (isGroup) return '';
+    const names = Array.isArray(workers) ? workers.filter(Boolean) : [];
+    if (names.length === 0) {
+        return '<div class="worker-badges"><span class="worker-badge muted">Belum ditugaskan</span></div>';
+    }
+    const badges = names.slice(0, 3).map(name => {
+        const first = String(name || '').trim().split(/\s+/)[0] || '';
+        return first ? `<span class="worker-badge">${escHtml(first)}</span>` : '';
+    }).join('');
+    const more = names.length > 3 ? `<span class="worker-badge more">+${names.length - 3}</span>` : '';
+    return `<div class="worker-badges">${badges}${more}</div>`;
+}
+
 async function openChat(contact) {
     S.activeContact = contact;
     S.messages.clear();
@@ -403,6 +450,7 @@ async function openChat(contact) {
     document.getElementById('chat-messages').classList.remove('d-none');
     document.getElementById('input-bar').classList.remove('d-none');
     document.getElementById('chat-empty').classList.add('d-none');
+    loadContactDetail(S.activeSession, contact);
 
     // Load messages
     try {
@@ -433,6 +481,108 @@ async function openChat(contact) {
     scrollToBottom();
     // Clear unread immediately when opening a conversation
     markConversationRead(S.activeSession, contact);
+}
+
+async function loadContactDetail(sessionId, contact) {
+    if (!sessionId || !contact) return;
+    try {
+        const r = await fetch(`/api/member/contact-detail/${encodeURIComponent(sessionId)}/${encodeURIComponent(contact)}`);
+        const d = await r.json();
+        if (!d.success) return;
+        renderContactDetail(d);
+    } catch (e) {
+        console.error('Load contact detail error:', e);
+    }
+}
+
+function renderContactDetail(detail) {
+    const isGroup = detail.isGroup || String(detail.contact || '').includes('@g.us');
+    const displayName = isGroup ? detail.contact : (detail.displayName || cleanPhone(detail.contact || ''));
+    const phone = detail.phone || detail.contact || '-';
+    const initials = isGroup ? 'GR' : cleanPhone(phone).slice(-2) || 'WA';
+
+    setText('detail-name', displayName || '-');
+    setText('detail-phone', phone);
+    setText('detail-name-line', displayName || '-');
+    setText('detail-phone-line', phone);
+    const avatar = document.getElementById('detail-avatar');
+    if (avatar) {
+        avatar.textContent = initials;
+        avatar.style.background = isGroup ? '#047857' : avatarColor(cleanPhone(phone));
+        avatar.style.color = '#fff';
+    }
+
+    const note = document.getElementById('detail-note');
+    if (note) {
+        const summary = [
+            `Total pesan: ${detail.totalMessages || 0}`,
+            `Media: ${detail.mediaCount || 0}`,
+            `Dokumen: ${detail.docCount || 0}`
+        ].join('\n');
+        note.textContent = detail.notes ? `${detail.notes}\n\n${summary}` : summary;
+    }
+
+    const mediaList = document.getElementById('detail-media-list');
+    if (mediaList) {
+        const mediaItems = detail.mediaItems || [];
+        if (mediaItems.length === 0) {
+            mediaList.innerHTML = '<div class="detail-empty">Belum ada media/file pada percakapan ini.</div>';
+        } else {
+            mediaList.innerHTML = mediaItems.map(item => {
+                const icon = mediaIcon(item.message_type);
+                const title = item.filename || item.caption || item.content || item.message_type || 'Media';
+                const size = item.file_size ? formatBytes(item.file_size) : '';
+                const date = item.timestamp ? formatMsgTime(item.timestamp) : '';
+                return `<div class="detail-media-item" data-msgid="${escHtml(item.message_id || '')}">
+                    <span class="detail-media-thumb ${escHtml(item.message_type || 'file')}"><i class="bi ${icon}"></i></span>
+                    <span class="detail-media-body">
+                        <span class="detail-media-title">${escHtml(truncate(title, 36))}</span>
+                        <span class="detail-media-meta">${escHtml(item.message_type || 'file')}${size ? ' • ' + escHtml(size) : ''}${date ? ' • ' + escHtml(date) : ''}</span>
+                    </span>
+                    <i class="bi bi-download detail-media-download"></i>
+                </div>`;
+            }).join('');
+            mediaList.querySelectorAll('.detail-media-item').forEach(el => {
+                el.addEventListener('click', () => {
+                    const msgId = el.dataset.msgid;
+                    if (msgId) window.downloadDoc(msgId);
+                });
+            });
+        }
+    }
+
+    const activityList = document.getElementById('detail-activity-list');
+    if (activityList) {
+        const rows = detail.activity || [];
+        activityList.innerHTML = rows.length ? rows.map(row => {
+            const label = row.is_deleted ? 'Pesan ditandai dihapus' : row.is_edited ? 'Pesan diedit' : row.direction === 'incoming' ? 'Pesan masuk diterima' : 'Pesan keluar terkirim';
+            return `<div class="detail-activity-item">
+                <i class="bi bi-check-circle-fill"></i>
+                <span><b>${escHtml(label)}</b><small>${escHtml(formatDate(row.timestamp))} ${escHtml(formatMsgTime(row.timestamp))}</small></span>
+            </div>`;
+        }).join('') : '<div class="detail-empty">Belum ada aktivitas.</div>';
+    }
+}
+
+function setText(id, text) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+}
+
+function mediaIcon(type) {
+    if (type === 'image' || type === 'sticker') return 'bi-image-fill';
+    if (type === 'video' || type === 'gif') return 'bi-play-circle-fill';
+    if (type === 'audio' || type === 'voice' || type === 'ptt') return 'bi-volume-up-fill';
+    if (type === 'document') return 'bi-file-earmark-text-fill';
+    return 'bi-paperclip';
+}
+
+function formatBytes(bytes) {
+    const n = Number(bytes || 0);
+    if (!n) return '';
+    if (n < 1024) return `${n} B`;
+    if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
+    return `${(n / 1024 / 1024).toFixed(1)} MB`;
 }
 
 // Reload active chat messages (used after reconnect to catch missed messages)
@@ -480,6 +630,10 @@ function renderMessages() {
         const msgId = m.message_id || m.id;
         const mediaUrl = m.media_url || '';
         const hasMedia = mediaUrl || m.media_data || m.has_media;
+        const isDeleted = m.is_deleted === true || m.is_deleted === 1 || m.status === 'deleted';
+        const isEdited = m.is_edited === true || m.is_edited === 1;
+        const remoteJid = m.remote_jid || (dir === 'out' ? m.to_number : m.from_number) || S.activeContact || '';
+        const participant = m.participant || '';
 
         // Resolve media source: prefer media_url (file), then API endpoint, then base64
         function resolveMediaSrc(defaultMime) {
@@ -492,7 +646,9 @@ function renderMessages() {
         }
 
         // Media rendering — uses file URL first, then API endpoint, then inline base64
-        if (m.message_type === 'image' && hasMedia) {
+        if (isDeleted) {
+            body += '<div class="msg-deleted"><i class="bi bi-ban"></i><span>Pesan ini telah dihapus</span></div>';
+        } else if (m.message_type === 'image' && hasMedia) {
             const imgSrc = resolveMediaSrc('image/jpeg');
             body += `<div class="msg-media"><img src="${imgSrc}" onclick="viewImage(this.src)" alt="" loading="lazy" onerror="this.onerror=null;this.parentElement.innerHTML='<div class=msg-media-expired><i class=bi-image></i> Media sudah dihapus</div>'"></div>`;
         } else if (m.message_type === 'image' && !hasMedia) {
@@ -519,7 +675,7 @@ function renderMessages() {
 
         // Text/caption content — use caption field for media, content for text
         const displayText = (m.message_type !== 'text') ? (m.caption || m.content || '') : (m.content || '');
-        if (displayText) {
+        if (displayText && !isDeleted) {
             const isFilenameOnly = (m.message_type === 'document') && m.filename && displayText === m.filename;
             if (!isFilenameOnly) {
                 body += `<div class="${m.message_type !== 'text' ? 'msg-caption' : 'msg-text'}">${escHtml(displayText)}</div>`;
@@ -529,20 +685,247 @@ function renderMessages() {
         }
 
         const check = dir === 'out' ? `<i class="bi bi-check2-all msg-check"></i>` : '';
+        const editedLabel = isEdited && !isDeleted ? '<span class="msg-edited-label">diedit</span>' : '';
         const isHidden = m.is_hidden === true || m.is_hidden === 1;
         const hiddenClass = isHidden ? ' msg-hidden' : '';
         const isNonWorker = S.user && S.user.role !== 'worker';
-        const hideBtn = isNonWorker
-            ? `<button class="msg-hide-btn" data-msgid="${escHtml(msgId)}" data-hidden="${isHidden ? '1' : '0'}" onclick="toggleHideMsg(this)" title="${isHidden ? 'Tampilkan kembali' : 'Sembunyikan dari worker'}"><i class="bi ${isHidden ? 'bi-eye-slash-fill' : 'bi-eye'}"></i></button>`
-            : '';
+        const reactions = renderMessageReactions(m.reaction_json);
+        const displayTextForActions = (m.message_type !== 'text') ? (m.caption || m.content || '') : (m.content || '');
+        const canDownload = !isDeleted && hasMedia && msgId;
+        const actionPayload = `data-msgid="${escHtml(msgId || '')}" data-remotejid="${escHtml(remoteJid)}" data-fromme="${dir === 'out' ? '1' : '0'}" data-participant="${escHtml(participant)}"`;
+        const actionButtons = [];
+        if (msgId && !isPending) actionButtons.push(`<button class="msg-action-btn msg-reaction-btn" type="button" title="Reaction" ${actionPayload}><i class="bi bi-emoji-smile"></i></button>`);
+        if (msgId && !isPending && !isDeleted && dir === 'out') actionButtons.push(`<button class="msg-action-btn msg-edit-btn" type="button" title="Edit" ${actionPayload}><i class="bi bi-pencil"></i></button>`);
+        if (msgId && !isPending && !isDeleted) actionButtons.push(`<button class="msg-action-btn msg-forward-btn" type="button" title="Forward" ${actionPayload}><i class="bi bi-forward-fill"></i></button>`);
+        if (displayTextForActions && !isDeleted) actionButtons.push(`<button class="msg-action-btn msg-copy-btn" type="button" title="Copy" data-text="${escHtml(displayTextForActions)}"><i class="bi bi-copy"></i></button>`);
+        if (canDownload) actionButtons.push(`<button class="msg-action-btn msg-download-btn" type="button" title="Download" data-msgid="${escHtml(msgId)}"><i class="bi bi-download"></i></button>`);
+        if (isNonWorker) actionButtons.push(`<button class="msg-action-btn msg-hide-btn" data-msgid="${escHtml(msgId)}" data-hidden="${isHidden ? '1' : '0'}" title="${isHidden ? 'Tampilkan kembali' : 'Sembunyikan dari worker'}"><i class="bi ${isHidden ? 'bi-eye-slash-fill' : 'bi-eye'}"></i></button>`);
+        const actionRail = actionButtons.length ? `<div class="msg-actions">${actionButtons.join('')}</div>` : '';
         const hideBadge = (isHidden && isNonWorker) ? '<span class="msg-hidden-badge"><i class="bi bi-eye-slash me-1"></i>Disembunyikan</span>' : '';
         html += `<div class="msg-row ${dir}">`;
-        html += `<div class="msg-bubble${isPending ? ' pending' : ''}${hiddenClass}">${hideBtn}${body}`;
-        html += `<div class="msg-footer"><span class="msg-time">${time}</span>${hideBadge}${check}</div>`;
+        html += `<div class="msg-bubble${isPending ? ' pending' : ''}${hiddenClass}" data-msgid="${escHtml(msgId || '')}">${actionRail}${body}${reactions}`;
+        html += `<div class="msg-footer">${editedLabel}<span class="msg-time">${time}</span>${hideBadge}${check}</div>`;
         html += `</div></div>`;
     }
 
     container.innerHTML = html;
+    wireMessageActions(container);
+}
+
+function parseReactionJson(value) {
+    if (!value) return [];
+    if (Array.isArray(value)) return value;
+    try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch {
+        return [];
+    }
+}
+
+function renderMessageReactions(value) {
+    const reactions = parseReactionJson(value).filter(r => r && r.emoji);
+    if (!reactions.length) return '';
+    const grouped = reactions.reduce((acc, r) => {
+        acc[r.emoji] = (acc[r.emoji] || 0) + 1;
+        return acc;
+    }, {});
+    return `<div class="msg-reactions">${Object.entries(grouped).map(([emoji, count]) =>
+        `<span class="msg-reaction-pill">${escHtml(emoji)}${count > 1 ? `<span class="msg-reaction-count">${count}</span>` : ''}</span>`
+    ).join('')}</div>`;
+}
+
+function wireMessageActions(container) {
+    container.querySelectorAll('.msg-reaction-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openReactionPicker(btn);
+        });
+    });
+    container.querySelectorAll('.msg-edit-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            startEditMessage(btn.dataset);
+        });
+    });
+    container.querySelectorAll('.msg-forward-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openForwardPrompt(btn.dataset);
+        });
+    });
+    container.querySelectorAll('.msg-copy-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            await navigator.clipboard?.writeText(btn.dataset.text || '');
+            Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Pesan disalin', timer: 1500, showConfirmButton: false });
+        });
+    });
+    container.querySelectorAll('.msg-download-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            window.downloadDoc(btn.dataset.msgid);
+        });
+    });
+    container.querySelectorAll('.msg-hide-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleHideMsg(btn);
+        });
+    });
+}
+
+function openReactionPicker(anchor) {
+    let picker = document.getElementById('reaction-picker');
+    if (!picker) {
+        picker = document.createElement('div');
+        picker.id = 'reaction-picker';
+        picker.className = 'reaction-picker';
+        document.body.appendChild(picker);
+    }
+
+    const options = ['👍', '❤️', '😂', '😮', '😢', '🙏', ''];
+    picker.innerHTML = options.map(emoji =>
+        `<button type="button" data-emoji="${escHtml(emoji)}" title="${emoji ? 'Reaction ' + escHtml(emoji) : 'Hapus reaction'}">${emoji || '<i class="bi bi-x-lg"></i>'}</button>`
+    ).join('');
+
+    const rect = anchor.getBoundingClientRect();
+    picker.style.left = Math.max(8, Math.min(rect.left - 72, window.innerWidth - 260)) + 'px';
+    picker.style.top = Math.max(8, rect.top - 44) + 'px';
+    picker.classList.add('show');
+
+    picker.querySelectorAll('button').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            sendReaction(anchor.dataset, btn.dataset.emoji || '');
+            picker.classList.remove('show');
+        });
+    });
+}
+
+function sendReaction(data, emoji) {
+    if (!S.socket || !S.activeSession || !data.msgid || !data.remotejid) return;
+    S.socket.emit('send-reaction', {
+        sessionId: S.activeSession,
+        remoteJid: data.remotejid,
+        messageId: data.msgid,
+        fromMe: data.fromme === '1',
+        participant: data.participant || null,
+        emoji
+    });
+}
+
+function startEditMessage(data) {
+    const msg = S.messages.get(data.msgid);
+    if (!msg || !S.socket) return;
+    if (msg.message_type !== 'text' && !(msg.caption || msg.content)) {
+        Swal.fire({ toast: true, position: 'top-end', icon: 'info', title: 'Media/file tidak dapat diedit langsung. Kirim ulang file baru jika perlu.', timer: 2800, showConfirmButton: false });
+        return;
+    }
+    const currentText = msg.message_type !== 'text' ? (msg.caption || msg.content || '') : (msg.content || '');
+    S.editingMessage = {
+        messageId: data.msgid,
+        remoteJid: data.remotejid,
+        participant: data.participant || null,
+        originalText: currentText
+    };
+    const input = document.getElementById('msg-input');
+    input.value = currentText;
+    autoResizeTextarea(input);
+    updateEditModeUI();
+    input.focus();
+}
+
+function cancelEditMode() {
+    S.editingMessage = null;
+    const input = document.getElementById('msg-input');
+    input.value = '';
+    autoResizeTextarea(input);
+    updateEditModeUI();
+}
+
+function updateEditModeUI() {
+    const editBar = document.getElementById('edit-bar');
+    const preview = document.getElementById('edit-preview');
+    const sendBtn = document.getElementById('btn-send');
+    if (!editBar || !sendBtn) return;
+    if (S.editingMessage) {
+        editBar.classList.remove('hidden');
+        if (preview) preview.textContent = truncate(S.editingMessage.originalText || '', 90);
+        sendBtn.title = 'Simpan edit';
+        sendBtn.classList.add('editing');
+    } else {
+        editBar.classList.add('hidden');
+        if (preview) preview.textContent = '';
+        sendBtn.title = 'Kirim';
+        sendBtn.classList.remove('editing', 'sending');
+    }
+}
+
+function saveEditedMessage() {
+    if (!S.editingMessage || !S.socket) return;
+    const input = document.getElementById('msg-input');
+    const text = input.value.trim();
+    if (!text) {
+        Swal.fire({ toast: true, position: 'top-end', icon: 'warning', title: 'Pesan tidak boleh kosong', timer: 1800, showConfirmButton: false });
+        return;
+    }
+    if (text === S.editingMessage.originalText) {
+        cancelEditMode();
+        return;
+    }
+    setComposerSending(true);
+    S.socket.emit('edit-message', {
+        sessionId: S.activeSession,
+        remoteJid: S.editingMessage.remoteJid,
+        messageId: S.editingMessage.messageId,
+        fromMe: true,
+        participant: S.editingMessage.participant || null,
+        text
+    });
+}
+
+async function openForwardPrompt(data) {
+    const msg = S.messages.get(data.msgid);
+    if (!msg) return;
+    const result = await Swal.fire({
+        title: 'Forward pesan',
+        input: 'text',
+        inputPlaceholder: 'Nomor tujuan atau JID grup',
+        showCancelButton: true,
+        confirmButtonText: 'Forward',
+        cancelButtonText: 'Batal',
+        showLoaderOnConfirm: true,
+        preConfirm: async (target) => {
+            const to = String(target || '').trim();
+            if (!to) {
+                Swal.showValidationMessage('Tujuan forward wajib diisi');
+                return false;
+            }
+            try {
+                const r = await fetch('/api/member/forward-message', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sessionId: S.activeSession,
+                        contact: S.activeContact,
+                        messageId: data.msgid,
+                        to
+                    })
+                });
+                const d = await r.json();
+                if (!d.success) throw new Error(d.error || 'Forward gagal');
+                return d;
+            } catch (error) {
+                Swal.showValidationMessage(error.message || 'Forward gagal');
+                return false;
+            }
+        },
+        allowOutsideClick: () => !Swal.isLoading()
+    });
+    if (result.isConfirmed) {
+        Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Pesan berhasil diforward', timer: 1800, showConfirmButton: false });
+    }
 }
 
 function scrollToBottom() {
@@ -600,12 +983,17 @@ async function toggleHideMsg(btn) {
 
 // ─── Send Message ─────────────────────────────────────────────
 function sendTextMessage() {
+    if (S.editingMessage) {
+        saveEditedMessage();
+        return;
+    }
     const input = document.getElementById('msg-input');
     const text = input.value.trim();
-    if (!text || !S.activeSession || !S.activeContact) return;
+    if (!text || !S.activeSession || !S.activeContact || S.isSending) return;
 
     const tempId = 'tmp_' + Date.now();
-    const phone = cleanPhone(S.activeContact);
+    const phone = normalizeContactForSend(S.activeContact);
+    setComposerSending(true);
 
     // Optimistic add
     const msg = {
@@ -635,11 +1023,23 @@ function sendTextMessage() {
     });
 }
 
+function setComposerSending(isSending) {
+    S.isSending = !!isSending;
+    const sendBtn = document.getElementById('btn-send');
+    const input = document.getElementById('msg-input');
+    if (sendBtn) {
+        sendBtn.disabled = !!isSending;
+        sendBtn.classList.toggle('sending', !!isSending);
+        sendBtn.innerHTML = isSending ? '<i class="bi bi-hourglass-split"></i>' : '<i class="bi bi-send-fill"></i>';
+    }
+    if (input) input.disabled = !!isSending;
+}
+
 function sendMediaMessage() {
     if (!S.selectedFile || !S.activeSession || !S.activeContact) return;
 
     const caption = document.getElementById('media-caption').value.trim();
-    const phone = cleanPhone(S.activeContact);
+    const phone = normalizeContactForSend(S.activeContact);
     const tempId = 'tmp_' + Date.now();
     const file = S.selectedFile;
 
@@ -793,6 +1193,7 @@ function setupSocketListeners() {
     });
 
     sock.on('message-sent', data => {
+        setComposerSending(false);
         if (data.tempId && S.pendingMsgs.has(data.tempId)) {
             S.messages.delete(data.tempId);
             S.pendingMsgs.delete(data.tempId);
@@ -811,6 +1212,8 @@ function setupSocketListeners() {
                 has_media: !!(data.mediaUrl),
                 mimetype: data.mimetype || null,
                 filename: data.filename || null,
+                remote_jid: data.to?.includes('@') ? data.to : `${(data.to || '').replace(/[^0-9]/g, '')}@s.whatsapp.net`,
+                participant: data.participant || null,
                 timestamp: new Date().toISOString(),
                 status: 'sent',
             };
@@ -851,6 +1254,8 @@ function setupSocketListeners() {
             has_media: !!(data.mediaUrl),
             mimetype: data.mimetype || null,
             filename: data.filename || null,
+            remote_jid: data.remoteJid || data.from || data.phone || '',
+            participant: data.participant || null,
             timestamp: data.timestamp || new Date().toISOString(),
             status: data.fromMe ? 'sent' : 'received',
         };
@@ -876,6 +1281,7 @@ function setupSocketListeners() {
     });
 
     sock.on('send-error', data => {
+        setComposerSending(false);
         if (data.tempId && S.pendingMsgs.has(data.tempId)) {
             S.messages.delete(data.tempId);
             S.pendingMsgs.delete(data.tempId);
@@ -892,11 +1298,61 @@ function setupSocketListeners() {
             renderSessionTabs();
         }
     });
+
+    sock.on('message.reaction.updated', data => applyMessageMutation('reaction', data));
+    sock.on('message.deleted', data => applyMessageMutation('deleted', data));
+    sock.on('message.edited', data => applyMessageMutation('edited', data));
+}
+
+function applyMessageMutation(type, data) {
+    if (!data || data.sessionId !== S.activeSession) return;
+    const contact = data.remoteJid || data.contact || '';
+    if (S.activeContact && contact && !isChatOpen(data.sessionId, contact)) return;
+
+    const msgId = data.messageId || data.message_id || data.updatedMessage?.message_id;
+    if (!msgId) return;
+
+    let msg = S.messages.get(msgId);
+    if (!msg && data.updatedMessage) {
+        msg = data.updatedMessage;
+        S.messages.set(msgId, msg);
+    }
+    if (!msg) return;
+
+    const updated = data.updatedMessage || {};
+    if (type === 'reaction') {
+        msg.reaction_json = updated.reaction_json || JSON.stringify(data.reaction || []);
+    } else if (type === 'deleted') {
+        msg.is_deleted = true;
+        msg.deleted_at = updated.deleted_at || new Date().toISOString();
+        msg.status = 'deleted';
+    } else if (type === 'edited') {
+        msg.is_edited = true;
+        msg.edited_at = updated.edited_at || new Date().toISOString();
+        const text = data.updatedText || updated.edited_message || updated.content || '';
+        if (text) {
+            msg.content = text;
+            msg.edited_message = text;
+        }
+    }
+
+    renderMessages();
+    if (type === 'edited') {
+        const editingThisMessage = S.editingMessage?.messageId === msgId;
+        if (editingThisMessage) {
+            setComposerSending(false);
+            cancelEditMode();
+            Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Pesan diedit', timer: 1600, showConfirmButton: false });
+        }
+    }
+    loadContactDetail(S.activeSession, S.activeContact);
+    if (type !== 'reaction') loadConversations(true);
 }
 
 function isChatOpen(sessionId, contact) {
     if (S.activeSession !== sessionId) return false;
     if (!S.activeContact || !contact) return false;
+    if (S.activeContact === contact) return true;
     const c1 = cleanPhone(S.activeContact);
     const c2 = cleanPhone(contact);
     return c1 === c2;
@@ -914,6 +1370,31 @@ async function loadUnread() {
         }
         renderSessionTabs();
     } catch {}
+}
+
+// ─── Filter Helpers ────────────────────────────────────────────
+function applyFilter(filter) {
+    filter = filter === 'all' ? 'semua' : filter === 'group' ? 'grup' : filter;
+    S.currentFilter = filter;
+    // Update active button styles
+    const btns = {
+        'semua': document.getElementById('filter-all'),
+        'client': document.getElementById('filter-client'),
+        'unread': document.getElementById('filter-unread'),
+        'grup': document.getElementById('filter-grup'),
+    };
+    Object.values(btns).forEach(b => {
+        if (b) {
+            b.classList.remove('border-emerald-400', 'bg-emerald-50', 'text-emerald-700', 'font-extrabold');
+            b.classList.add('border-slate-200', 'bg-white', 'text-slate-600', 'font-bold');
+        }
+    });
+    const active = btns[filter];
+    if (active) {
+        active.classList.remove('border-slate-200', 'bg-white', 'text-slate-600', 'font-bold');
+        active.classList.add('border-emerald-400', 'bg-emerald-50', 'text-emerald-700', 'font-extrabold');
+    }
+    renderConversations(S.searchQuery);
 }
 
 // ─── UI Wiring ────────────────────────────────────────────────
@@ -937,17 +1418,37 @@ function wireUI() {
     if (pwaBtn) pwaBtn.addEventListener('click', () => PWAInstall.promptInstall());
 
     // Search conversations
-    document.getElementById('conv-search-input').addEventListener('input', (e) => {
-        renderConversations(e.target.value);
+    const searchInput = document.getElementById('conv-search-input');
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            S.searchQuery = e.target.value;
+            renderConversations(S.searchQuery);
+        });
+    }
+
+    // Filter buttons — React creates/destroys these on every render.
+    // Wire via MutationObserver so we catch the initial render AND every re-render.
+    const filterButtons = {
+        'filter-all': 'semua',
+        'filter-client': 'client',
+        'filter-unread': 'unread',
+        'filter-grup': 'grup',
+    };
+    Object.entries(filterButtons).forEach(([id, filter]) => {
+        const btn = document.getElementById(id);
+        if (btn) btn.addEventListener('click', () => applyFilter(filter));
     });
+    applyFilter(S.currentFilter);
 
     // Back button (mobile)
     document.getElementById('btn-back').addEventListener('click', showConvPanel);
 
     // Send text
     document.getElementById('btn-send').addEventListener('click', sendTextMessage);
+    document.getElementById('btn-cancel-edit')?.addEventListener('click', cancelEditMode);
     document.getElementById('msg-input').addEventListener('keydown', e => {
         if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendTextMessage(); }
+        if (e.key === 'Escape' && S.editingMessage) { e.preventDefault(); cancelEditMode(); }
     });
 
     // Auto-resize textarea
@@ -978,6 +1479,21 @@ function wireUI() {
         if (attachMenu && !attachMenu.contains(e.target) && e.target !== document.getElementById('btn-attach')) {
             attachMenu.classList.remove('show');
         }
+        const reactionPicker = document.getElementById('reaction-picker');
+        if (reactionPicker && !reactionPicker.contains(e.target) && !e.target.closest?.('.msg-reaction-btn')) {
+            reactionPicker.classList.remove('show');
+        }
+    });
+    document.getElementById('btn-voice')?.addEventListener('click', () => {
+        const fileInput = document.getElementById('file-input');
+        fileInput.setAttribute('accept', 'audio/*');
+        fileInput.click();
+    });
+    document.getElementById('btn-emoji')?.addEventListener('click', () => {
+        const input = document.getElementById('msg-input');
+        input.value += '🙂';
+        autoResizeTextarea(input);
+        input.focus();
     });
     document.getElementById('file-input').addEventListener('change', handleFileSelect);
 
@@ -1085,6 +1601,11 @@ function upsertConversation(sessionId, contact, content, msgType, direction, ts,
         c.lastMessageType = msgType || 'text';
         c.lastDirection = direction;
         c.lastTime = ts;
+        c.isGroup = c.isGroup || /@g\.us$/i.test(contact);
+        if (msgType && msgType !== 'text') {
+            c.hasMedia = true;
+            c.mediaCount = (c.mediaCount || 0) + 1;
+        }
         c.totalMessages = (c.totalMessages || 0) + 1;
         if (direction === 'incoming' && incrementUnread) c.unread = (c.unread || 0) + 1;
     } else {
@@ -1096,6 +1617,9 @@ function upsertConversation(sessionId, contact, content, msgType, direction, ts,
             lastTime: ts,
             totalMessages: 1,
             unread: (direction === 'incoming' && incrementUnread) ? 1 : 0,
+            isGroup: /@g\.us$/i.test(contact),
+            hasMedia: !!(msgType && msgType !== 'text'),
+            mediaCount: msgType && msgType !== 'text' ? 1 : 0,
         });
     }
     S.conversations.sort((a, b) => new Date(b.lastTime) - new Date(a.lastTime));
@@ -1147,6 +1671,12 @@ function maskPhone(phone) {
 function cleanPhone(jid) {
     if (!jid) return '';
     return jid.replace(/@s\.whatsapp\.net$/i, '').replace(/@.*$/, '').replace(/[^0-9]/g, '');
+}
+
+function normalizeContactForSend(contact) {
+    if (!contact) return '';
+    if (/@g\.us$/i.test(contact) || /@s\.whatsapp\.net$/i.test(contact) || /@lid$/i.test(contact)) return contact;
+    return cleanPhone(contact);
 }
 
 function avatarColor(phone) {

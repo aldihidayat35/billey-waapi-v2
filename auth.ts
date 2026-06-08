@@ -22,6 +22,7 @@ export interface User {
     token: string
     status: UserStatus
     phone_visible: number  // 1 = tampilkan nomor HP, 0 = sembunyikan
+    whatsapp_number?: string | null
     created_at: string
     updated_at: string
 }
@@ -43,6 +44,7 @@ export interface CreateUserInput {
     role?: UserRole
     status?: UserStatus
     phone_visible?: number
+    whatsapp_number?: string
 }
 
 export interface UpdateUserInput {
@@ -51,6 +53,7 @@ export interface UpdateUserInput {
     role?: UserRole
     status?: UserStatus
     phone_visible?: number
+    whatsapp_number?: string
 }
 
 // ============================================
@@ -108,6 +111,15 @@ export function initAuthTables(): void {
         }
     } catch (e) { /* column may already exist */ }
 
+    // Add whatsapp_number column to users for worker auto-forward target
+    try {
+        const userCols = db.prepare('PRAGMA table_info(users)').all() as any[]
+        if (!userCols.some(c => c.name === 'whatsapp_number')) {
+            db.exec(`ALTER TABLE users ADD COLUMN whatsapp_number TEXT DEFAULT ''`)
+            console.log('✅ whatsapp_number column added to users')
+        }
+    } catch (e) { console.error('⚠️ whatsapp_number migration error:', e) }
+
     // Migrate role CHECK constraint to include 'worker'
     try {
         const roleCheck = db.prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='users'`).get() as any
@@ -125,11 +137,12 @@ export function initAuthTables(): void {
                     token TEXT NOT NULL UNIQUE,
                     status TEXT NOT NULL DEFAULT 'aktif' CHECK(status IN ('aktif', 'non-aktif')),
                     phone_visible INTEGER NOT NULL DEFAULT 1,
+                    whatsapp_number TEXT DEFAULT '',
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
                 );
                 INSERT INTO users_new SELECT id, name, email, password, role, token, status,
-                    COALESCE(phone_visible, 1), created_at, updated_at FROM users;
+                    COALESCE(phone_visible, 1), COALESCE(whatsapp_number, ''), created_at, updated_at FROM users;
                 DROP TABLE users;
                 ALTER TABLE users_new RENAME TO users;
                 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
@@ -339,6 +352,11 @@ export function generateSessionToken(): string {
     return crypto.randomBytes(32).toString('hex')
 }
 
+function normalizeWhatsAppNumber(value?: string): string {
+    const digits = String(value || '').replace(/[^0-9]/g, '')
+    return digits
+}
+
 // ============================================
 // User Database Operations
 // ============================================
@@ -417,8 +435,8 @@ export const userDb = {
             const token = generateToken()
 
             const result = db.prepare(`
-                INSERT INTO users (name, email, password, role, token, status, phone_visible)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO users (name, email, password, role, token, status, phone_visible, whatsapp_number)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             `).run(
                 input.name,
                 input.email,
@@ -426,7 +444,8 @@ export const userDb = {
                 input.role || 'memberwa',
                 token,
                 input.status || 'aktif',
-                input.phone_visible !== undefined ? input.phone_visible : 1
+                input.phone_visible !== undefined ? input.phone_visible : 1,
+                normalizeWhatsAppNumber(input.whatsapp_number)
             )
 
             return { success: true, id: Number(result.lastInsertRowid) }
@@ -469,6 +488,11 @@ export const userDb = {
             if (input.phone_visible !== undefined) {
                 updates.push('phone_visible = ?')
                 params.push(input.phone_visible)
+            }
+
+            if (input.whatsapp_number !== undefined) {
+                updates.push('whatsapp_number = ?')
+                params.push(normalizeWhatsAppNumber(input.whatsapp_number))
             }
 
             if (updates.length === 0) {

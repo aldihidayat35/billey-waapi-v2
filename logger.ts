@@ -37,6 +37,8 @@ export interface MessageLog {
 	status: 'sent' | 'received' | 'failed'
 	messageId?: string
 	source?: 'contact' | 'mobile' | 'ui'
+	remoteJid?: string
+	participant?: string
 }
 
 /**
@@ -206,7 +208,9 @@ export class Logger {
 				mimetype: log.mediaInfo?.mimetype,
 				timestamp: logEntry.timestamp,
 				status: log.status,
-				source: log.source || (log.direction === 'incoming' ? 'contact' : 'ui')
+				source: log.source || (log.direction === 'incoming' ? 'contact' : 'ui'),
+				remote_jid: log.remoteJid,
+				participant: log.participant
 			})
 		} catch (error) {
 			console.error('❌ Error logging message to database:', error)

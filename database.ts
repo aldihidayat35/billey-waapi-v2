@@ -44,6 +44,16 @@ db.exec(`
         timestamp DATETIME NOT NULL,
         status TEXT DEFAULT 'received',
         source TEXT DEFAULT 'contact',
+        remote_jid TEXT,
+        participant TEXT,
+        is_deleted INTEGER DEFAULT 0,
+        deleted_at DATETIME,
+        deleted_by TEXT,
+        is_edited INTEGER DEFAULT 0,
+        edited_at DATETIME,
+        original_message TEXT,
+        edited_message TEXT,
+        reaction_json TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
@@ -400,6 +410,16 @@ export interface MessageLogEntry {
     timestamp: string
     status?: string
     source?: string
+    remote_jid?: string
+    participant?: string
+    is_deleted?: number
+    deleted_at?: string
+    deleted_by?: string
+    is_edited?: number
+    edited_at?: string
+    original_message?: string
+    edited_message?: string
+    reaction_json?: string
 }
 
 // Session Log Interface
@@ -437,8 +457,8 @@ export const messageLogDb = {
             INSERT INTO message_logs (
                 message_id, session_id, direction, from_number, to_number,
                 message_type, content, caption, media_url, media_data, filename,
-                file_size, mimetype, timestamp, status, source
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                file_size, mimetype, timestamp, status, source, remote_jid, participant
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(message_id) DO UPDATE SET
                 media_url = COALESCE(excluded.media_url, media_url),
                 media_data = COALESCE(excluded.media_data, media_data),
@@ -447,6 +467,8 @@ export const messageLogDb = {
                 file_size = COALESCE(excluded.file_size, file_size),
                 mimetype = COALESCE(excluded.mimetype, mimetype),
                 status = COALESCE(excluded.status, status),
+                remote_jid = COALESCE(excluded.remote_jid, remote_jid),
+                participant = COALESCE(excluded.participant, participant),
                 updated_at = CURRENT_TIMESTAMP
         `)
         
@@ -466,7 +488,9 @@ export const messageLogDb = {
             log.mimetype || null,
             log.timestamp,
             log.status || (log.direction === 'incoming' ? 'received' : 'sent'),
-            log.source || 'contact'
+            log.source || 'contact',
+            log.remote_jid || null,
+            log.participant || null
         )
         
         return result.lastInsertRowid
@@ -2460,6 +2484,129 @@ try {
     }
 } catch (migrationError) {
     console.error('⚠️ Caption migration error:', migrationError)
+}
+
+// Migration: Add metadata for reactions, deleted messages, edited messages, and group participants
+try {
+    const msgTableInfo = db.prepare("PRAGMA table_info(message_logs)").all() as any[]
+    const msgColumnNames = new Set(msgTableInfo.map((col: any) => col.name))
+    const metadataColumns: Array<[string, string]> = [
+        ['remote_jid', 'TEXT'],
+        ['participant', 'TEXT'],
+        ['is_deleted', 'INTEGER DEFAULT 0'],
+        ['deleted_at', 'DATETIME'],
+        ['deleted_by', 'TEXT'],
+        ['is_edited', 'INTEGER DEFAULT 0'],
+        ['edited_at', 'DATETIME'],
+        ['original_message', 'TEXT'],
+        ['edited_message', 'TEXT'],
+        ['reaction_json', 'TEXT']
+    ]
+
+    for (const [name, definition] of metadataColumns) {
+        if (!msgColumnNames.has(name)) {
+            console.log(`Migrating message_logs: Adding ${name} column...`)
+            db.exec(`ALTER TABLE message_logs ADD COLUMN ${name} ${definition}`)
+        }
+    }
+
+    db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_message_logs_remote_jid ON message_logs(remote_jid);
+        CREATE INDEX IF NOT EXISTS idx_message_logs_participant ON message_logs(participant);
+    `)
+} catch (migrationError) {
+    console.error('message_logs metadata migration error:', migrationError)
+}
+
+export type MessageReactionEntry = {
+    emoji: string
+    fromMe?: boolean
+    sender?: string | null
+    participant?: string | null
+    timestamp?: string
+}
+
+export const messageMutationDb = {
+    findByMessageKey: (sessionId: string, remoteJid: string, messageId: string, fromMe?: boolean, participant?: string | null): any => {
+        const direction = fromMe === undefined ? null : (fromMe ? 'outgoing' : 'incoming')
+        const params: any[] = [sessionId, messageId]
+        let where = 'session_id = ? AND message_id = ?'
+
+        if (remoteJid) {
+            where += ' AND (remote_jid = ? OR from_number = ? OR to_number = ?)'
+            params.push(remoteJid, remoteJid, remoteJid)
+        }
+        if (direction) {
+            where += ' AND direction = ?'
+            params.push(direction)
+        }
+        if (participant) {
+            where += ' AND (participant = ? OR participant IS NULL OR participant = "")'
+            params.push(participant)
+        }
+
+        return db.prepare(`SELECT * FROM message_logs WHERE ${where} ORDER BY timestamp DESC LIMIT 1`).get(...params)
+    },
+
+    markDeleted: (sessionId: string, remoteJid: string, messageId: string, fromMe?: boolean, participant?: string | null, deletedBy?: string | null): any => {
+        const existing = messageMutationDb.findByMessageKey(sessionId, remoteJid, messageId, fromMe, participant)
+        if (!existing) return null
+        db.prepare(`
+            UPDATE message_logs
+            SET is_deleted = 1,
+                deleted_at = COALESCE(deleted_at, datetime('now')),
+                deleted_by = COALESCE(?, deleted_by),
+                status = 'deleted',
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        `).run(deletedBy || null, existing.id)
+        return db.prepare('SELECT * FROM message_logs WHERE id = ?').get(existing.id)
+    },
+
+    markEdited: (sessionId: string, remoteJid: string, messageId: string, newText: string, fromMe?: boolean, participant?: string | null): any => {
+        const existing = messageMutationDb.findByMessageKey(sessionId, remoteJid, messageId, fromMe, participant)
+        if (!existing) return null
+        const original = existing.original_message || existing.content || existing.caption || ''
+        db.prepare(`
+            UPDATE message_logs
+            SET is_edited = 1,
+                edited_at = datetime('now'),
+                original_message = COALESCE(NULLIF(original_message, ''), ?),
+                edited_message = ?,
+                content = CASE WHEN message_type = 'text' THEN ? ELSE content END,
+                caption = CASE WHEN message_type != 'text' THEN ? ELSE caption END,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        `).run(original, newText, newText, newText, existing.id)
+        return db.prepare('SELECT * FROM message_logs WHERE id = ?').get(existing.id)
+    },
+
+    updateReaction: (sessionId: string, remoteJid: string, messageId: string, reaction: MessageReactionEntry, fromMe?: boolean, participant?: string | null): any => {
+        const existing = messageMutationDb.findByMessageKey(sessionId, remoteJid, messageId, fromMe, participant)
+        if (!existing) return null
+        let reactions: MessageReactionEntry[] = []
+        try { reactions = existing.reaction_json ? JSON.parse(existing.reaction_json) : [] } catch { reactions = [] }
+
+        const senderKey = reaction.sender || reaction.participant || participant || (reaction.fromMe ? sessionId : remoteJid)
+        reactions = reactions.filter(r => (r.sender || r.participant || '') !== senderKey)
+        if (reaction.emoji) {
+            reactions.push({
+                emoji: reaction.emoji,
+                fromMe: reaction.fromMe,
+                sender: senderKey,
+                participant: reaction.participant || participant || null,
+                timestamp: reaction.timestamp || new Date().toISOString()
+            })
+        }
+
+        db.prepare(`
+            UPDATE message_logs
+            SET reaction_json = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        `).run(reactions.length ? JSON.stringify(reactions) : null, existing.id)
+        return db.prepare('SELECT * FROM message_logs WHERE id = ?').get(existing.id)
+    }
 }
 
 // Export database instance for direct queries if needed

@@ -10,7 +10,7 @@ import makeWASocket, {
 	downloadMediaMessage
 } from './src'
 import { logger as activityLogger } from './logger'
-import { messageLogDb, chatTemplateDb, autoReplyDb, autoReplyLogDb, autoReplyCooldownDb, autoForwardConfigDb, autoForwardTokenDb, autoForwardLogDb, db } from './database.js'
+import { messageLogDb, messageMutationDb, chatTemplateDb, autoReplyDb, autoReplyLogDb, autoReplyCooldownDb, autoForwardConfigDb, autoForwardTokenDb, autoForwardLogDb, db } from './database.js'
 import { getAuthorizedSocketIds } from './notification.js'
 import { saveMedia } from './media-storage.js'
 import { readFileSync, existsSync, readdirSync, rmSync, mkdirSync, renameSync, statSync } from 'fs'
@@ -829,7 +829,9 @@ export class SessionManager {
 						},
 						status: fromMe ? 'sent' : 'received',
 						messageId: messageId,
-						source: source
+						source: source,
+						remoteJid,
+						participant: msg.key.participant
 					})
 					
 					// Fallback: save base64 to DB if file save failed
@@ -1037,8 +1039,148 @@ export class SessionManager {
 					// AUTO FORWARD HANDLER
 					// ============================================
 					try {
+						const workerForwardBody = messageContent || messageCaption || (
+							messageType !== 'text'
+								? `[${messageType}]${mediaInfo?.filename ? ` ${mediaInfo.filename}` : ''}`
+								: ''
+						)
+						let workerReplyHandled = false
+						const workerReplyMatch = (!fromMe && messageType === 'text' && messageContent)
+							? messageContent.match(/^@([A-Za-z0-9]+)\s*[-–—]\s*(.+)/s)
+							: null
+						if (workerReplyMatch) {
+							const replyToken = workerReplyMatch[1].toUpperCase()
+							const replyText = workerReplyMatch[2].trim()
+							const tokenEntry = autoForwardTokenDb.getBySenderToken(sessionId, replyToken)
+							if (tokenEntry) {
+								const workerNumber = remoteJid.replace(/[^0-9]/g, '')
+								const assignment = db.prepare(`
+									SELECT u.id, u.name, u.whatsapp_number
+									FROM worker_assignments wa
+									JOIN users u ON u.id = wa.worker_id
+									WHERE wa.session_id = ?
+									  AND wa.contact = ?
+									  AND u.role = 'worker'
+									  AND u.status = 'aktif'
+									  AND u.whatsapp_number = ?
+									  AND (wa.end_datetime IS NULL OR wa.end_datetime >= datetime('now', 'localtime'))
+									  AND (wa.start_datetime IS NULL OR wa.start_datetime <= datetime('now', 'localtime'))
+									LIMIT 1
+								`).get(sessionId, tokenEntry.sender_number, workerNumber) as any
+								if (assignment) {
+									workerReplyHandled = true
+									try {
+										const targetJid = tokenEntry.sender_number.includes('@')
+											? tokenEntry.sender_number
+											: `${tokenEntry.sender_number.replace(/[^0-9]/g, '')}@s.whatsapp.net`
+										await sock.sendMessage(targetJid, { text: replyText })
+										autoForwardTokenDb.updateLastMessage(sessionId, replyToken, `[Worker→Client] ${replyText}`)
+										autoForwardLogDb.insert({
+											session_id: sessionId,
+											token: replyToken,
+											direction: 'admin_to_user',
+											sender_number: remoteJid,
+											message_content: replyText,
+											message_type: 'text',
+											status: 'success'
+										})
+										await sock.sendMessage(remoteJid, {
+											text: `✅ Balasan terkirim ke ${targetJid.replace('@s.whatsapp.net', '')} [${replyToken}]`
+										}).catch(() => {})
+										this.socketIO.emit('auto-forward-reply', {
+											sessionId, token: replyToken, to: targetJid, message: replyText, workerId: assignment.id
+										})
+										console.log(`📨➡️ Worker auto-forward reply sent: ${replyToken} → ${targetJid}`)
+									} catch (sendErr: any) {
+										autoForwardLogDb.insert({
+											session_id: sessionId,
+											token: replyToken,
+											direction: 'admin_to_user',
+											sender_number: remoteJid,
+											message_content: replyText,
+											status: 'failed',
+											error_message: sendErr.message
+										})
+										await sock.sendMessage(remoteJid, {
+											text: `❌ Gagal kirim balasan ke [${replyToken}]: ${sendErr.message}`
+										}).catch(() => {})
+									}
+								}
+							}
+						}
+
+						if (!workerReplyHandled && !fromMe && !remoteJid.includes('@g.us') && workerForwardBody) {
+							const assignedWorkers = db.prepare(`
+								SELECT u.id, u.name, u.whatsapp_number
+								FROM worker_assignments wa
+								JOIN users u ON u.id = wa.worker_id
+								WHERE wa.session_id = ?
+								  AND wa.contact = ?
+								  AND u.role = 'worker'
+								  AND u.status = 'aktif'
+								  AND COALESCE(u.whatsapp_number, '') != ''
+								  AND (wa.end_datetime IS NULL OR wa.end_datetime >= datetime('now', 'localtime'))
+								  AND (wa.start_datetime IS NULL OR wa.start_datetime <= datetime('now', 'localtime'))
+								ORDER BY u.name ASC
+							`).all(sessionId, remoteJid) as any[]
+
+							if (assignedWorkers.length > 0) {
+								const pushName = msg.pushName || ''
+								const senderNumber = remoteJid.replace('@s.whatsapp.net', '')
+
+								// Check if sender is a registered user with phone privacy enabled
+								const clientDigits = remoteJid.replace(/[^0-9]/g, '')
+								const senderRow = db.prepare("SELECT phone_visible FROM users WHERE whatsapp_number = ?").get(clientDigits) as any
+								const hideClientPhone = senderRow && senderRow.phone_visible === 0
+
+								const tokenEntry = autoForwardTokenDb.getOrCreate(sessionId, remoteJid, pushName)
+								const token = tokenEntry.token
+								const displayNumber = hideClientPhone ? '***' : senderNumber
+								const forwardText = [
+									`${token} - ${displayNumber}${pushName && !hideClientPhone ? ` (${pushName})` : ''}`,
+									workerForwardBody,
+									'',
+									`Balas: @${token} - pesan balasan`
+								].join('\n')
+
+								for (const worker of assignedWorkers) {
+									const workerJid = this.normalizeChatJid(worker.whatsapp_number)
+									try {
+										await sock.sendMessage(workerJid, { text: forwardText })
+										autoForwardLogDb.insert({
+											session_id: sessionId,
+											token,
+											direction: 'user_to_admin',
+											sender_number: remoteJid,
+											message_content: workerForwardBody.substring(0, 1000),
+											message_type: messageType,
+											status: 'success'
+										})
+										this.socketIO.emit('auto-forward-received', {
+											sessionId, token, from: displayNumber, name: pushName,
+											message: workerForwardBody.substring(0, 200), workerId: worker.id
+										})
+										console.log(`📨 Auto-forward worker: [${token}] ${displayNumber} → ${worker.name}`)
+									} catch (workerForwardErr: any) {
+										autoForwardLogDb.insert({
+											session_id: sessionId,
+											token,
+											direction: 'user_to_admin',
+											sender_number: remoteJid,
+											message_content: workerForwardBody.substring(0, 1000),
+											message_type: messageType,
+											status: 'failed',
+											error_message: workerForwardErr.message
+										})
+										console.error(`❌ Auto-forward to worker failed:`, workerForwardErr)
+									}
+								}
+								autoForwardTokenDb.updateLastMessage(sessionId, token, workerForwardBody.substring(0, 200))
+							}
+						}
+
 						const forwardConfig = autoForwardConfigDb.get(sessionId)
-						if (forwardConfig && forwardConfig.enabled) {
+						if (!workerReplyHandled && forwardConfig && forwardConfig.enabled) {
 							const isGroup = remoteJid.includes('@g.us')
 							
 							// --- CASE 1: Admin replies with @TOKEN format ---
@@ -1223,6 +1365,93 @@ export class SessionManager {
 			}
 		})
 
+		sock.ev.on('messages.reaction', async (reactions: any[]) => {
+			for (const item of reactions || []) {
+				try {
+					const key = item.key || item.message?.key || item.reaction?.key
+					const targetKey = item.reaction?.key || item.message?.reactionMessage?.key || item.reactionMessage?.key || key
+					const emoji = item.reaction?.text ?? item.text ?? item.message?.reactionMessage?.text ?? item.reactionMessage?.text ?? ''
+					const remoteJid = targetKey?.remoteJid || key?.remoteJid || ''
+					const messageId = targetKey?.id || item.msgKey?.id || ''
+					if (!remoteJid || !messageId) continue
+
+					const updated = messageMutationDb.updateReaction(
+						sessionId,
+						remoteJid,
+						messageId,
+						{
+							emoji,
+							fromMe: key?.fromMe,
+							sender: key?.participant || item.sender || item.participant || null,
+							participant: key?.participant || null,
+							timestamp: new Date().toISOString()
+						},
+						targetKey?.fromMe,
+						targetKey?.participant || null
+					)
+					if (!updated) continue
+
+					this.emitMessageMutation(sessionId, remoteJid, 'message.reaction.updated', {
+						messageId,
+						reaction: updated.reaction_json ? JSON.parse(updated.reaction_json) : [],
+						updatedMessage: updated
+					})
+				} catch (error) {
+					console.error('⚠️ messages.reaction handler error:', error)
+				}
+			}
+		})
+
+		sock.ev.on('messages.update', async (updates: any[]) => {
+			for (const { key, update } of updates || []) {
+				try {
+					const remoteJid = key?.remoteJid || ''
+					const messageId = key?.id || ''
+					if (!remoteJid || !messageId) continue
+
+					const editedText = this.extractEditedText(update)
+					if (editedText !== null) {
+						const updated = messageMutationDb.markEdited(
+							sessionId,
+							remoteJid,
+							messageId,
+							editedText,
+							key?.fromMe,
+							key?.participant || null
+						)
+						if (updated) {
+							this.emitMessageMutation(sessionId, remoteJid, 'message.edited', {
+								messageId,
+								isEdited: true,
+								updatedMessage: updated,
+								updatedText: editedText
+							})
+						}
+					}
+
+					if (this.isDeletedUpdate(update)) {
+						const updated = messageMutationDb.markDeleted(
+							sessionId,
+							remoteJid,
+							messageId,
+							key?.fromMe,
+							key?.participant || null,
+							key?.participant || null
+						)
+						if (updated) {
+							this.emitMessageMutation(sessionId, remoteJid, 'message.deleted', {
+								messageId,
+								isDeleted: true,
+								updatedMessage: updated
+							})
+						}
+					}
+				} catch (error) {
+					console.error('⚠️ messages.update handler error:', error)
+				}
+			}
+		})
+
 		// Request pairing code
 		if (type === 'pairing' && phoneNumber && !sock.authState.creds.registered) {
 			const code = await sock.requestPairingCode(phoneNumber.replace(/[^0-9]/g, ''))
@@ -1241,9 +1470,7 @@ export class SessionManager {
 			throw new Error('Session not connected')
 		}
 
-		const jid = phone.includes('@s.whatsapp.net')
-			? phone
-			: `${phone.replace(/[^0-9]/g, '')}@s.whatsapp.net`
+		const jid = this.normalizeChatJid(phone)
 
 		const result = await session.sock.sendMessage(jid, { text: message })
 		
@@ -1256,6 +1483,42 @@ export class SessionManager {
 		}
 		
 		return result
+	}
+
+	async sendReaction(
+		sessionId: string,
+		chatJid: string,
+		messageKey: any,
+		emoji: string
+	): Promise<any> {
+		const session = this.getSession(sessionId)
+		if (!session || !session.sock || !session.isConnected) {
+			throw new Error('Session not connected')
+		}
+
+		return session.sock.sendMessage(this.normalizeChatJid(chatJid), {
+			react: {
+				text: emoji || '',
+				key: messageKey
+			}
+		})
+	}
+
+	async editMessage(
+		sessionId: string,
+		chatJid: string,
+		messageKey: any,
+		text: string
+	): Promise<any> {
+		const session = this.getSession(sessionId)
+		if (!session || !session.sock || !session.isConnected) {
+			throw new Error('Session not connected')
+		}
+
+		return session.sock.sendMessage(this.normalizeChatJid(chatJid), {
+			text,
+			edit: messageKey
+		})
 	}
 
 	async sendImage(
@@ -1272,9 +1535,7 @@ export class SessionManager {
 			throw new Error('Session not connected')
 		}
 
-		const jid = phone.includes('@s.whatsapp.net')
-			? phone
-			: `${phone.replace(/[^0-9]/g, '')}@s.whatsapp.net`
+		const jid = this.normalizeChatJid(phone)
 
 		const imageMsg: { image: Buffer; caption?: string; mimetype?: string } = {
 			image: imageBuffer,
@@ -1316,9 +1577,7 @@ export class SessionManager {
 			throw new Error('Session not connected')
 		}
 
-		const jid = phone.includes('@s.whatsapp.net')
-			? phone
-			: `${phone.replace(/[^0-9]/g, '')}@s.whatsapp.net`
+		const jid = this.normalizeChatJid(phone)
 
 		const videoMsg: { video: Buffer; caption?: string; mimetype?: string } = {
 			video: videoBuffer,
@@ -1360,9 +1619,7 @@ export class SessionManager {
 			throw new Error('Session not connected')
 		}
 
-		const jid = phone.includes('@s.whatsapp.net')
-			? phone
-			: `${phone.replace(/[^0-9]/g, '')}@s.whatsapp.net`
+		const jid = this.normalizeChatJid(phone)
 
 		const docMsg: { document: Buffer; mimetype: string; fileName?: string; caption?: string } = {
 			document: documentBuffer,
@@ -1405,9 +1662,7 @@ export class SessionManager {
 			return []
 		}
 
-		const jid = phone.includes('@s.whatsapp.net')
-			? phone
-			: `${phone.replace(/[^0-9]/g, '')}@s.whatsapp.net`
+		const jid = this.normalizeChatJid(phone)
 
 		try {
 			console.log('📜 Fetching chat history for', jid, 'limit:', limit)
@@ -1428,6 +1683,46 @@ export class SessionManager {
 			console.error('❌ Error fetching chat history:', error)
 			return []
 		}
+	}
+
+	private emitMessageMutation(sessionId: string, remoteJid: string, eventName: string, payload: any): void {
+		const authorizedSockets = getAuthorizedSocketIds(sessionId, remoteJid)
+		const data = { sessionId, remoteJid, ...payload }
+		for (const sid of authorizedSockets) {
+			this.socketIO.to(sid).emit(eventName, data)
+		}
+	}
+
+	private extractEditedText(update: any): string | null {
+		const editedMessage =
+			update?.message?.editedMessage ||
+			update?.message?.protocolMessage?.editedMessage ||
+			update?.message?.editedMessage?.message ||
+			update?.message?.protocolMessage?.editedMessage?.message
+
+		if (!editedMessage) return null
+		const message = editedMessage.message || editedMessage
+		return this.getMessageContent(message) || this.getMessageCaption(message) || ''
+	}
+
+	private isDeletedUpdate(update: any): boolean {
+		if (!update) return false
+		if (update.message === null) return true
+		const protocolType = update.message?.protocolMessage?.type
+		const stubType = update.messageStubType || update.message?.messageStubType
+		const protocolName = String(protocolType || '').toLowerCase()
+		const stubName = String(stubType || '').toLowerCase()
+		return protocolName.includes('revoke') ||
+			protocolName.includes('delete') ||
+			stubName.includes('revoke') ||
+			stubName.includes('delete') ||
+			Number(protocolType) === 0
+	}
+
+	private normalizeChatJid(value: string): string {
+		if (!value) return value
+		if (value.includes('@g.us') || value.includes('@s.whatsapp.net') || value.includes('@lid')) return value
+		return `${value.replace(/[^0-9]/g, '')}@s.whatsapp.net`
 	}
 
 	private getMessageType(message: any): string {

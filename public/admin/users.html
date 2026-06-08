@@ -244,6 +244,7 @@
                                             <tr class="text-start text-muted fw-bold fs-7 text-uppercase">
                                                 <th>User</th>
                                                 <th>Role</th>
+                                                <th>WA Worker</th>
                                                 <th>Token API</th>
                                                 <th>Status</th>
                                                 <th>Dibuat</th>
@@ -327,6 +328,12 @@
                                     <option value="non-aktif">Non-Aktif</option>
                                 </select>
                             </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label">Nomor WhatsApp Worker</label>
+                            <input type="tel" class="form-control" id="user-whatsapp-number" placeholder="Contoh: 628123456789">
+                            <small class="text-muted">Dipakai untuk auto-forward pesan client ke worker yang ditugaskan. Isi angka saja, format internasional 62xxx.</small>
                         </div>
 
                         <div class="mb-3">
@@ -564,6 +571,11 @@
                             </span>
                         </td>
                         <td>
+                            ${user.role === 'worker'
+                                ? `<span class="badge bg-light text-dark">${escapeHtml(user.whatsapp_number || 'Belum diisi')}</span>`
+                                : '<span class="text-muted">-</span>'}
+                        </td>
+                        <td>
                             <div class="d-flex align-items-center">
                                 <span class="token-text me-2" id="token-${user.id}">${user.token}</span>
                                 <button class="btn btn-sm btn-icon btn-light" onclick="copyToken('${user.token}')" title="Copy">
@@ -657,6 +669,7 @@
             document.getElementById('user-id').value = '';
             document.getElementById('password-group').style.display = 'block';
             document.getElementById('user-password').required = true;
+            document.getElementById('user-whatsapp-number').value = '';
             document.getElementById('user-phone-visible').checked = true;
             updatePhoneVisibleLabel(true);
             userModal.show();
@@ -673,6 +686,7 @@
             document.getElementById('user-email').value = user.email;
             document.getElementById('user-role').value = user.role;
             document.getElementById('user-status').value = user.status;
+            document.getElementById('user-whatsapp-number').value = user.whatsapp_number || '';
             const visible = user.phone_visible !== 0;
             document.getElementById('user-phone-visible').checked = visible;
             updatePhoneVisibleLabel(visible);
@@ -695,6 +709,7 @@
                 email: document.getElementById('user-email').value,
                 role: document.getElementById('user-role').value,
                 status: document.getElementById('user-status').value,
+                whatsapp_number: document.getElementById('user-whatsapp-number').value,
                 phone_visible: document.getElementById('user-phone-visible').checked ? 1 : 0,
             };
             
