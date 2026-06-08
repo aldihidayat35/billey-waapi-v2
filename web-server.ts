@@ -22,6 +22,7 @@ import {
 import multer from 'multer'
 import { NotificationService, registerUserSocket, unregisterUserSocket, registerAdminSocket, unregisterAdminSocket, isUserOnline, getOnlineUserCount } from './notification.js'
 import { saveMedia, saveMediaBase64, getMediaDir, getMediaPath, cleanupOldMedia, migrateMediaFromDb, MEDIA_RETENTION_DAYS } from './media-storage.js'
+import { filterMessagesByVisibilityRange } from './visibility-range.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -867,18 +868,7 @@ app.get('/api/member/messages/:sessionId/:contact', authMiddleware, (req, res) =
 				const visEnd = assignment.visibility_end || null
 
 				// Filter by visibility time window (based on message timestamp)
-				if (visStart || visEnd) {
-					messages = messages.filter((m: any) => {
-						const msgDate = new Date(m.timestamp)
-						const hh = msgDate.getHours().toString().padStart(2, '0')
-						const mm = msgDate.getMinutes().toString().padStart(2, '0')
-						const hhmm = `${hh}:${mm}`
-						if (visStart && visEnd) return hhmm >= visStart && hhmm <= visEnd
-						if (visStart) return hhmm >= visStart
-						if (visEnd) return hhmm <= visEnd
-						return true
-					})
-				}
+				messages = filterMessagesByVisibilityRange(messages, visStart, visEnd)
 			}
 			// Exclude hidden messages for workers
 			messages = messages.filter((m: any) => !hiddenIds.has(m.message_id))

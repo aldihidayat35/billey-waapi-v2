@@ -1110,6 +1110,7 @@
         function handleUnlimitedToggle(label, e) {
             // Prevent double-fire from checkbox's own change event
             if (e.target.tagName === 'INPUT') return;
+            e.preventDefault();
             const cbx = label.querySelector('.cnr-vis-unlimited');
             cbx.checked = !cbx.checked;
             cbx.dispatchEvent(new Event('change'));
@@ -1123,6 +1124,7 @@
             const ends = row.querySelectorAll('.cnr-vis-end');
             starts.forEach(el => { el.disabled = cbx.checked; if (cbx.checked) el.value = ''; });
             ends.forEach(el => { el.disabled = cbx.checked; if (cbx.checked) el.value = ''; });
+            row.querySelector('.cnr-unlimited-toggle')?.classList.toggle('checked', cbx.checked);
             if (contactNotesMap[key]) contactNotesMap[key].no_visibility_limit = cbx.checked;
         }
 
@@ -1160,6 +1162,9 @@
             });
             document.querySelectorAll('.cnr-vis-end[data-key]').forEach(el => {
                 if (contactNotesMap[el.dataset.key]) contactNotesMap[el.dataset.key].visibility_end = el.value;
+            });
+            document.querySelectorAll('.cnr-vis-unlimited[data-key]').forEach(el => {
+                if (contactNotesMap[el.dataset.key]) contactNotesMap[el.dataset.key].no_visibility_limit = el.checked;
             });
             const assignments = [];
             for (const [sid, set] of Object.entries(selectedContacts)) {
