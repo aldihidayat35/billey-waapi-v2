@@ -21,7 +21,7 @@ import {
 } from './middleware.js'
 import multer from 'multer'
 import { NotificationService, registerUserSocket, unregisterUserSocket, registerAdminSocket, unregisterAdminSocket, isUserOnline, getOnlineUserCount } from './notification.js'
-import { saveMedia, saveMediaBase64, getMediaDir, getMediaPath, cleanupOldMedia, migrateMediaFromDb } from './media-storage.js'
+import { saveMedia, saveMediaBase64, getMediaDir, getMediaPath, cleanupOldMedia, migrateMediaFromDb, MEDIA_RETENTION_DAYS } from './media-storage.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -629,6 +629,10 @@ app.put('/api/workers/:id/assignments', adminOrApiKeyMiddleware, (req, res) => {
 			try {
 				assignmentLogDb.logAssignment(workerId, worker.name, enriched, req.user!.id, req.user!.name)
 			} catch (logErr) { console.error('⚠️ Failed to log assignment:', logErr) }
+			
+			// Broadcast assignment update to trigger frontend refresh
+			io.emit('assignment-updated', { workerId })
+
 			res.json({ success: true, message: 'Penugasan berhasil disimpan' })
 		} else {
 			res.status(400).json(result)
@@ -776,8 +780,6 @@ app.get('/api/member/conversations', authMiddleware, (req, res) => {
 				FROM worker_assignments wa
 				JOIN users u ON u.id = wa.worker_id
 				WHERE wa.session_id = ? AND wa.contact = ?
-				  AND (wa.end_datetime IS NULL OR wa.end_datetime >= datetime('now', 'localtime'))
-				  AND (wa.start_datetime IS NULL OR wa.start_datetime <= datetime('now', 'localtime'))
 				ORDER BY u.name ASC
 			`).all(r.session_id, r.contact).map((row: any) => row.name).filter(Boolean)
 			const contactNameRow = db.prepare(`
@@ -847,44 +849,67 @@ app.get('/api/member/messages/:sessionId/:contact', authMiddleware, (req, res) =
 		// Get hidden message IDs for this session+contact
 		const hiddenIds = hiddenMessageDb.getHiddenForContact(sessionId, contact)
 
+		// Get assignment info to send to frontend for header/notes rendering
+		let assignmentInfo = null;
 		if (user.role === 'worker') {
-			// Worker: get visibility settings from assignment
 			const assignment = workerAssignmentDb.getAssignment(user.id, sessionId, contact)
-			const visStart = assignment?.visibility_start || null
-			const visEnd = assignment?.visibility_end || null
+			if (assignment) {
+				assignmentInfo = {
+					notes: assignment.notes,
+					priority: assignment.priority,
+					start_datetime: assignment.start_datetime,
+					end_datetime: assignment.end_datetime,
+					visibility_start: assignment.visibility_start,
+					visibility_end: assignment.visibility_end,
+				}
 
-			// Filter by visibility time window (based on message timestamp)
-			if (visStart && visEnd) {
-				messages = messages.filter((m: any) => {
-					const msgDate = new Date(m.timestamp)
-					const hh = msgDate.getHours().toString().padStart(2, '0')
-					const mm = msgDate.getMinutes().toString().padStart(2, '0')
-					const hhmm = `${hh}:${mm}`
-					return hhmm >= visStart && hhmm <= visEnd
-				})
+				const visStart = assignment.visibility_start || null
+				const visEnd = assignment.visibility_end || null
+
+				// Filter by visibility time window (based on message timestamp)
+				if (visStart || visEnd) {
+					messages = messages.filter((m: any) => {
+						const msgDate = new Date(m.timestamp)
+						const hh = msgDate.getHours().toString().padStart(2, '0')
+						const mm = msgDate.getMinutes().toString().padStart(2, '0')
+						const hhmm = `${hh}:${mm}`
+						if (visStart && visEnd) return hhmm >= visStart && hhmm <= visEnd
+						if (visStart) return hhmm >= visStart
+						if (visEnd) return hhmm <= visEnd
+						return true
+					})
+				}
 			}
-
 			// Exclude hidden messages for workers
 			messages = messages.filter((m: any) => !hiddenIds.has(m.message_id))
+		} else {
+			// Admin/Member: get the assignment if any worker is assigned (we take the first one or just fetch via getWorkersAssignment)
+			// Actually, just fetch from db directly for this contact
+			const assignmentRow = db.prepare(`
+				SELECT notes, priority, start_datetime, end_datetime, visibility_start, visibility_end
+				FROM worker_assignments
+				WHERE session_id = ? AND contact = ?
+				LIMIT 1
+			`).get(sessionId, contact) as any
+			if (assignmentRow) {
+				const assignedWorkers = db.prepare(`
+					SELECT u.name
+					FROM worker_assignments wa
+					JOIN users u ON u.id = wa.worker_id
+					WHERE wa.session_id = ? AND wa.contact = ?
+					ORDER BY u.name ASC
+				`).all(sessionId, contact).map((row: any) => row.name).filter(Boolean)
+				assignmentInfo = { ...assignmentRow, assignedWorkers }
+			}
 
-			// Add assignment info for header display
-			const assignmentInfo = assignment ? {
-				start_datetime: assignment.start_datetime,
-				end_datetime: assignment.end_datetime,
-				visibility_start: assignment.visibility_start,
-				visibility_end: assignment.visibility_end,
-			} : null
-
-			return res.json({ success: true, messages, assignment: assignmentInfo })
+			// Admin/Member: include all messages, but mark hidden ones
+			messages = messages.map((m: any) => ({
+				...m,
+				is_hidden: hiddenIds.has(m.message_id)
+			}))
 		}
 
-		// Admin/Member: include all messages, but mark hidden ones
-		messages = messages.map((m: any) => ({
-			...m,
-			is_hidden: hiddenIds.has(m.message_id)
-		}))
-
-		res.json({ success: true, messages })
+		res.json({ success: true, messages, assignment: assignmentInfo })
 	} catch (error: any) {
 		res.status(500).json({ success: false, error: error.message })
 	}
@@ -1066,10 +1091,10 @@ app.get('/api/member/contact-detail/:sessionId/:contact', authMiddleware, (req, 
 			WHERE session_id = ? AND (from_number = ? OR to_number = ?)
 		`).get(sessionId, cleanJid, cleanJid) as any
 
-		const mediaItems = db.prepare(`
-			SELECT message_id, message_type, content, caption, media_url, filename, file_size, mimetype, timestamp
+		const mediaItemsRaw = db.prepare(`
+			SELECT message_id, message_type, content, caption, media_url, filename, file_size, mimetype, timestamp, direction
 			FROM (
-				SELECT message_id, message_type, content, caption, media_url, filename, file_size, mimetype, timestamp
+				SELECT message_id, message_type, content, caption, media_url, filename, file_size, mimetype, timestamp, direction
 				FROM message_logs
 				WHERE session_id = ? AND (from_number = ? OR to_number = ?)
 				  AND is_deleted != 1
@@ -1077,26 +1102,52 @@ app.get('/api/member/contact-detail/:sessionId/:contact', authMiddleware, (req, 
 				       OR (media_url IS NOT NULL AND media_url != '')
 				       OR (media_data IS NOT NULL AND media_data != ''))
 				UNION ALL
-				SELECT message_id, 'link' as message_type, content, caption, media_url, filename, file_size, mimetype, timestamp
+				SELECT message_id, 'link' as message_type, content, caption, media_url, filename, file_size, mimetype, timestamp, direction
 				FROM message_logs
 				WHERE session_id = ? AND (from_number = ? OR to_number = ?)
 				  AND is_deleted != 1
+				  AND message_type = 'text'
 				  AND ((content LIKE '%http://%' OR content LIKE '%https://%')
 				       OR (caption LIKE '%http://%' OR caption LIKE '%https://%'))
 			)
 			ORDER BY timestamp DESC
-			LIMIT 12
+			LIMIT 50
 		`).all(sessionId, cleanJid, cleanJid, sessionId, cleanJid, cleanJid) as any[]
+
+		// Annotate each media item with is_expired and file availability
+		const retentionMs = MEDIA_RETENTION_DAYS * 24 * 60 * 60 * 1000
+		const now = Date.now()
+		const mediaItems = mediaItemsRaw.map((item: any) => {
+			const msgDate = item.timestamp ? new Date(item.timestamp).getTime() : 0
+			const expiresAt = msgDate ? new Date(msgDate + retentionMs).toISOString() : null
+			const isExpiredByDate = msgDate > 0 && (now - msgDate) > retentionMs
+			// Check if physical file exists
+			const fileExists = item.media_url ? (getMediaPath(item.media_url) !== null) : false
+			const hasMedia = !!(item.media_url)
+			const isExpired = item.message_type !== 'link' && hasMedia && (isExpiredByDate || !fileExists)
+			const isAvailable = item.message_type === 'link' ? true : (hasMedia && fileExists && !isExpiredByDate)
+			return {
+				...item,
+				media_expires_at: expiresAt,
+				is_expired: isExpired,
+				file_available: isAvailable,
+			}
+		})
 
 		const assignedWorkers = db.prepare(`
 			SELECT u.name
 			FROM worker_assignments wa
 			JOIN users u ON u.id = wa.worker_id
 			WHERE wa.session_id = ? AND wa.contact = ?
-			  AND (wa.end_datetime IS NULL OR wa.end_datetime >= datetime('now', 'localtime'))
-			  AND (wa.start_datetime IS NULL OR wa.start_datetime <= datetime('now', 'localtime'))
 			ORDER BY u.name ASC
 		`).all(sessionId, cleanJid).map((row: any) => row.name).filter(Boolean)
+
+		const assignmentInfoRaw = db.prepare(`
+			SELECT notes, priority, start_datetime, end_datetime, visibility_start, visibility_end
+			FROM worker_assignments
+			WHERE session_id = ? AND contact = ?
+			LIMIT 1
+		`).get(sessionId, cleanJid) as any
 
 		const contactNameRow = db.prepare(`
 			SELECT sender_name
@@ -1141,9 +1192,6 @@ app.get('/api/member/contact-detail/:sessionId/:contact', authMiddleware, (req, 
 			ORDER BY timestamp DESC LIMIT 1
 		`).get(sessionId, cleanJid, cleanJid) as any
 
-		// Get assignment notes if any
-		const notes = workerAssignmentDb.getByContact(contact)
-
 		res.json({
 			success: true,
 			contact,
@@ -1151,19 +1199,20 @@ app.get('/api/member/contact-detail/:sessionId/:contact', authMiddleware, (req, 
 			mediaCount: mediaCount?.total || 0,
 			docCount: docCount?.total || 0,
 			lastSeen: latest?.timestamp || null,
-			notes: notes?.notes || '',
-			priority: notes?.priority || null,
+			assignment: assignmentInfoRaw || null,
 			isGroup: contact.includes('@g.us'),
 			displayName: contactNameRow?.sender_name || (contact.includes('@g.us') ? contact.replace('@g.us', '') : ''),
 			phone: contact,
 			assignedWorkers,
 			mediaItems,
 			activity,
+			mediaRetentionDays: MEDIA_RETENTION_DAYS,
 		})
 	} catch (error: any) {
 		res.status(500).json({ success: false, error: error.message })
 	}
 })
+
 
 // Forward a message from member dashboard with worker assignment validation
 app.post('/api/member/forward-message', authMiddleware, async (req, res) => {
@@ -5693,19 +5742,19 @@ server.listen(PORT, async () => {
 		console.error('⚠️ Media migration error:', err)
 	}
 
-	// Start cleanup: delete media files older than 7 days (check every 6 hours)
-	startMediaAutoCleanup(3, 6) // DB blob cleanup
+	// Start cleanup: delete media files older than MEDIA_RETENTION_DAYS (check every 6 hours)
+	startMediaAutoCleanup(MEDIA_RETENTION_DAYS, 6) // DB blob cleanup
 	setInterval(() => {
 		try {
-			const deleted = cleanupOldMedia(7)
+			const deleted = cleanupOldMedia(MEDIA_RETENTION_DAYS)
 			if (deleted > 0) {
-				console.log(`🗑️ Auto-deleted ${deleted} media files older than 7 days`)
-				// Mark DB rows where file was deleted
+				console.log(`🗑️ Auto-deleted ${deleted} media files older than ${MEDIA_RETENTION_DAYS} days`)
+				// Mark DB rows where file was deleted — null out media_url so UI shows expired state
 				db.prepare(`
 					UPDATE message_logs 
 					SET media_url = NULL 
 					WHERE media_url IS NOT NULL AND media_url != ''
-					AND datetime(timestamp) < datetime('now', '-7 days')
+					AND datetime(timestamp) < datetime('now', '-${MEDIA_RETENTION_DAYS} days')
 				`).run()
 			}
 		} catch (err) {
@@ -5716,14 +5765,14 @@ server.listen(PORT, async () => {
 	// Run once at startup too
 	setTimeout(() => {
 		try {
-			const deleted = cleanupOldMedia(7)
+			const deleted = cleanupOldMedia(MEDIA_RETENTION_DAYS)
 			if (deleted > 0) {
-				console.log(`🗑️ Startup cleanup: deleted ${deleted} media files older than 7 days`)
+				console.log(`🗑️ Startup cleanup: deleted ${deleted} media files older than ${MEDIA_RETENTION_DAYS} days`)
 				db.prepare(`
 					UPDATE message_logs 
 					SET media_url = NULL 
 					WHERE media_url IS NOT NULL AND media_url != ''
-					AND datetime(timestamp) < datetime('now', '-7 days')
+					AND datetime(timestamp) < datetime('now', '-${MEDIA_RETENTION_DAYS} days')
 				`).run()
 			}
 		} catch (_) {}

@@ -6,6 +6,9 @@ import { fileURLToPath } from 'url'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
+// Configurable media retention (days) from env, default 30
+export const DB_MEDIA_RETENTION_DAYS = Math.max(1, parseInt(process.env.MEDIA_RETENTION_DAYS || '30', 10) || 30)
+
 // Database file path
 const DB_PATH = path.join(__dirname, 'data', 'whatsapp.db')
 
@@ -363,8 +366,10 @@ try {
         db.prepare(`DELETE FROM notifications WHERE user_id = 0 AND title = '_migration_test_'`).run()
     } catch {
         // Old constraint rejects 'both' → recreate table
+        const tempTable = `notifications_old_${Date.now()}`
+        db.prepare(`DROP TABLE IF EXISTS notifications_old`).run()
         db.exec(`
-            ALTER TABLE notifications RENAME TO notifications_old;
+            ALTER TABLE notifications RENAME TO ${tempTable};
             CREATE TABLE notifications (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL,
@@ -378,8 +383,9 @@ try {
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             );
-            INSERT INTO notifications SELECT * FROM notifications_old;
-            DROP TABLE notifications_old;
+            INSERT INTO notifications (id, user_id, type, title, body, data, channel, status, read_at, created_at)
+            SELECT id, user_id, type, title, body, data, channel, status, read_at, created_at FROM ${tempTable};
+            DROP TABLE ${tempTable};
             CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
             CREATE INDEX IF NOT EXISTS idx_notifications_status ON notifications(status);
             CREATE INDEX IF NOT EXISTS idx_notifications_created ON notifications(created_at);
@@ -1857,7 +1863,7 @@ export const dbMaintenance = {
     },
 
     // Clear old media data (keep message metadata)
-    clearOldMedia: (days: number = 7): number => {
+    clearOldMedia: (days: number = DB_MEDIA_RETENTION_DAYS): number => {
         const cutoffDate = new Date()
         cutoffDate.setDate(cutoffDate.getDate() - days)
         
@@ -2237,7 +2243,7 @@ export const memberSessionDb = {
 // ============================================
 let _mediaCleanupTimer: ReturnType<typeof setInterval> | null = null
 
-export function startMediaAutoCleanup(days: number = 3, intervalHours: number = 6): void {
+export function startMediaAutoCleanup(days: number = DB_MEDIA_RETENTION_DAYS, intervalHours: number = 6): void {
     // Run once immediately
     const cleaned = dbMaintenance.clearOldMedia(days)
     if (cleaned > 0) {

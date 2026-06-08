@@ -350,6 +350,13 @@
             font-size: 22px;
         }
         .msg-doc-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+        .msg-doc.msg-doc-expired { opacity: 0.6; cursor: not-allowed; }
+        .msg-expired-label {
+            font-size: 11px;
+            color: #ef4444;
+            font-weight: 600;
+            white-space: nowrap;
+        }
         .msg-link-preview {
             display: flex;
             align-items: center;
@@ -853,6 +860,50 @@
         .detail-media-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #0f172a; font-size: 13px; font-weight: 850; }
         .detail-media-meta { color: #64748b; font-size: 11px; font-weight: 700; }
         .detail-media-download { color: #64748b; }
+
+        /* ── Expired media in detail panel ── */
+        .detail-media-item.expired { opacity: 0.7; cursor: default; }
+        .detail-media-item.expired:hover { background: transparent; }
+        .detail-media-thumb.expired-thumb {
+            background: #f1f5f9;
+            color: #94a3b8;
+        }
+        .detail-media-expired-badge {
+            display: inline-block;
+            margin-left: 5px;
+            padding: 1px 6px;
+            background: #fef2f2;
+            color: #dc2626;
+            border-radius: 99px;
+            font-size: 10px;
+            font-weight: 700;
+            vertical-align: middle;
+            line-height: 1.5;
+        }
+        .detail-media-expired-info {
+            font-size: 10px;
+            color: #ef4444;
+            font-weight: 600;
+            opacity: 0.85;
+        }
+        .detail-media-download.expired-icon {
+            color: #cbd5e1;
+            cursor: not-allowed;
+        }
+        /* ── Expired bubble in chat ── */
+        .msg-media-expired {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 10px 14px;
+            background: #f8fafc;
+            border: 1.5px dashed #cbd5e1;
+            border-radius: 11px;
+            color: #64748b;
+            font-size: 12.5px;
+            font-style: italic;
+        }
+
         .detail-activity-item { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; color: #334155; }
         .detail-activity-item i { margin-top: 2px; color: #10b981; }
         .detail-activity-item span { display: flex; min-width: 0; flex-direction: column; gap: 2px; font-size: 12px; line-height: 1.35; }
@@ -1360,6 +1411,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js"></script>
     <script src="/js/notifications.js"></script>
+    <script src="/member/assignment-panel.js"></script>
     <script src="/member/chat.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {

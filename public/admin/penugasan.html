@@ -1175,6 +1175,21 @@
                 }
             }
             const btn = document.getElementById('btn-save-assignment');
+            
+            // Add confirmation if the admin is about to remove all assignments
+            if (assignments.length === 0) {
+                const confirm = await Swal.fire({
+                    title: 'Hapus Semua Penugasan?',
+                    text: 'Anda tidak memilih satupun kontak. Ini akan menghapus semua penugasan untuk worker ini. Lanjutkan?',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Ya, Hapus Semua',
+                    cancelButtonText: 'Batal',
+                    confirmButtonColor: '#f1416c'
+                });
+                if (!confirm.isConfirmed) return;
+            }
+
             btn.disabled = true;
             btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Menyimpan...';
             try {

@@ -18,7 +18,8 @@ const S = {
     selectedFileData: null,
     _loadingConversations: false,  // Guard against concurrent loads
     _conversationsLoaded: false,   // Track if initial load done
-    assignmentNotes: {},    // contact → { notes, priority }
+    assignmentNotes: {},    // `${sessionId}::${contact}` -> { notes, priority }
+    assignmentPanel: null,
     adminPhone: '',         // admin phone for report feature
     currentFilter: 'client', // 'semua' | 'client' | 'unread' | 'grup' | 'media'
     searchQuery: '',        // current search text
@@ -77,6 +78,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     S.socket = io();
     setupSocketListeners();
     setupNotificationSound();
+    initAssignmentPanel();
 
     // 3. Load assignment notes (before sessions, so icons render on first paint)
     await loadAssignmentNotes();
@@ -99,6 +101,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 7. Poll unread every 60s as fallback sync
     loadUnread();
     setInterval(loadUnread, 60000);
+    window.addEventListener('focus', () => {
+        if (S.activeSession && S.activeContact) {
+            loadContactDetail(S.activeSession, S.activeContact, { force: true, background: true });
+        }
+    });
 });
 
 // ─── Sessions ─────────────────────────────────────────────────
@@ -143,7 +150,7 @@ async function loadAssignmentNotes() {
         const d = await r.json();
         S.assignmentNotes = {};
         for (const n of (d.notes || [])) {
-            S.assignmentNotes[n.contact] = {
+            S.assignmentNotes[assignmentNoteKey(n.session_id, n.contact)] = {
                 notes: n.notes || '', priority: n.priority || 'low', session_id: n.session_id,
                 start_datetime: n.start_datetime || null, end_datetime: n.end_datetime || null,
                 visibility_start: n.visibility_start || null, visibility_end: n.visibility_end || null,
@@ -152,8 +159,184 @@ async function loadAssignmentNotes() {
     } catch { S.assignmentNotes = {}; }
 }
 
+function assignmentNoteKey(sessionId, contact) {
+    return `${sessionId || ''}::${contact || ''}`;
+}
+
+function getAssignmentNote(sessionId, contact) {
+    return S.assignmentNotes[assignmentNoteKey(sessionId, contact)] || null;
+}
+
+function setAssignmentNote(sessionId, contact, assignment) {
+    if (!sessionId || !contact || !assignment) return;
+    S.assignmentNotes[assignmentNoteKey(sessionId, contact)] = {
+        ...assignment,
+        session_id: assignment.session_id || sessionId,
+        contact: assignment.contact || contact,
+    };
+}
+
+function clearAssignmentNote(sessionId, contact) {
+    delete S.assignmentNotes[assignmentNoteKey(sessionId, contact)];
+}
+
+function initAssignmentPanel() {
+    if (!window.MemberAssignmentPanel?.createAssignmentPanelController) return;
+    S.assignmentPanel = window.MemberAssignmentPanel.createAssignmentPanelController({
+        getActiveChat: () => ({ sessionId: S.activeSession, contact: S.activeContact }),
+        fetchDetail: async (sessionId, contact, options = {}) => {
+            const r = await fetch(`/api/member/contact-detail/${encodeURIComponent(sessionId)}/${encodeURIComponent(contact)}`, {
+                signal: options.signal
+            });
+            const d = await r.json();
+            return { ...d, sessionId, contact };
+        },
+        renderLoading: renderAssignmentLoading,
+        renderDetail: renderContactDetail,
+        renderEmpty: renderAssignmentEmpty,
+        renderError: renderAssignmentError,
+        getFallbackDetail: getAssignmentFallbackDetail,
+        onAssignment: syncAssignmentFromDetail,
+    });
+}
+
+function getAssignmentFallbackDetail(chat) {
+    const sessionId = chat?.sessionId || S.activeSession;
+    const contact = chat?.contact || S.activeContact;
+    if (!sessionId || !contact) return null;
+    const conv = getConversation(sessionId, contact) || {};
+    const assignment = getAssignmentNote(sessionId, contact);
+    const assignmentWorkers = Array.isArray(assignment?.assignedWorkers) ? assignment.assignedWorkers.filter(Boolean) : [];
+    const conversationWorkers = Array.isArray(conv.assignedWorkers) ? conv.assignedWorkers.filter(Boolean) : [];
+    const assignedWorkers = assignmentWorkers.length ? assignmentWorkers : conversationWorkers;
+    if (!assignment && assignedWorkers.length === 0) return null;
+    return {
+        success: true,
+        sessionId,
+        contact,
+        assignment,
+        assignedWorkers,
+        isGroup: conv.isGroup || String(contact).includes('@g.us'),
+        displayName: conv.displayName || conv.name || '',
+        phone: contact,
+        totalMessages: conv.totalMessages || 0,
+        mediaCount: conv.mediaCount || 0,
+        docCount: conv.docCount || 0,
+        mediaItems: [],
+        activity: [],
+    };
+}
+
+function renderAssignmentFromCachedState(sessionId, contact) {
+    if (sessionId !== S.activeSession || contact !== S.activeContact) return;
+    const fallback = getAssignmentFallbackDetail({ sessionId, contact });
+    if (fallback) renderContactDetail(fallback);
+}
+
+function syncAssignmentFromDetail(detail) {
+    if (!detail?.sessionId || !detail?.contact) return;
+    if (detail.assignment) {
+        setAssignmentNote(detail.sessionId, detail.contact, detail.assignment);
+    } else {
+        clearAssignmentNote(detail.sessionId, detail.contact);
+    }
+    updateHeaderNoteIcon(detail.contact);
+
+    const conv = getConversation(detail.sessionId, detail.contact);
+    if (conv && Array.isArray(detail.assignedWorkers)) {
+        conv.assignedWorkers = detail.assignedWorkers;
+        conv.displayName = detail.displayName || conv.displayName;
+        if (detail.sessionId === S.activeSession) renderConversations(S.searchQuery);
+    }
+}
+
+function getAssignmentSections() {
+    return Array.from(document.querySelectorAll('#assign-content-wrap > section'));
+}
+
+function setAssignmentSectionsVisible(visible) {
+    getAssignmentSections().forEach(el => el.classList.toggle('hidden', !visible));
+}
+
+function setAssignmentState(message, iconHtml) {
+    const assignEmptyState = document.getElementById('assign-empty-state');
+    if (!assignEmptyState) return;
+    assignEmptyState.innerHTML = `${iconHtml || '<div class="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-sm border border-slate-100 text-3xl text-slate-300"><i class="bi bi-inbox"></i></div>'}<p class="text-sm font-semibold text-slate-500">${escHtml(message)}</p>`;
+    assignEmptyState.classList.remove('hidden');
+    assignEmptyState.classList.add('flex');
+    setAssignmentSectionsVisible(false);
+}
+
+function clearAssignmentFields(chat = {}) {
+    const contact = chat.contact || S.activeContact || '';
+    const sessionId = chat.sessionId || S.activeSession || '';
+    const conv = getConversation(sessionId, contact) || {};
+    const isGroup = String(contact || '').includes('@g.us') || conv.isGroup;
+    const displayName = contact ? contactDisplayName(contact, conv) : '-';
+    const session = S.sessions.find(s => s.id === sessionId);
+
+    setText('detail-name', displayName || '-');
+    setText('detail-phone', contact || '-');
+    setText('detail-name-line', displayName || 'Kontak');
+    setText('detail-phone-line', contact || '');
+    setText('detail-session-name', session?.name || sessionId || '-');
+    setText('assign-start-time', '-');
+    setText('assign-end-time', '-');
+    setText('assign-time-left', '');
+    setText('assign-notes-text', '-');
+    setText('detail-note', '');
+
+    const avatar = document.getElementById('detail-avatar');
+    if (avatar) {
+        avatar.textContent = isGroup ? 'GR' : (cleanPhone(contact).slice(-2) || 'WA');
+        avatar.style.background = isGroup ? '#047857' : avatarColor(cleanPhone(contact || 'WA'));
+        avatar.style.color = '#fff';
+    }
+
+    const workerList = document.getElementById('assign-worker-list');
+    if (workerList) workerList.textContent = '-';
+    setBadge('assign-priority-badge', '-', 'bg-slate-100 text-slate-600');
+    setBadge('assign-status-badge', '-', 'bg-slate-100 text-slate-600');
+    setBadge('assign-vis-status', '-', 'bg-slate-100 text-slate-600');
+    const visRange = document.getElementById('assign-vis-range');
+    if (visRange) visRange.innerHTML = '<i class="bi bi-infinity text-emerald-500"></i> Tanpa Batas Waktu';
+    setText('assign-vis-desc', 'Anda dapat melihat seluruh riwayat chat tanpa batasan jam kerja.');
+    const mediaList = document.getElementById('detail-media-list');
+    if (mediaList) mediaList.innerHTML = '';
+    const activityList = document.getElementById('detail-activity-list');
+    if (activityList) activityList.innerHTML = '';
+}
+
+function renderAssignmentLoading(chat) {
+    clearAssignmentFields(chat);
+    setAssignmentState(
+        'Memuat data penugasan...',
+        '<div class="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-sm border border-slate-100 text-emerald-500"><span class="spinner-border spinner-border-sm"></span></div>'
+    );
+}
+
+function renderAssignmentEmpty(chat) {
+    clearAssignmentFields(chat);
+    setAssignmentState('Belum ada penugasan untuk chat ini.');
+}
+
+function renderAssignmentError(chat) {
+    clearAssignmentFields(chat);
+    setAssignmentState(
+        'Gagal memuat data penugasan.',
+        '<div class="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-sm border border-rose-100 text-3xl text-rose-400"><i class="bi bi-exclamation-triangle"></i></div>'
+    );
+}
+
+function setBadge(id, text, className) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.className = `rounded-lg px-2.5 py-1 text-xs font-bold ${className || 'bg-slate-100 text-slate-600'}`;
+    el.textContent = text;
+}
+
 function openNoteModal(contact) {
-    const n = S.assignmentNotes[contact];
+    const n = getAssignmentNote(S.activeSession, contact);
     if (!n) return;
     const modal = document.getElementById('note-modal');
     const overlay = document.getElementById('note-modal-overlay');
@@ -292,6 +475,7 @@ function renderSessionTabs() {
 function selectSession(sid) {
     S.activeSession = sid;
     S.activeContact = null;
+    S.assignmentPanel?.reset?.();
     S._conversationsLoaded = false;
     S._loadingConversations = false;
     sessionStorage.setItem('member_activeSession', sid);
@@ -392,7 +576,7 @@ function renderConversations(filter = '', activeFilter = S.currentFilter) {
         const subtitlePhone = conversationPhoneLabel(c.contact, isGroup);
         const groupBadge = isGroup ? '<span class="group-badge">Grup</span>' : '';
         const workerBadge = renderWorkerBadges(c.assignedWorkers, isGroup);
-        const noteData = S.assignmentNotes[c.contact];
+        const noteData = getAssignmentNote(c.sessionId || S.activeSession, c.contact);
         const noteIcon = noteData ? `<span class="note-icon note-${noteData.priority}" data-note-contact="${c.contact}" title="Catatan penugasan"><i class="bi bi-sticky-fill"></i></span>` : '';
         const reportIcon = `<span class="report-icon" data-report-contact="${c.contact}" title="Laporan"><i class="bi bi-flag-fill"></i></span>`;
         const muted = isChatMuted(c.sessionId || S.activeSession, c.contact);
@@ -549,7 +733,22 @@ function updateChatHeader(contact, source = {}) {
     renderHeaderWorkerBadges(source.assignedWorkers || [], isGroup);
 }
 
+function updateHeaderNoteIcon(contact) {
+    const hdrNote = document.getElementById('chat-hdr-note');
+    if (!hdrNote) return;
+    const noteData = getAssignmentNote(S.activeSession, contact);
+    if (noteData) {
+        hdrNote.className = 'note-icon-hdr note-' + (noteData.priority || 'low');
+        hdrNote.classList.remove('d-none');
+        hdrNote.onclick = () => openNoteModal(contact);
+    } else {
+        hdrNote.classList.add('d-none');
+        hdrNote.onclick = null;
+    }
+}
+
 async function openChat(contact) {
+    const sessionId = S.activeSession;
     S.activeContact = contact;
     S.messages.clear();
     sessionStorage.setItem('member_activeContact', contact);
@@ -561,19 +760,12 @@ async function openChat(contact) {
     showChatPanel();
 
     // Update header
-    const currentConversation = getConversation(S.activeSession, contact) || {};
+    const currentConversation = getConversation(sessionId, contact) || {};
     updateChatHeader(contact, currentConversation);
 
     // Note icon in header
     const hdrNote = document.getElementById('chat-hdr-note');
-    const noteData = S.assignmentNotes[contact];
-    if (noteData) {
-        hdrNote.className = 'note-icon-hdr note-' + noteData.priority;
-        hdrNote.classList.remove('d-none');
-        hdrNote.onclick = () => openNoteModal(contact);
-    } else {
-        hdrNote.classList.add('d-none');
-    }
+    updateHeaderNoteIcon(contact);
 
     // Report icon in header
     const hdrReport = document.getElementById('chat-hdr-report');
@@ -587,12 +779,24 @@ async function openChat(contact) {
     document.getElementById('chat-messages').classList.remove('d-none');
     document.getElementById('input-bar').classList.remove('d-none');
     document.getElementById('chat-empty').classList.add('d-none');
-    loadContactDetail(S.activeSession, contact);
+    
+    loadContactDetail(sessionId, contact);
 
     // Load messages
     try {
-        const r = await fetch(`/api/member/messages/${encodeURIComponent(S.activeSession)}/${encodeURIComponent(contact)}?limit=200`);
+        const r = await fetch(`/api/member/messages/${encodeURIComponent(sessionId)}/${encodeURIComponent(contact)}?limit=200`);
         const d = await r.json();
+        
+        if (sessionId !== S.activeSession || contact !== S.activeContact) return;
+
+        if (d.assignment) {
+            setAssignmentNote(sessionId, contact, d.assignment);
+        } else {
+            clearAssignmentNote(sessionId, contact);
+        }
+        updateHeaderNoteIcon(contact);
+        renderAssignmentFromCachedState(sessionId, contact);
+
         (d.messages || []).forEach(m => {
             S.messages.set(m.message_id || m.id, m);
         });
@@ -617,27 +821,67 @@ async function openChat(contact) {
     renderMessages();
     scrollToBottom();
     // Clear unread immediately when opening a conversation
-    markConversationRead(S.activeSession, contact);
+    markConversationRead(sessionId, contact);
 }
 
-async function loadContactDetail(sessionId, contact) {
-    if (!sessionId || !contact) return;
+async function loadContactDetail(sessionId, contact, options = {}) {
+    if (!sessionId || !contact) {
+        S.assignmentPanel?.reset?.();
+        return null;
+    }
+    if (S.assignmentPanel) {
+        return S.assignmentPanel.load({ sessionId, contact }, options);
+    }
+    renderAssignmentLoading({ sessionId, contact });
     try {
         const r = await fetch(`/api/member/contact-detail/${encodeURIComponent(sessionId)}/${encodeURIComponent(contact)}`);
         const d = await r.json();
-        if (!d.success) return;
-        renderContactDetail(d);
+        const detail = { ...d, sessionId, contact };
+        if (sessionId !== S.activeSession || contact !== S.activeContact) return null;
+        if (!d.success) {
+            renderAssignmentError({ sessionId, contact });
+            return null;
+        }
+        syncAssignmentFromDetail(detail);
+        if ((Array.isArray(detail.assignedWorkers) && detail.assignedWorkers.length) || detail.assignment) {
+            renderContactDetail(detail);
+        } else {
+            renderAssignmentEmpty({ sessionId, contact });
+        }
+        return detail;
     } catch (e) {
+        if (sessionId === S.activeSession && contact === S.activeContact) {
+            renderAssignmentError({ sessionId, contact });
+        }
         console.error('Load contact detail error:', e);
+        return null;
     }
 }
 
 function renderContactDetail(detail) {
+    if (detail.sessionId && detail.sessionId !== S.activeSession) return;
+    if (detail.contact !== S.activeContact) return;
+
     const isGroup = detail.isGroup || String(detail.contact || '').includes('@g.us');
     const displayName = contactDisplayName(detail.contact, detail);
     const phone = detail.phone || detail.contact || '-';
     const initials = isGroup ? 'GR' : cleanPhone(phone).slice(-2) || 'WA';
     const workers = Array.isArray(detail.assignedWorkers) ? detail.assignedWorkers : [];
+    const assign = detail.assignment || getAssignmentNote(detail.sessionId || S.activeSession, detail.contact) || {};
+
+    const assignEmptyState = document.getElementById('assign-empty-state');
+    const assignDetailsCards = getAssignmentSections();
+    
+    if (Object.keys(assign).length === 0 && workers.length === 0) {
+        renderAssignmentEmpty({ sessionId: detail.sessionId || S.activeSession, contact: detail.contact });
+        return;
+    } else {
+        if (assignEmptyState) {
+            assignEmptyState.classList.add('hidden');
+            assignEmptyState.classList.remove('flex');
+        }
+        assignDetailsCards.forEach(el => el.classList.remove('hidden'));
+    }
 
     if (detail.contact === S.activeContact) {
         const conv = getConversation(S.activeSession, detail.contact) || {};
@@ -649,12 +893,16 @@ function renderContactDetail(detail) {
     setText('detail-phone', phone);
     setText('detail-name-line', displayName || 'Kontak');
     setText('detail-phone-line', phone || detail.contact || '');
+    const session = S.sessions.find(s => s.id === (detail.sessionId || S.activeSession));
+    setText('detail-session-name', session?.name || detail.sessionId || S.activeSession || '-');
     const avatar = document.getElementById('detail-avatar');
     if (avatar) {
         avatar.textContent = initials;
         avatar.style.background = isGroup ? '#047857' : avatarColor(cleanPhone(phone));
         avatar.style.color = '#fff';
     }
+
+    renderAssignmentFields(detail, assign, workers);
 
     const note = document.getElementById('detail-note');
     if (note) {
@@ -713,6 +961,114 @@ function renderContactDetail(detail) {
             </div>`;
         }).join('') : '<div class="detail-empty">Belum ada aktivitas.</div>';
     }
+}
+
+function renderAssignmentFields(detail, assign, workers) {
+    const workerList = document.getElementById('assign-worker-list');
+    if (workerList) {
+        workerList.innerHTML = workers.length
+            ? workers.map(name => `<span>${escHtml(name)}</span>`).join('')
+            : '<span class="text-slate-400">Belum ditugaskan</span>';
+    }
+
+    const priority = assign.priority || '-';
+    const priorityInfo = getPriorityInfo(priority);
+    setBadge('assign-priority-badge', priorityInfo.label, priorityInfo.className);
+
+    const statusInfo = getAssignmentStatus(assign, workers);
+    setBadge('assign-status-badge', statusInfo.label, statusInfo.className);
+    setText('assign-start-time', assign.start_datetime ? formatDateTimeFull(assign.start_datetime) : '-');
+    setText('assign-end-time', assign.end_datetime ? formatDateTimeFull(assign.end_datetime) : '-');
+    setText('assign-time-left', getTimeLeftText(assign.end_datetime));
+
+    const visibilityInfo = getVisibilityInfo(assign.visibility_start, assign.visibility_end);
+    setBadge('assign-vis-status', visibilityInfo.status, visibilityInfo.statusClass);
+    const visRange = document.getElementById('assign-vis-range');
+    if (visRange) visRange.innerHTML = visibilityInfo.rangeHtml;
+    setText('assign-vis-desc', visibilityInfo.description);
+
+    setText('assign-notes-text', assign.notes || '-');
+    const notesCard = document.getElementById('assign-notes-card');
+    if (notesCard) {
+        notesCard.classList.toggle('bg-amber-50', !!assign.notes);
+        notesCard.classList.toggle('border-amber-200', !!assign.notes);
+        notesCard.classList.toggle('bg-white', !assign.notes);
+        notesCard.classList.toggle('border-slate-200', !assign.notes);
+    }
+}
+
+function getPriorityInfo(priority) {
+    const value = String(priority || '').toLowerCase();
+    if (value === 'critical') return { label: 'Critical', className: 'bg-rose-100 text-rose-700' };
+    if (value === 'medium') return { label: 'Medium', className: 'bg-amber-100 text-amber-700' };
+    if (value === 'low') return { label: 'Low', className: 'bg-emerald-100 text-emerald-700' };
+    return { label: '-', className: 'bg-slate-100 text-slate-600' };
+}
+
+function getAssignmentStatus(assign, workers) {
+    if (!assign || Object.keys(assign).length === 0) {
+        return workers.length
+            ? { label: 'Ditugaskan', className: 'bg-emerald-100 text-emerald-700' }
+            : { label: '-', className: 'bg-slate-100 text-slate-600' };
+    }
+    const now = Date.now();
+    const start = parseDateMs(assign.start_datetime);
+    const end = parseDateMs(assign.end_datetime);
+    if (start && start > now) return { label: 'Belum mulai', className: 'bg-sky-100 text-sky-700' };
+    if (end && end < now) return { label: 'Lewat deadline', className: 'bg-rose-100 text-rose-700' };
+    return { label: 'Aktif', className: 'bg-emerald-100 text-emerald-700' };
+}
+
+function parseDateMs(value) {
+    if (!value) return null;
+    const ms = new Date(value).getTime();
+    return Number.isNaN(ms) ? null : ms;
+}
+
+function getTimeLeftText(endDatetime) {
+    const end = parseDateMs(endDatetime);
+    if (!end) return '';
+    const diff = end - Date.now();
+    if (diff <= 0) return 'Deadline terlewat';
+    const minutes = Math.ceil(diff / 60000);
+    const days = Math.floor(minutes / 1440);
+    const hours = Math.floor((minutes % 1440) / 60);
+    const mins = minutes % 60;
+    const parts = [];
+    if (days) parts.push(`${days} hari`);
+    if (hours) parts.push(`${hours} jam`);
+    if (!days && mins) parts.push(`${mins} menit`);
+    return `Sisa waktu: ${parts.join(' ') || 'kurang dari 1 menit'}`;
+}
+
+function getVisibilityInfo(start, end) {
+    if (!start && !end) {
+        return {
+            status: 'Aktif',
+            statusClass: 'bg-emerald-100 text-emerald-700',
+            rangeHtml: '<i class="bi bi-infinity text-emerald-500"></i> Tanpa Batas Waktu',
+            description: 'Anda dapat melihat seluruh riwayat chat tanpa batasan jam kerja.'
+        };
+    }
+    const now = new Date();
+    const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const active = isTimeInRange(hhmm, start, end);
+    const range = [start || '00:00', end || '23:59'].join(' - ');
+    return {
+        status: active ? 'Aktif' : 'Di luar jam',
+        statusClass: active ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700',
+        rangeHtml: `<i class="bi bi-clock text-emerald-500"></i> ${escHtml(range)}`,
+        description: active
+            ? 'Worker dapat melihat chat sesuai range waktu visibilitas ini.'
+            : 'Saat ini berada di luar range waktu visibilitas worker.'
+    };
+}
+
+function isTimeInRange(current, start, end) {
+    const from = start || '00:00';
+    const to = end || '23:59';
+    if (from <= to) return current >= from && current <= to;
+    return current >= from || current <= to;
 }
 
 function setText(id, text) {
@@ -1516,6 +1872,17 @@ function setupSocketListeners() {
 
     sock.on('disconnect', (reason) => {
         console.log('🔴 Socket disconnected:', reason);
+    });
+
+    sock.on('assignment-updated', (data) => {
+        console.log('📋 Assignment updated event received:', data);
+        const userId = window.userId || (document.body.dataset.userId ? parseInt(document.body.dataset.userId) : null);
+        const userRole = window.userRole || document.body.dataset.userRole;
+        if (userRole === 'worker' && data.workerId !== userId) return;
+        loadConversations(true);
+        if (S.activeSession && S.activeContact) {
+            loadContactDetail(S.activeSession, S.activeContact, { force: true });
+        }
     });
 
     sock.on('message-sent', data => {

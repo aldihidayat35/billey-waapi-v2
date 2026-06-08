@@ -216,44 +216,111 @@
     }
 
     function ContactDetailPanel() {
-        return h('aside', { id: 'contact-detail-panel', className: 'contact-panel hidden w-[386px] shrink-0 overflow-y-auto border-l border-slate-200 bg-white p-5 xl:block' }, [
+        return h('aside', { id: 'contact-detail-panel', className: 'contact-panel hidden w-[386px] shrink-0 overflow-y-auto border-l border-slate-200 bg-slate-50 p-5 xl:block' }, [
             h('div', { key: 'top', className: 'detail-top mb-5 flex items-center justify-between gap-3' }, [
-                h('h2', { key: 'title', className: 'm-0 text-lg font-extrabold tracking-tight text-slate-950' }, 'Detail Kontak'),
-                h('button', { key: 'close', id: 'btn-close-contact-detail', type: 'button', className: 'detail-close-btn hidden h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-600' }, h('i', { className: 'bi bi-x-lg' }))
+                h('div', { key: 'title-group', className: 'flex items-center gap-2' }, [
+                    h('i', { className: 'bi bi-clipboard-check text-emerald-600 text-xl' }),
+                    h('h2', { className: 'm-0 text-lg font-extrabold tracking-tight text-slate-900' }, 'Informasi Penugasan')
+                ]),
+                h('button', { key: 'close', id: 'btn-close-contact-detail', type: 'button', className: 'detail-close-btn hidden h-10 w-10 items-center justify-center rounded-xl bg-white shadow-sm text-slate-600 border border-slate-200' }, h('i', { className: 'bi bi-x-lg' }))
             ]),
-            h('section', { key: 'info', className: 'detail-card' }, [
-                h('div', { key: 'head', className: 'mb-4 flex items-center gap-3' }, [
-                    h('div', { key: 'ava', id: 'detail-avatar', className: 'flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-sm font-extrabold text-white' }, 'WA'),
-                    h('div', { key: 'txt', className: 'min-w-0' }, [
-                        h('div', { key: 'name', id: 'detail-name', className: 'truncate text-base font-extrabold text-slate-950' }, '-'),
-                        h('div', { key: 'phone', id: 'detail-phone', className: 'mt-1 truncate text-sm font-semibold text-slate-500' }, '-')
+
+            // Empty state container
+            h('div', { key: 'empty', id: 'assign-empty-state', className: 'hidden flex-col items-center justify-center py-10 text-center' }, [
+                h('div', { className: 'mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-sm border border-slate-100 text-3xl text-slate-300' }, h('i', { className: 'bi bi-inbox' })),
+                h('p', { className: 'text-sm font-semibold text-slate-500' }, 'Pilih chat untuk melihat penugasan')
+            ]),
+
+            // Content container
+            h('div', { key: 'content', id: 'assign-content-wrap', className: 'space-y-4' }, [
+                
+                // Card 1: Client
+                h('section', { key: 'client', className: 'rounded-2xl bg-white p-4 shadow-sm border border-slate-200' }, [
+                    h('div', { className: 'mb-3 flex items-center gap-2 text-xs font-extrabold text-slate-400 uppercase tracking-wider' }, [
+                        h('i', { className: 'bi bi-person-lines-fill' }), 'Client'
+                    ]),
+                    h('div', { className: 'flex items-center gap-3' }, [
+                        h('div', { id: 'detail-avatar', className: 'flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 font-bold' }, 'WA'),
+                        h('div', { className: 'min-w-0 flex-1' }, [
+                            h('div', { id: 'detail-name', className: 'truncate text-sm font-bold text-slate-900' }, '-'),
+                            h('div', { id: 'detail-phone', className: 'truncate text-xs font-semibold text-slate-500 mt-0.5' }, '-'),
+                        ])
+                    ]),
+                    h('div', { className: 'mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-semibold' }, [
+                        h('span', { className: 'text-slate-500' }, 'Session'),
+                        h('span', { id: 'detail-session-name', className: 'text-slate-800' }, '-')
                     ])
                 ]),
-                h('div', { key: 'rows', className: 'space-y-3 text-sm font-semibold text-slate-700' }, [
-                    h('div', { key: 'r1', className: 'flex items-center gap-3' }, [h('i', { className: 'bi bi-person text-slate-500' }), h('span', { id: 'detail-name-line' }, '-')]),
-                    h('div', { key: 'r2', className: 'flex items-center gap-3' }, [h('i', { className: 'bi bi-telephone text-slate-500' }), h('span', { id: 'detail-phone-line' }, '-')])
+
+                // Card 2: Worker & Priority
+                h('section', { key: 'worker', className: 'rounded-2xl bg-white p-4 shadow-sm border border-slate-200' }, [
+                    h('div', { className: 'mb-3 flex items-center gap-2 text-xs font-extrabold text-slate-400 uppercase tracking-wider' }, [
+                        h('i', { className: 'bi bi-briefcase-fill' }), 'Penugasan'
+                    ]),
+                    h('div', { className: 'space-y-3 text-sm' }, [
+                        h('div', { className: 'flex items-start justify-between gap-2' }, [
+                            h('span', { className: 'font-semibold text-slate-500' }, 'Worker'),
+                            h('div', { id: 'assign-worker-list', className: 'text-right font-bold text-slate-900 flex flex-col items-end gap-1' }, '-')
+                        ]),
+                        h('div', { className: 'flex items-center justify-between gap-2' }, [
+                            h('span', { className: 'font-semibold text-slate-500' }, 'Prioritas'),
+                            h('span', { id: 'assign-priority-badge', className: 'rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600' }, '-')
+                        ])
+                    ])
+                ]),
+
+                // Card 3: Deadline
+                h('section', { key: 'deadline', className: 'rounded-2xl bg-white p-4 shadow-sm border border-slate-200' }, [
+                    h('div', { className: 'mb-3 flex items-center justify-between' }, [
+                        h('div', { className: 'flex items-center gap-2 text-xs font-extrabold text-slate-400 uppercase tracking-wider' }, [
+                            h('i', { className: 'bi bi-clock-history' }), 'Jadwal Pengerjaan'
+                        ]),
+                        h('span', { id: 'assign-status-badge', className: 'rounded-lg bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600' }, '-')
+                    ]),
+                    h('div', { className: 'space-y-2' }, [
+                        h('div', { className: 'flex items-center gap-3 rounded-xl bg-slate-50 p-2.5' }, [
+                            h('div', { className: 'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white shadow-sm text-emerald-600 text-lg' }, h('i', { className: 'bi bi-play-circle-fill' })),
+                            h('div', { className: 'min-w-0 flex-1' }, [
+                                h('div', { className: 'text-[10px] font-bold text-slate-400 uppercase' }, 'Mulai'),
+                                h('div', { id: 'assign-start-time', className: 'text-xs font-bold text-slate-800 mt-0.5' }, '-')
+                            ])
+                        ]),
+                        h('div', { className: 'flex items-center gap-3 rounded-xl bg-slate-50 p-2.5' }, [
+                            h('div', { className: 'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white shadow-sm text-rose-500 text-lg' }, h('i', { className: 'bi bi-stop-circle-fill' })),
+                            h('div', { className: 'min-w-0 flex-1' }, [
+                                h('div', { className: 'text-[10px] font-bold text-slate-400 uppercase' }, 'Deadline'),
+                                h('div', { id: 'assign-end-time', className: 'text-xs font-bold text-slate-800 mt-0.5' }, '-')
+                            ])
+                        ]),
+                        h('div', { id: 'assign-time-left', className: 'mt-2 text-center text-xs font-bold text-slate-500' }, '')
+                    ])
+                ]),
+
+                // Card 4: Visibility
+                h('section', { key: 'visibility', className: 'rounded-2xl bg-white p-4 shadow-sm border border-slate-200' }, [
+                    h('div', { className: 'mb-3 flex items-center justify-between' }, [
+                        h('div', { className: 'flex items-center gap-2 text-xs font-extrabold text-slate-400 uppercase tracking-wider' }, [
+                            h('i', { className: 'bi bi-eye-fill' }), 'Visibilitas Chat'
+                        ]),
+                        h('span', { id: 'assign-vis-status', className: 'rounded-lg bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-600' }, 'Aktif')
+                    ]),
+                    h('div', { className: 'rounded-xl border border-slate-100 bg-slate-50 p-3' }, [
+                        h('div', { id: 'assign-vis-range', className: 'text-sm font-bold text-slate-800 flex items-center gap-2' }, [
+                            h('i', { className: 'bi bi-infinity text-emerald-500' }), 'Tanpa Batas Waktu'
+                        ]),
+                        h('div', { id: 'assign-vis-desc', className: 'mt-1.5 text-xs font-medium leading-relaxed text-slate-500' }, 
+                            'Anda dapat melihat seluruh riwayat chat tanpa batasan jam kerja.'
+                        )
+                    ])
+                ]),
+
+                // Card 5: Notes
+                h('section', { key: 'notes', id: 'assign-notes-card', className: 'rounded-2xl bg-amber-50 p-4 shadow-sm border border-amber-200' }, [
+                    h('div', { className: 'mb-2 flex items-center gap-2 text-xs font-extrabold text-amber-700 uppercase tracking-wider' }, [
+                        h('i', { className: 'bi bi-journal-text' }), 'Catatan Admin'
+                    ]),
+                    h('div', { id: 'assign-notes-text', className: 'text-sm font-semibold leading-relaxed text-amber-900 whitespace-pre-wrap' }, '-')
                 ])
-            ]),
-            h('section', { key: 'media', className: 'detail-card' }, [
-                h('div', { key: 'h', className: 'detail-card-head' }, [
-                    h('h3', { key: 't' }, 'Riwayat Media'),
-                    h('span', { key: 's' }, 'Terbaru')
-                ]),
-                h('div', { key: 'list', id: 'detail-media-list' }, h('div', { className: 'detail-empty' }, 'Pilih chat untuk melihat media.'))
-            ]),
-            h('section', { key: 'note', className: 'detail-card' }, [
-                h('div', { key: 'h', className: 'detail-card-head' }, [
-                    h('h3', { key: 't' }, 'Catatan'),
-                    h('i', { key: 'i', className: 'bi bi-pencil-square text-slate-500' })
-                ]),
-                h('div', { key: 'n', id: 'detail-note', className: 'detail-note' }, 'Pilih chat untuk melihat ringkasan kontak.')
-            ]),
-            h('section', { key: 'activity', className: 'detail-card' }, [
-                h('div', { key: 'h', className: 'detail-card-head' }, [
-                    h('h3', { key: 't' }, 'Aktivitas Sistem'),
-                    h('span', { key: 's' }, 'Live')
-                ]),
-                h('div', { key: 'list', id: 'detail-activity-list' }, h('div', { className: 'detail-empty' }, 'Belum ada aktivitas.'))
             ])
         ]);
     }

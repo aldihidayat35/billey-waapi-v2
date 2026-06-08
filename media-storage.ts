@@ -5,6 +5,9 @@ import { fileURLToPath } from 'url'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
+// Configurable retention days from env, default 30
+export const MEDIA_RETENTION_DAYS = Math.max(1, parseInt(process.env.MEDIA_RETENTION_DAYS || '30', 10) || 30)
+
 // Media storage directory
 const MEDIA_DIR = path.join(__dirname, 'data', 'media')
 
@@ -129,9 +132,10 @@ export function deleteMedia(mediaUrl: string): boolean {
 
 /**
  * Clean up media files older than specified days.
+ * Reads MEDIA_RETENTION_DAYS from env; falls back to provided maxAgeDays, then 30.
  * Returns the number of files deleted.
  */
-export function cleanupOldMedia(maxAgeDays: number = 7): number {
+export function cleanupOldMedia(maxAgeDays: number = MEDIA_RETENTION_DAYS): number {
 	let deleted = 0
 	const cutoff = Date.now() - maxAgeDays * 24 * 60 * 60 * 1000
 
