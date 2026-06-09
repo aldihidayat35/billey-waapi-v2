@@ -65,6 +65,8 @@ const protectStaticFiles = (req: any, res: any, next: any) => {
 	const publicPaths = [
 		'/auth/login',
 		'/auth/login.html',
+		'/guest-session.html',
+		'/guest-session',
 		'/api-docs.html',
 		'/api-docs',
 		'/assets/',
@@ -258,6 +260,240 @@ app.get('/api/auth/me', authMiddleware, (req, res) => {
 			status: req.user!.status
 		}
 	})
+})
+
+function getBaseUrl(req: any): string {
+	const proto = req.headers['x-forwarded-proto'] || req.protocol || 'http'
+	const host = req.headers['x-forwarded-host'] || req.get('host') || `localhost:${PORT}`
+	return `${proto}://${host}`
+}
+
+function getGuestBearerToken(req: any): string {
+	const auth = req.headers.authorization || ''
+	if (auth.toLowerCase().startsWith('bearer ')) return auth.slice(7).trim()
+	return (req.headers['x-guest-token'] as string) || (req.query.token as string) || ''
+}
+
+function createGuestSessionId(): string {
+	return `guest_${generateToken().replace(/[^a-z0-9]/gi, '').toLowerCase().slice(0, 20)}`
+}
+
+function getGuestSessionByToken(token: string): any {
+	if (!token) return null
+	return db.prepare('SELECT * FROM guest_sessions WHERE api_token = ?').get(token) as any
+}
+
+function getGuestSessionById(sessionId: string): any {
+	if (!sessionId) return null
+	return db.prepare('SELECT * FROM guest_sessions WHERE session_id = ?').get(sessionId) as any
+}
+
+function getGuestSessionForRequest(req: any, sessionId?: string): any {
+	const token = getGuestBearerToken(req)
+	const row = getGuestSessionByToken(token)
+	if (!row) return null
+	if (sessionId && row.session_id !== sessionId) return null
+	return row
+}
+
+function updateGuestSessionFromRuntime(sessionId: string, statusHint?: string): any {
+	const row = getGuestSessionById(sessionId)
+	if (!row) return null
+	const runtime = sessionManager.getSession(sessionId)
+	const now = new Date().toISOString()
+	let status = statusHint || row.status || 'creating'
+	if (runtime?.isConnected) status = 'connected'
+	else if (runtime?.qrCode) status = 'qr_ready'
+	else if (row.expired_at && new Date(row.expired_at).getTime() < Date.now() && status !== 'connected') status = 'qr_expired'
+
+	const jid = runtime?.user?.id || row.jid || null
+	const phoneNumber = (runtime?.phoneNumber || jid?.replace(/:.+/, '').replace(/@.+/, '') || row.phone_number || null)
+	const pushName = runtime?.user?.name || row.push_name || null
+	const deviceInfo = runtime?.user ? JSON.stringify(runtime.user) : row.device_info
+	const connectedAt = status === 'connected' ? (row.connected_at || now) : row.connected_at
+
+	db.prepare(`
+		UPDATE guest_sessions
+		SET status = ?, phone_number = ?, jid = ?, push_name = ?, device_info = ?, connected_at = ?, last_seen = ?
+		WHERE session_id = ?
+	`).run(status, phoneNumber, jid, pushName, deviceInfo, connectedAt, now, sessionId)
+
+	return getGuestSessionById(sessionId)
+}
+
+function buildGuestIntegrationPayload(req: any, row: any): any {
+	const runtime = sessionManager.getSession(row.session_id)
+	const refreshed = updateGuestSessionFromRuntime(row.session_id) || row
+	const baseUrl = getBaseUrl(req)
+	const apiBaseUrl = `${baseUrl}/api`
+	const endpointPath = '/api/send-message'
+	const payload = {
+		session_id: refreshed.session_id,
+		to: refreshed.phone_number || '628xxxxxxxxxx',
+		message: 'Halo dari aplikasi lain'
+	}
+	const curl = `curl -X POST "${baseUrl}${endpointPath}" \\
+  -H "Authorization: Bearer ${refreshed.api_token}" \\
+  -H "Content-Type: application/json" \\
+  -d '${JSON.stringify(payload, null, 2)}'`
+
+	return {
+		sessionId: refreshed.session_id,
+		sessionName: refreshed.session_name,
+		phoneNumber: refreshed.phone_number,
+		jid: refreshed.jid || runtime?.user?.id || null,
+		pushName: refreshed.push_name || runtime?.user?.name || null,
+		status: refreshed.status,
+		apiBaseUrl,
+		apiToken: refreshed.api_token,
+		sendMessageEndpoint: `POST ${endpointPath}`,
+		examplePayload: payload,
+		exampleCurl: curl,
+		createdAt: refreshed.created_at,
+		connectedAt: refreshed.connected_at,
+		lastSeen: refreshed.last_seen,
+		expiredAt: refreshed.expired_at,
+		deviceInfo: refreshed.device_info ? safeJsonParse(refreshed.device_info) : (runtime?.user || null)
+	}
+}
+
+function safeJsonParse(value: string): any {
+	try { return JSON.parse(value) } catch { return value }
+}
+
+app.get('/guest-session', (_req, res) => {
+	res.sendFile(path.join(publicDir, 'guest-session.html'))
+})
+
+// Public guest WhatsApp session creation. No app-login required.
+app.post('/api/guest-session/create', async (req, res) => {
+	try {
+		const activeGuestCount = (db.prepare(`
+			SELECT COUNT(*) as total FROM guest_sessions
+			WHERE is_guest = 1 AND status IN ('creating', 'qr_ready', 'connecting', 'connected')
+		`).get() as any)?.total || 0
+		const maxGuestSessions = Math.max(1, parseInt(process.env.MAX_GUEST_SESSIONS || '50', 10) || 50)
+		if (activeGuestCount >= maxGuestSessions) {
+			return res.status(429).json({ success: false, error: 'Batas maksimal guest session aktif sudah tercapai.' })
+		}
+
+		let sessionId = createGuestSessionId()
+		while (getGuestSessionById(sessionId)) sessionId = createGuestSessionId()
+		const apiToken = generateToken()
+		const sessionName = `Guest Session ${sessionId.slice(-6).toUpperCase()}`
+		const now = new Date()
+		const expiredAt = new Date(now.getTime() + 10 * 60 * 1000).toISOString()
+
+		db.prepare(`
+			INSERT INTO guest_sessions (session_id, session_name, api_token, status, created_at, last_seen, expired_at)
+			VALUES (?, ?, ?, 'creating', ?, ?, ?)
+		`).run(sessionId, sessionName, apiToken, now.toISOString(), now.toISOString(), expiredAt)
+
+		sessionManager.createSession(sessionId)
+		await sessionManager.startSession(sessionId, 'qr')
+		db.prepare('UPDATE guest_sessions SET status = ? WHERE session_id = ?').run('connecting', sessionId)
+
+		res.json({
+			success: true,
+			sessionId,
+			apiToken,
+			status: 'connecting',
+			info: buildGuestIntegrationPayload(req, getGuestSessionById(sessionId))
+		})
+	} catch (error: any) {
+		console.error('[guest-session/create]', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+app.post('/api/guest-session/:sessionId/refresh-qr', async (req, res) => {
+	try {
+		const row = getGuestSessionForRequest(req, req.params.sessionId)
+		if (!row) return res.status(401).json({ success: false, error: 'Token guest tidak valid.' })
+		const expiredAt = new Date(Date.now() + 10 * 60 * 1000).toISOString()
+		db.prepare('UPDATE guest_sessions SET status = ?, expired_at = ?, last_seen = CURRENT_TIMESTAMP WHERE session_id = ?')
+			.run('connecting', expiredAt, row.session_id)
+		sessionManager.createSession(row.session_id)
+		await sessionManager.startSession(row.session_id, 'qr')
+		res.json({ success: true, status: 'connecting', expiredAt })
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+app.get('/api/guest-session/:sessionId/status', (req, res) => {
+	const row = getGuestSessionForRequest(req, req.params.sessionId)
+	if (!row) return res.status(401).json({ success: false, error: 'Token guest tidak valid.' })
+	const refreshed = updateGuestSessionFromRuntime(row.session_id) || row
+	const runtime = sessionManager.getSession(row.session_id)
+	res.json({
+		success: true,
+		status: refreshed.status,
+		sessionId: refreshed.session_id,
+		qr: refreshed.status === 'qr_ready' ? runtime?.qrCode || null : null,
+		info: buildGuestIntegrationPayload(req, refreshed)
+	})
+})
+
+app.get('/api/guest-session/:sessionId/qr', (req, res) => {
+	const row = getGuestSessionForRequest(req, req.params.sessionId)
+	if (!row) return res.status(401).json({ success: false, error: 'Token guest tidak valid.' })
+	const refreshed = updateGuestSessionFromRuntime(row.session_id) || row
+	const runtime = sessionManager.getSession(row.session_id)
+	res.json({ success: true, status: refreshed.status, qr: runtime?.qrCode || null })
+})
+
+app.get('/api/guest-session/:sessionId/info', (req, res) => {
+	const row = getGuestSessionForRequest(req, req.params.sessionId)
+	if (!row) return res.status(401).json({ success: false, error: 'Token guest tidak valid.' })
+	res.json({ success: true, info: buildGuestIntegrationPayload(req, row) })
+})
+
+app.delete('/api/guest-session/:sessionId', async (req, res) => {
+	try {
+		const row = getGuestSessionForRequest(req, req.params.sessionId)
+		if (!row) return res.status(401).json({ success: false, error: 'Token guest tidak valid.' })
+		await sessionManager.deleteSession(row.session_id)
+		db.prepare('UPDATE guest_sessions SET status = ?, last_seen = CURRENT_TIMESTAMP WHERE session_id = ?').run('deleted', row.session_id)
+		res.json({ success: true, message: 'Guest session dihapus.' })
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+app.post('/api/send-message', async (req, res) => {
+	try {
+		const row = getGuestSessionByToken(getGuestBearerToken(req))
+		if (!row) return res.status(401).json({ success: false, error: 'Bearer token guest tidak valid.' })
+		const { session_id, to, message } = req.body
+		if (!to || !message) return res.status(400).json({ success: false, error: 'Field "to" dan "message" wajib diisi.' })
+		if (session_id && session_id !== row.session_id) return res.status(403).json({ success: false, error: 'Token tidak memiliki akses ke session ini.' })
+		const info = updateGuestSessionFromRuntime(row.session_id) || row
+		if (info.status !== 'connected') return res.status(409).json({ success: false, error: 'Session belum connected.' })
+
+		const result = await sessionManager.sendMessage(row.session_id, to, message)
+		const jid = to.includes('@') ? to : `${String(to).replace(/[^0-9]/g, '')}@s.whatsapp.net`
+		try {
+			messageLogDb.insert({
+				message_id: result?.key?.id || `guest_${Date.now()}`,
+				session_id: row.session_id,
+				direction: 'outgoing',
+				from_number: row.session_id,
+				to_number: jid,
+				remote_jid: jid,
+				message_type: 'text',
+				content: message,
+				timestamp: new Date().toISOString(),
+				status: 'sent',
+				source: 'guest_api'
+			})
+		} catch (dbError) {
+			console.error('[guest-send-message/log]', dbError)
+		}
+		res.json({ success: true, message: 'Pesan berhasil dikirim.', data: { session_id: row.session_id, to, msg_id: result?.key?.id } })
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
 })
 
 // API: Change own password
@@ -2323,6 +2559,30 @@ io.on('connection', (socket) => {
 	socket.on('get-sessions', () => {
 		const sessions = sessionManager.getAllSessions()
 		socket.emit('all-sessions', sessions)
+	})
+
+	socket.on('guest-watch', (data: { sessionId?: string, token?: string }) => {
+		try {
+			if (!data?.sessionId || !data?.token) {
+				return socket.emit('guest-session.error', { error: 'Session ID dan token diperlukan.' })
+			}
+			const row = getGuestSessionByToken(data.token)
+			if (!row || row.session_id !== data.sessionId) {
+				return socket.emit('guest-session.error', { error: 'Token guest tidak valid.' })
+			}
+			socket.join(`guest:${row.session_id}`)
+			const runtime = sessionManager.getSession(row.session_id)
+			socket.emit('guest-session.status', {
+				sessionId: row.session_id,
+				status: runtime?.isConnected ? 'connected' : runtime?.qrCode ? 'qr_ready' : row.status,
+				isConnected: !!runtime?.isConnected
+			})
+			if (runtime?.qrCode) {
+				socket.emit('guest-session.qr', { sessionId: row.session_id, qr: runtime.qrCode, status: 'qr_ready' })
+			}
+		} catch (error: any) {
+			socket.emit('guest-session.error', { error: error.message })
+		}
 	})
 
 	// Create new session

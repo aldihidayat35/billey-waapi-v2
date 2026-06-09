@@ -239,6 +239,27 @@ db.exec(`
 
     CREATE INDEX IF NOT EXISTS idx_member_sessions_user ON member_sessions(user_id);
     CREATE INDEX IF NOT EXISTS idx_member_sessions_session ON member_sessions(session_id);
+
+    -- Guest WhatsApp Sessions Table (public QR connection without app login)
+    CREATE TABLE IF NOT EXISTS guest_sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id TEXT NOT NULL UNIQUE,
+        session_name TEXT NOT NULL,
+        api_token TEXT NOT NULL UNIQUE,
+        phone_number TEXT,
+        jid TEXT,
+        push_name TEXT,
+        status TEXT NOT NULL DEFAULT 'creating',
+        device_info TEXT,
+        is_guest INTEGER DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        connected_at DATETIME,
+        last_seen DATETIME,
+        expired_at DATETIME
+    );
+    CREATE INDEX IF NOT EXISTS idx_guest_sessions_session_id ON guest_sessions(session_id);
+    CREATE INDEX IF NOT EXISTS idx_guest_sessions_api_token ON guest_sessions(api_token);
+    CREATE INDEX IF NOT EXISTS idx_guest_sessions_status ON guest_sessions(status);
 `)
 
 // ── Migration: Create contacts table (nomor yang pernah chat) ─────────────

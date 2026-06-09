@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#059669">
+    <title>Hubungkan WhatsApp Tanpa Login</title>
+    <link rel="manifest" href="/manifest.json">
+    <link rel="shortcut icon" href="/assets/media/logos/favicon.ico">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    <style>
+        * { box-sizing: border-box; }
+        :root {
+            --green: #10b981;
+            --green-dark: #047857;
+            --ink: #0f172a;
+            --muted: #64748b;
+            --line: #dbe5e2;
+            --soft: #f4fbf8;
+            --card: rgba(255,255,255,.92);
+            --shadow: 0 24px 80px rgba(15, 23, 42, .12);
+        }
+        body {
+            margin: 0;
+            min-height: 100dvh;
+            font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at 18% 18%, rgba(16,185,129,.16), transparent 28%),
+                radial-gradient(circle at 82% 6%, rgba(20,184,166,.13), transparent 24%),
+                linear-gradient(135deg, #f7fffb 0%, #eef7f4 48%, #f8fafc 100%);
+        }
+        .shell { width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 24px 0 36px; }
+        .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
+        .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+        .brand-mark { width: 46px; height: 46px; display: grid; place-items: center; border-radius: 16px; color: #fff; background: linear-gradient(135deg, var(--green), var(--green-dark)); box-shadow: 0 12px 28px rgba(16,185,129,.28); font-size: 23px; }
+        .brand h1 { margin: 0; font-size: clamp(19px, 2.4vw, 28px); letter-spacing: -.03em; }
+        .brand p { margin: 2px 0 0; color: var(--muted); font-size: 13px; font-weight: 700; }
+        .back-link { display: inline-flex; align-items: center; gap: 8px; min-height: 42px; padding: 0 14px; border: 1px solid var(--line); border-radius: 14px; background: #fff; color: #334155; text-decoration: none; font-size: 13px; font-weight: 800; box-shadow: 0 8px 24px rgba(15,23,42,.06); }
+        .hero {
+            display: grid;
+            grid-template-columns: minmax(0, .92fr) minmax(420px, 1.08fr);
+            gap: 18px;
+            align-items: start;
+        }
+        .panel { background: var(--card); border: 1px solid rgba(219,229,226,.92); border-radius: 24px; box-shadow: var(--shadow); backdrop-filter: blur(18px); overflow: hidden; }
+        .panel-head { padding: 22px 24px 0; }
+        .panel-head h2 { margin: 0; font-size: 18px; letter-spacing: -.02em; }
+        .panel-head p { margin: 7px 0 0; color: var(--muted); font-size: 13px; line-height: 1.55; font-weight: 650; }
+        .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 18px 24px 6px; }
+        .step { min-width: 0; border: 1px solid #e2e8f0; border-radius: 15px; background: #fff; padding: 11px 10px; color: #94a3b8; font-size: 11px; font-weight: 850; }
+        .step b { display: block; width: 24px; height: 24px; margin-bottom: 7px; border-radius: 9px; background: #f1f5f9; color: #64748b; display: grid; place-items: center; font-size: 12px; }
+        .step.active { border-color: #86efac; background: #ecfdf5; color: #047857; }
+        .step.active b { background: var(--green); color: #fff; }
+        .qr-zone { padding: 18px 24px 24px; }
+        .status-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+        .badge { display: inline-flex; align-items: center; gap: 8px; min-height: 34px; padding: 0 12px; border-radius: 999px; background: #f1f5f9; color: #475569; font-size: 12px; font-weight: 900; }
+        .badge::before { content: ''; width: 9px; height: 9px; border-radius: 999px; background: currentColor; box-shadow: 0 0 0 5px rgba(100,116,139,.12); }
+        .badge.qr_ready, .badge.connecting { background: #ecfdf5; color: #059669; }
+        .badge.connected { background: #dcfce7; color: #15803d; }
+        .badge.failed, .badge.qr_expired, .badge.disconnected { background: #fff1f2; color: #e11d48; }
+        .small-id { min-width: 0; color: #94a3b8; font-size: 11px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .qr-card { min-height: 360px; display: grid; place-items: center; border: 1px dashed #b7d9ce; border-radius: 22px; background: linear-gradient(180deg, #ffffff, #f7fffb); position: relative; }
+        #qr-canvas-wrap canvas, #qr-canvas-wrap img { width: min(300px, 74vw) !important; height: min(300px, 74vw) !important; border-radius: 16px; box-shadow: 0 20px 55px rgba(15,23,42,.12); }
+        .qr-empty { text-align: center; max-width: 270px; color: var(--muted); font-size: 13px; line-height: 1.6; font-weight: 700; }
+        .qr-empty i { display: block; margin-bottom: 12px; color: var(--green); font-size: 44px; }
+        .qr-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+        button, .button { border: 0; cursor: pointer; min-height: 43px; padding: 0 14px; border-radius: 14px; font-family: inherit; font-weight: 850; font-size: 13px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; }
+        .btn-primary { background: var(--green); color: #fff; box-shadow: 0 12px 28px rgba(16,185,129,.22); }
+        .btn-soft { background: #f1f5f9; color: #334155; border: 1px solid #e2e8f0; }
+        .btn-danger { background: #fff1f2; color: #be123c; border: 1px solid #ffe4e6; }
+        .security { display: flex; gap: 10px; margin-top: 16px; padding: 13px; border: 1px solid #c7f9df; border-radius: 16px; background: #f0fdf4; color: #047857; font-size: 12px; line-height: 1.55; font-weight: 700; }
+        .info-panel { padding: 22px 24px 24px; }
+        .data-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
+        .data-item { min-width: 0; border: 1px solid #e2e8f0; border-radius: 16px; background: #fff; padding: 13px; }
+        .data-item.full { grid-column: 1 / -1; }
+        .data-label { display: flex; justify-content: space-between; gap: 10px; color: #64748b; font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: .06em; }
+        .copy-btn { min-height: 26px; padding: 0 8px; border-radius: 9px; background: #ecfdf5; color: #047857; font-size: 11px; }
+        .data-value { margin-top: 8px; overflow: auto; color: #0f172a; font-size: 13px; font-weight: 750; line-height: 1.5; white-space: nowrap; }
+        pre.data-value { max-height: 230px; white-space: pre; padding: 12px; border-radius: 12px; background: #0f172a; color: #e2f5ef; font-size: 12px; font-weight: 650; }
+        .empty-info { min-height: 240px; display: grid; place-items: center; text-align: center; color: var(--muted); font-size: 14px; line-height: 1.6; font-weight: 700; }
+        .empty-info i { display: block; margin-bottom: 12px; font-size: 42px; color: #cbd5e1; }
+        .toast { position: fixed; right: 18px; bottom: 18px; z-index: 20; min-width: 220px; padding: 12px 14px; border-radius: 14px; background: #0f172a; color: #fff; font-size: 13px; font-weight: 800; box-shadow: 0 18px 50px rgba(15,23,42,.24); opacity: 0; transform: translateY(12px); transition: .18s ease; }
+        .toast.show { opacity: 1; transform: translateY(0); }
+        @media (max-width: 920px) {
+            .hero { grid-template-columns: 1fr; }
+            .steps { grid-template-columns: repeat(2, 1fr); }
+            .data-grid { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 520px) {
+            .shell { width: min(100% - 20px, 1180px); padding-top: 14px; }
+            .topbar { align-items: flex-start; }
+            .back-link span { display: none; }
+            .panel-head, .qr-zone, .info-panel { padding-left: 16px; padding-right: 16px; }
+            .steps { padding-left: 16px; padding-right: 16px; gap: 6px; }
+            .step { padding: 9px; }
+            .qr-card { min-height: 320px; }
+        }
+    </style>
+</head>
+<body>
+    <main class="shell">
+        <header class="topbar">
+            <div class="brand">
+                <div class="brand-mark"><i class="bi bi-whatsapp"></i></div>
+                <div>
+                    <h1>Hubungkan WhatsApp</h1>
+                    <p>Session QR tanpa akun aplikasi</p>
+                </div>
+            </div>
+            <a class="back-link" href="/auth/login"><i class="bi bi-arrow-left"></i><span>Kembali ke login</span></a>
+        </header>
+
+        <section class="hero">
+            <div class="panel">
+                <div class="panel-head">
+                    <h2>Koneksi Session</h2>
+                    <p>Halaman ini membuat session guest otomatis. Scan QR dari WhatsApp, lalu gunakan token integrasi yang muncul setelah session terhubung.</p>
+                </div>
+                <div class="steps" id="steps">
+                    <div class="step active" data-step="creating"><b>1</b>Buat session</div>
+                    <div class="step" data-step="qr"><b>2</b>Scan QR</div>
+                    <div class="step" data-step="connected"><b>3</b>Terhubung</div>
+                    <div class="step" data-step="integrate"><b>4</b>Integrasi</div>
+                </div>
+                <div class="qr-zone">
+                    <div class="status-row">
+                        <span class="badge creating" id="status-badge">Creating</span>
+                        <span class="small-id" id="session-id-label">Menyiapkan session...</span>
+                    </div>
+                    <div class="qr-card">
+                        <div id="qr-canvas-wrap">
+                            <div class="qr-empty"><i class="bi bi-hourglass-split"></i>Session sedang dibuat. QR akan tampil otomatis beberapa detik lagi.</div>
+                        </div>
+                    </div>
+                    <div class="qr-actions">
+                        <button class="btn-primary" id="btn-new"><i class="bi bi-plus-circle"></i>Session Baru</button>
+                        <button class="btn-soft" id="btn-refresh"><i class="bi bi-arrow-clockwise"></i>Refresh QR</button>
+                        <button class="btn-danger" id="btn-delete"><i class="bi bi-trash3"></i>Hapus Session</button>
+                    </div>
+                    <div class="security"><i class="bi bi-shield-lock-fill"></i><span>Token API hanya diberikan untuk session ini. File auth WhatsApp dan credential internal Baileys tidak pernah ditampilkan di browser.</span></div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-head">
+                    <h2>Data Integrasi</h2>
+                    <p>Setelah connected, gunakan data berikut dari aplikasi lain. Session harus tetap berstatus connected agar endpoint dapat mengirim pesan.</p>
+                </div>
+                <div class="info-panel" id="info-panel">
+                    <div class="empty-info"><div><i class="bi bi-qr-code-scan"></i>Scan QR terlebih dahulu untuk melihat token, endpoint, payload, dan contoh curl.</div></div>
+                </div>
+            </div>
+        </section>
+    </main>
+    <div class="toast" id="toast">Disalin</div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <script>
+        const state = {
+            sessionId: localStorage.getItem('guest_session_id') || '',
+            token: localStorage.getItem('guest_api_token') || '',
+            qr: '',
+            info: null,
+            poller: null,
+            socket: null
+        };
+
+        const els = {
+            status: document.getElementById('status-badge'),
+            session: document.getElementById('session-id-label'),
+            qr: document.getElementById('qr-canvas-wrap'),
+            info: document.getElementById('info-panel'),
+            toast: document.getElementById('toast')
+        };
+
+        function authHeaders() {
+            return state.token ? { 'Authorization': 'Bearer ' + state.token, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' };
+        }
+
+        function statusLabel(status) {
+            return ({
+                creating: 'Membuat Session',
+                connecting: 'Menghubungkan',
+                qr_ready: 'QR Siap Discan',
+                qr_expired: 'QR Expired',
+                connected: 'Connected',
+                disconnected: 'Disconnected',
+                failed: 'Gagal',
+                deleted: 'Dihapus'
+            })[status] || status || 'Menunggu';
+        }
+
+        function setStatus(status) {
+            els.status.className = 'badge ' + (status || 'creating');
+            els.status.textContent = statusLabel(status);
+            document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+            if (status === 'connected') {
+                document.querySelector('[data-step="connected"]').classList.add('active');
+                document.querySelector('[data-step="integrate"]').classList.add('active');
+            } else if (status === 'qr_ready' || status === 'qr_expired') {
+                document.querySelector('[data-step="qr"]').classList.add('active');
+            } else {
+                document.querySelector('[data-step="creating"]').classList.add('active');
+            }
+        }
+
+        function showToast(text) {
+            els.toast.textContent = text;
+            els.toast.classList.add('show');
+            setTimeout(() => els.toast.classList.remove('show'), 1400);
+        }
+
+        async function copyText(text, label = 'Data disalin') {
+            await navigator.clipboard.writeText(text || '');
+            showToast(label);
+        }
+
+        async function renderQr(qr) {
+            if (!qr) {
+                els.qr.innerHTML = '<div class="qr-empty"><i class="bi bi-wifi"></i>Menunggu QR dari server...</div>';
+                return;
+            }
+            if (state.qr === qr && els.qr.querySelector('canvas')) return;
+            state.qr = qr;
+            els.qr.innerHTML = '';
+            if (window.QRCode?.toCanvas) {
+                const canvas = document.createElement('canvas');
+                await QRCode.toCanvas(canvas, qr, { width: 300, margin: 2, color: { dark: '#0f172a', light: '#ffffff' } });
+                els.qr.appendChild(canvas);
+            } else {
+                const img = document.createElement('img');
+                img.alt = 'QR WhatsApp';
+                img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + encodeURIComponent(qr);
+                els.qr.appendChild(img);
+            }
+        }
+
+        function renderConnected() {
+            els.qr.innerHTML = '<div class="qr-empty"><i class="bi bi-check-circle-fill"></i>Session WhatsApp sudah terhubung. Data integrasi tersedia di panel kanan.</div>';
+        }
+
+        function renderInfo(info) {
+            state.info = info;
+            if (!info || info.status !== 'connected') return;
+            const config = JSON.stringify(info, null, 2);
+            const payload = JSON.stringify(info.examplePayload, null, 2);
+            els.info.innerHTML = `
+                <div class="data-grid">
+                    ${dataItem('Session ID', info.sessionId, 'Salin Session ID')}
+                    ${dataItem('Status', info.status || '-')}
+                    ${dataItem('Nomor WhatsApp', info.phoneNumber || '-')}
+                    ${dataItem('Push Name', info.pushName || '-')}
+                    ${dataItem('JID WhatsApp', info.jid || '-', 'Salin JID')}
+                    ${dataItem('API Base URL', info.apiBaseUrl, 'Salin Base URL')}
+                    ${dataItem('Access Token', info.apiToken, 'Salin Token', true)}
+                    ${dataItem('Endpoint Kirim Pesan', info.sendMessageEndpoint, 'Salin Endpoint')}
+                    ${preItem('Payload JSON', payload, 'Salin Payload')}
+                    ${preItem('Contoh Curl', info.exampleCurl, 'Salin Curl')}
+                    ${dataItem('Dibuat', formatDate(info.createdAt))}
+                    ${dataItem('Terakhir Connected', formatDate(info.connectedAt))}
+                </div>
+                <div class="qr-actions">
+                    <button class="btn-primary" data-download-config><i class="bi bi-download"></i>Download konfigurasi JSON</button>
+                    <button class="btn-soft" data-copy-all><i class="bi bi-copy"></i>Salin semua konfigurasi</button>
+                </div>
+            `;
+            els.info.querySelectorAll('[data-copy]').forEach(btn => {
+                btn.addEventListener('click', () => copyText(btn.dataset.copy, btn.dataset.label || 'Disalin'));
+            });
+            els.info.querySelector('[data-copy-all]')?.addEventListener('click', () => copyText(config, 'Konfigurasi disalin'));
+            els.info.querySelector('[data-download-config]')?.addEventListener('click', () => downloadConfig(config));
+        }
+
+        function dataItem(label, value, copyLabel, secret) {
+            const shown = secret && value ? value.slice(0, 14) + '...' + value.slice(-8) : (value || '-');
+            const copy = copyLabel ? `<button class="copy-btn" data-label="${copyLabel}" data-copy="${escapeAttr(value || '')}"><i class="bi bi-copy"></i></button>` : '';
+            return `<div class="data-item"><div class="data-label"><span>${label}</span>${copy}</div><div class="data-value">${escapeHtml(shown)}</div></div>`;
+        }
+
+        function preItem(label, value, copyLabel) {
+            return `<div class="data-item full"><div class="data-label"><span>${label}</span><button class="copy-btn" data-label="${copyLabel}" data-copy="${escapeAttr(value)}"><i class="bi bi-copy"></i></button></div><pre class="data-value">${escapeHtml(value)}</pre></div>`;
+        }
+
+        function formatDate(value) {
+            if (!value) return '-';
+            try { return new Date(value).toLocaleString('id-ID'); } catch { return value; }
+        }
+
+        function escapeHtml(value) {
+            return String(value || '').replace(/[&<>"']/g, s => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[s]));
+        }
+
+        function escapeAttr(value) {
+            return escapeHtml(value).replace(/`/g, '&#96;');
+        }
+
+        function downloadConfig(config) {
+            const blob = new Blob([config], { type: 'application/json' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = (state.sessionId || 'guest-session') + '-config.json';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(a.href);
+        }
+
+        async function createSession(forceNew = false) {
+            if (forceNew) {
+                localStorage.removeItem('guest_session_id');
+                localStorage.removeItem('guest_api_token');
+                state.sessionId = '';
+                state.token = '';
+            }
+            setStatus('creating');
+            els.session.textContent = 'Menyiapkan session...';
+            els.qr.innerHTML = '<div class="qr-empty"><i class="bi bi-hourglass-split"></i>Membuat session dan meminta QR WhatsApp...</div>';
+            const r = await fetch('/api/guest-session/create', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+            const d = await r.json();
+            if (!d.success) throw new Error(d.error || 'Gagal membuat session');
+            state.sessionId = d.sessionId;
+            state.token = d.apiToken;
+            localStorage.setItem('guest_session_id', state.sessionId);
+            localStorage.setItem('guest_api_token', state.token);
+            if (state.socket?.connected) state.socket.emit('guest-watch', { sessionId: state.sessionId, token: state.token });
+            els.session.textContent = state.sessionId;
+            if (d.info) renderInfo(d.info);
+            startPolling();
+        }
+
+        async function fetchStatus() {
+            if (!state.sessionId || !state.token) return;
+            const r = await fetch(`/api/guest-session/${encodeURIComponent(state.sessionId)}/status`, { headers: authHeaders() });
+            const d = await r.json();
+            if (!d.success) throw new Error(d.error || 'Gagal membaca status');
+            setStatus(d.status);
+            els.session.textContent = d.sessionId || state.sessionId;
+            if (d.qr) await renderQr(d.qr);
+            else if (d.status === 'connected') renderConnected();
+            else if (d.status === 'qr_expired') els.qr.innerHTML = '<div class="qr-empty"><i class="bi bi-exclamation-triangle"></i>QR expired. Klik Refresh QR untuk membuat QR baru.</div>';
+            if (d.info) renderInfo(d.info);
+        }
+
+        function startPolling() {
+            clearInterval(state.poller);
+            fetchStatus().catch(err => showToast(err.message));
+            state.poller = setInterval(() => fetchStatus().catch(() => {}), 2500);
+        }
+
+        async function refreshQr() {
+            if (!state.sessionId || !state.token) return createSession(true);
+            setStatus('connecting');
+            els.qr.innerHTML = '<div class="qr-empty"><i class="bi bi-arrow-clockwise"></i>Meminta QR baru...</div>';
+            const r = await fetch(`/api/guest-session/${encodeURIComponent(state.sessionId)}/refresh-qr`, { method: 'POST', headers: authHeaders() });
+            const d = await r.json();
+            if (!d.success) throw new Error(d.error || 'Gagal refresh QR');
+            startPolling();
+        }
+
+        async function deleteSession() {
+            if (!state.sessionId || !state.token) return;
+            await fetch(`/api/guest-session/${encodeURIComponent(state.sessionId)}`, { method: 'DELETE', headers: authHeaders() });
+            localStorage.removeItem('guest_session_id');
+            localStorage.removeItem('guest_api_token');
+            clearInterval(state.poller);
+            state.sessionId = '';
+            state.token = '';
+            setStatus('deleted');
+            els.session.textContent = 'Session dihapus';
+            els.qr.innerHTML = '<div class="qr-empty"><i class="bi bi-trash3"></i>Session guest sudah dihapus. Klik Session Baru untuk membuat koneksi lain.</div>';
+            els.info.innerHTML = '<div class="empty-info"><div><i class="bi bi-qr-code-scan"></i>Belum ada data integrasi.</div></div>';
+        }
+
+        function setupSocket() {
+            state.socket = io();
+            state.socket.on('connect', () => {
+                if (state.sessionId && state.token) state.socket.emit('guest-watch', { sessionId: state.sessionId, token: state.token });
+            });
+            state.socket.on('guest-session.qr', async data => {
+                if (data.sessionId === state.sessionId) {
+                    setStatus('qr_ready');
+                    await renderQr(data.qr);
+                }
+            });
+            state.socket.on('guest-session.status', data => {
+                if (data.sessionId === state.sessionId) {
+                    setStatus(data.status || (data.isConnected ? 'connected' : 'disconnected'));
+                    fetchStatus().catch(() => {});
+                }
+            });
+            state.socket.on('guest-session.error', data => showToast(data.error || 'Realtime guest gagal'));
+            state.socket.on('qr', async data => {
+                if (data.sessionId === state.sessionId) {
+                    setStatus('qr_ready');
+                    await renderQr(data.qr);
+                }
+            });
+            state.socket.on('session-status', data => {
+                if (data.sessionId === state.sessionId) {
+                    setStatus(data.status || (data.isConnected ? 'connected' : 'disconnected'));
+                    fetchStatus().catch(() => {});
+                }
+            });
+        }
+
+        document.getElementById('btn-new').addEventListener('click', () => createSession(true).catch(err => showToast(err.message)));
+        document.getElementById('btn-refresh').addEventListener('click', () => refreshQr().catch(err => showToast(err.message)));
+        document.getElementById('btn-delete').addEventListener('click', () => deleteSession().catch(err => showToast(err.message)));
+
+        setupSocket();
+        if (state.sessionId && state.token) {
+            els.session.textContent = state.sessionId;
+            startPolling();
+        } else {
+            createSession().catch(err => {
+                setStatus('failed');
+                els.qr.innerHTML = `<div class="qr-empty"><i class="bi bi-x-circle"></i>${escapeHtml(err.message)}</div>`;
+            });
+        }
+    </script>
+</body>
+</html>

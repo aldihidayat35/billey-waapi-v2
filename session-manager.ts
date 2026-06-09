@@ -519,6 +519,7 @@ export class SessionManager {
 				session.qrCode = qr
 				console.log(`📱 QR Code generated for session ${sessionId}, length: ${qr.length}`)
 				this.socketIO.emit('qr', { sessionId, qr })
+				this.socketIO.to(`guest:${sessionId}`).emit('guest-session.qr', { sessionId, qr, status: 'qr_ready' })
 				console.log(`📤 QR event emitted for ${sessionId}`)
 			}
 
@@ -536,6 +537,11 @@ export class SessionManager {
 						sessionId,
 						status: 'reconnecting'
 					})
+					this.socketIO.to(`guest:${sessionId}`).emit('guest-session.status', {
+						sessionId,
+						status: 'reconnecting',
+						isConnected: false
+					})
 					setTimeout(() => this.startSession(sessionId, type, phoneNumber), 3000)
 				} else {
 					console.log(`Session ${sessionId} logged out`)
@@ -550,6 +556,11 @@ export class SessionManager {
 					})
 					
 					this.socketIO.emit('session-status', {
+						sessionId,
+						status: 'disconnected',
+						isConnected: false
+					})
+					this.socketIO.to(`guest:${sessionId}`).emit('guest-session.status', {
 						sessionId,
 						status: 'disconnected',
 						isConnected: false
@@ -579,6 +590,12 @@ export class SessionManager {
 				})
 				
 				this.socketIO.emit('session-status', {
+					sessionId,
+					status: 'connected',
+					isConnected: true,
+					user: sock.user
+				})
+				this.socketIO.to(`guest:${sessionId}`).emit('guest-session.status', {
 					sessionId,
 					status: 'connected',
 					isConnected: true,
@@ -1800,6 +1817,11 @@ export class SessionManager {
 			session.qrCode = null
 			session.user = null
 			this.socketIO.emit('session-status', {
+				sessionId,
+				status: 'disconnected',
+				isConnected: false
+			})
+			this.socketIO.to(`guest:${sessionId}`).emit('guest-session.status', {
 				sessionId,
 				status: 'disconnected',
 				isConnected: false

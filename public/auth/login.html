@@ -98,6 +98,20 @@
         .btn-login:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 22px var(--green-glow); }
         .btn-login:active:not(:disabled) { transform: translateY(0); }
         .btn-login:disabled { opacity: .65; cursor: not-allowed; }
+        .login-divider {
+            display: flex; align-items: center; gap: 12px; margin: 18px 0 14px;
+            color: #94a3b8; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em;
+        }
+        .login-divider::before, .login-divider::after { content: ''; flex: 1; height: 1px; background: #e2e8f0; }
+        .btn-guest {
+            width: 100%; min-height: 50px; border: 1.5px solid #bbf7d0; border-radius: var(--radius);
+            background: linear-gradient(180deg, #f0fdf4, #ffffff); color: #047857;
+            font-size: 14.5px; font-weight: 750; font-family: inherit; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 9px;
+            text-decoration: none; transition: transform .18s, box-shadow .18s, border-color .18s;
+        }
+        .btn-guest:hover { transform: translateY(-2px); border-color: #34d399; box-shadow: 0 10px 24px rgba(16,185,129,.13); }
+        .btn-guest i { font-size: 17px; }
         .spinner {
             width: 18px; height: 18px; border: 2.5px solid rgba(255, 255, 255, .4); border-top-color: #fff;
             border-radius: 50%; animation: spin .7s linear infinite;
@@ -160,6 +174,11 @@
         </div>
         <button type="submit" class="btn-login" id="btn-login"><span id="btn-text">Masuk</span></button>
     </form>
+    <div class="login-divider">atau</div>
+    <a class="btn-guest" href="/guest-session.html">
+        <i class="bi bi-qr-code-scan"></i>
+        <span>Hubungkan WhatsApp Tanpa Login</span>
+    </a>
     <div class="footer-note"><i class="bi bi-shield-lock"></i>Koneksi aman &amp; terenkripsi</div>
 </div>
 <script>
