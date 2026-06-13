@@ -965,6 +965,108 @@ app.get('/api/member/assignment-notes', authMiddleware, (req, res) => {
 	}
 })
 
+const isAssignmentAdminUser = (user: any): boolean => user?.role === 'adminwa' || user?.role === 'admin'
+
+const normalizeAssignmentPriority = (value: any): string => {
+	const priority = String(value || 'low').toLowerCase()
+	return ['low', 'medium', 'critical'].includes(priority) ? priority : 'low'
+}
+
+const normalizeAssignmentDateTime = (value: any): string | null => {
+	if (!value) return null
+	const date = new Date(value)
+	if (Number.isNaN(date.getTime())) return null
+	const pad = (n: number) => String(n).padStart(2, '0')
+	return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:00`
+}
+
+const extractAssignmentTime = (value: string | null): string | null => {
+	if (!value) return null
+	const date = new Date(value.replace(' ', 'T'))
+	if (Number.isNaN(date.getTime())) return null
+	const pad = (n: number) => String(n).padStart(2, '0')
+	return `${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+const getMemberAssignmentDetail = (sessionId: string, contact: string) => {
+	const assignment = db.prepare(`
+		SELECT session_id, contact, notes, priority, start_datetime, end_datetime, visibility_start, visibility_end
+		FROM worker_assignments
+		WHERE session_id = ? AND contact = ?
+		LIMIT 1
+	`).get(sessionId, contact) as any
+	if (!assignment) return null
+	const assignedWorkers = db.prepare(`
+		SELECT u.name
+		FROM worker_assignments wa
+		JOIN users u ON u.id = wa.worker_id
+		WHERE wa.session_id = ? AND wa.contact = ?
+		ORDER BY u.name ASC
+	`).all(sessionId, contact).map((row: any) => row.name).filter(Boolean)
+	return { ...assignment, assignedWorkers }
+}
+
+// Update assignment info from member dashboard (admin only)
+app.patch('/api/member/assignment/:sessionId/:contact', authMiddleware, (req, res) => {
+	try {
+		const user = req.user!
+		if (!isAssignmentAdminUser(user)) {
+			return res.status(403).json({ success: false, error: 'Hanya admin yang dapat mengubah penugasan' })
+		}
+
+		const { sessionId, contact } = req.params
+		if (!sessionId || !contact) {
+			return res.status(400).json({ success: false, error: 'Session dan kontak wajib diisi' })
+		}
+
+		const existing = db.prepare(`
+			SELECT worker_id
+			FROM worker_assignments
+			WHERE session_id = ? AND contact = ?
+		`).all(sessionId, contact) as any[]
+		if (existing.length === 0) {
+			return res.status(404).json({ success: false, error: 'Penugasan untuk chat ini belum tersedia' })
+		}
+
+		const priority = normalizeAssignmentPriority(req.body?.priority)
+		const startDatetime = normalizeAssignmentDateTime(req.body?.start_datetime)
+		const endDatetime = normalizeAssignmentDateTime(req.body?.end_datetime)
+		if (startDatetime && endDatetime && new Date(endDatetime.replace(' ', 'T')).getTime() < new Date(startDatetime.replace(' ', 'T')).getTime()) {
+			return res.status(400).json({ success: false, error: 'Deadline tidak boleh lebih awal dari jadwal mulai' })
+		}
+
+		const notes = typeof req.body?.notes === 'string' ? req.body.notes.trim() : ''
+		const visibilityStart = extractAssignmentTime(startDatetime)
+		const visibilityEnd = extractAssignmentTime(endDatetime)
+
+		const result = db.prepare(`
+			UPDATE worker_assignments
+			SET notes = ?,
+				priority = ?,
+				start_datetime = ?,
+				end_datetime = ?,
+				visibility_start = ?,
+				visibility_end = ?,
+				assigned_by = ?
+			WHERE session_id = ? AND contact = ?
+		`).run(notes, priority, startDatetime, endDatetime, visibilityStart, visibilityEnd, user.id, sessionId, contact)
+
+		const assignment = getMemberAssignmentDetail(sessionId, contact)
+		if (!assignment || result.changes === 0) {
+			return res.status(404).json({ success: false, error: 'Penugasan tidak ditemukan' })
+		}
+
+		const workerIds = existing.map(row => row.worker_id).filter(Boolean)
+		const payload = { sessionId, contact, assignment, workerIds, updatedBy: user.id }
+		io.emit('assignment.updated', payload)
+		io.emit('assignment-updated', { sessionId, contact, assignment, workerIds })
+
+		res.json({ success: true, assignment, message: 'Penugasan berhasil diperbarui' })
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
 // Get conversations for member/worker (scoped to their sessions)
 app.get('/api/member/conversations', authMiddleware, (req, res) => {
 	try {

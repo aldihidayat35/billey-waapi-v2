@@ -20,6 +20,8 @@ const S = {
     _conversationsLoaded: false,   // Track if initial load done
     assignmentNotes: {},    // `${sessionId}::${contact}` -> { notes, priority }
     assignmentPanel: null,
+    currentAssignmentDetail: null,
+    assignmentEditPriority: 'low',
     adminPhone: '',         // admin phone for report feature
     currentFilter: 'client', // 'semua' | 'client' | 'unread' | 'grup' | 'media'
     searchQuery: '',        // current search text
@@ -90,6 +92,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     wireUI();
     wireNoteModal();
     wireReportModal();
+    wireAssignmentEditModal();
 
     // 6. Load admin phone for report feature
     try {
@@ -157,6 +160,11 @@ async function loadAssignmentNotes() {
             };
         }
     } catch { S.assignmentNotes = {}; }
+}
+
+function isAssignmentAdmin() {
+    const role = S.user?.role || window.userRole || document.body?.dataset?.userRole || '';
+    return role === 'adminwa' || role === 'admin';
 }
 
 function assignmentNoteKey(sessionId, contact) {
@@ -268,17 +276,19 @@ function setAssignmentState(message, iconHtml) {
 }
 
 function clearAssignmentFields(chat = {}) {
+    S.currentAssignmentDetail = null;
     const contact = chat.contact || S.activeContact || '';
     const sessionId = chat.sessionId || S.activeSession || '';
     const conv = getConversation(sessionId, contact) || {};
     const isGroup = String(contact || '').includes('@g.us') || conv.isGroup;
     const displayName = contact ? contactDisplayName(contact, conv) : '-';
+    const phoneLabel = contact ? conversationPhoneLabel(contact, isGroup) : '-';
     const session = S.sessions.find(s => s.id === sessionId);
 
     setText('detail-name', displayName || '-');
-    setText('detail-phone', contact || '-');
+    setText('detail-phone', phoneLabel);
     setText('detail-name-line', displayName || 'Kontak');
-    setText('detail-phone-line', contact || '');
+    setText('detail-phone-line', phoneLabel === '-' ? '' : phoneLabel);
     setText('detail-session-name', session?.name || sessionId || '-');
     setText('assign-start-time', '-');
     setText('assign-end-time', '-');
@@ -300,7 +310,8 @@ function clearAssignmentFields(chat = {}) {
     setBadge('assign-vis-status', '-', 'bg-slate-100 text-slate-600');
     const visRange = document.getElementById('assign-vis-range');
     if (visRange) visRange.innerHTML = '<i class="bi bi-infinity text-emerald-500"></i> Tanpa Batas Waktu';
-    setText('assign-vis-desc', 'Anda dapat melihat seluruh riwayat chat tanpa batasan jam kerja.');
+    setText('assign-vis-desc', 'Akses worker mengikuti jadwal pengerjaan yang ditentukan admin.');
+    updateAssignmentEditButton(null);
     const mediaList = document.getElementById('detail-media-list');
     if (mediaList) mediaList.innerHTML = '';
     const activityList = document.getElementById('detail-activity-list');
@@ -382,6 +393,134 @@ function formatDateTimeFull(dtStr) {
 
 function closeNoteModal() {
     document.getElementById('note-modal-overlay').classList.remove('show');
+}
+
+function updateAssignmentEditButton(detail) {
+    const btn = document.getElementById('btn-edit-assignment');
+    if (!btn) return;
+    const assignment = detail?.assignment;
+    const canEdit = isAssignmentAdmin() && assignment && Object.keys(assignment).length > 0 && detail?.sessionId && detail?.contact;
+    btn.classList.toggle('hidden', !canEdit);
+    btn.classList.toggle('inline-flex', !!canEdit);
+}
+
+function normalizeDateTimeInput(value) {
+    if (!value) return '';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) {
+        return String(value).slice(0, 16);
+    }
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function normalizeDateTimeForApi(value) {
+    if (!value) return null;
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return null;
+    return d.toISOString();
+}
+
+function setAssignmentEditPriority(priority) {
+    S.assignmentEditPriority = ['low', 'medium', 'critical'].includes(priority) ? priority : 'low';
+    document.querySelectorAll('#assignment-priority-options [data-priority]').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.priority === S.assignmentEditPriority);
+    });
+}
+
+function openAssignmentEditModal() {
+    if (!isAssignmentAdmin()) return;
+    const detail = S.currentAssignmentDetail;
+    const assignment = detail?.assignment || getAssignmentNote(S.activeSession, S.activeContact);
+    if (!detail || !assignment || !S.activeSession || !S.activeContact) {
+        Swal.fire({ toast: true, position: 'top-end', icon: 'info', title: 'Belum ada data penugasan untuk diedit', timer: 2200, showConfirmButton: false });
+        return;
+    }
+    const overlay = document.getElementById('assignment-edit-overlay');
+    if (!overlay) return;
+    overlay.dataset.sessionId = detail.sessionId || S.activeSession;
+    overlay.dataset.contact = detail.contact || S.activeContact;
+    const isGroup = detail.isGroup || String(detail.contact || '').includes('@g.us');
+    setText('assignment-edit-client-name', contactDisplayName(detail.contact, detail));
+    setText('assignment-edit-client-phone', conversationPhoneLabel(detail.contact, isGroup));
+    document.getElementById('assignment-edit-start').value = normalizeDateTimeInput(assignment.start_datetime);
+    document.getElementById('assignment-edit-end').value = normalizeDateTimeInput(assignment.end_datetime);
+    document.getElementById('assignment-edit-notes').value = assignment.notes || '';
+    setAssignmentEditPriority(assignment.priority || 'low');
+    overlay.classList.add('show');
+}
+
+function closeAssignmentEditModal() {
+    document.getElementById('assignment-edit-overlay')?.classList.remove('show');
+}
+
+async function saveAssignmentEdit() {
+    const overlay = document.getElementById('assignment-edit-overlay');
+    const saveBtn = document.getElementById('assignment-edit-save');
+    const sessionId = overlay?.dataset.sessionId || S.activeSession;
+    const contact = overlay?.dataset.contact || S.activeContact;
+    if (!sessionId || !contact) return;
+
+    const startInput = document.getElementById('assignment-edit-start').value;
+    const endInput = document.getElementById('assignment-edit-end').value;
+    const start = normalizeDateTimeForApi(startInput);
+    const end = normalizeDateTimeForApi(endInput);
+    if (start && end && new Date(end).getTime() < new Date(start).getTime()) {
+        Swal.fire({ toast: true, position: 'top-end', icon: 'warning', title: 'Deadline tidak boleh lebih awal dari jadwal mulai', timer: 2600, showConfirmButton: false });
+        return;
+    }
+
+    if (saveBtn) saveBtn.disabled = true;
+    const saveText = saveBtn?.querySelector('span');
+    const oldText = saveText ? saveText.textContent : '';
+    if (saveText) saveText.textContent = 'Menyimpan...';
+    try {
+        const r = await fetch(`/api/member/assignment/${encodeURIComponent(sessionId)}/${encodeURIComponent(contact)}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                priority: S.assignmentEditPriority,
+                start_datetime: start,
+                end_datetime: end,
+                notes: document.getElementById('assignment-edit-notes').value.trim()
+            })
+        });
+        const d = await r.json();
+        if (!r.ok || !d.success) throw new Error(d.error || 'Gagal menyimpan penugasan');
+
+        const assignment = d.assignment || {};
+        setAssignmentNote(sessionId, contact, assignment);
+        const detail = {
+            ...(S.currentAssignmentDetail || {}),
+            sessionId,
+            contact,
+            assignment,
+            assignedWorkers: assignment.assignedWorkers || S.currentAssignmentDetail?.assignedWorkers || []
+        };
+        S.currentAssignmentDetail = detail;
+        if (sessionId === S.activeSession && contact === S.activeContact) renderContactDetail(detail);
+        renderConversations(S.searchQuery);
+        closeAssignmentEditModal();
+        Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Penugasan diperbarui', timer: 1800, showConfirmButton: false });
+    } catch (error) {
+        Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: error.message || 'Gagal menyimpan penugasan', timer: 3000, showConfirmButton: false });
+    } finally {
+        if (saveBtn) saveBtn.disabled = false;
+        if (saveText) saveText.textContent = oldText || 'Simpan';
+    }
+}
+
+function wireAssignmentEditModal() {
+    document.getElementById('btn-edit-assignment')?.addEventListener('click', openAssignmentEditModal);
+    document.getElementById('assignment-edit-close')?.addEventListener('click', closeAssignmentEditModal);
+    document.getElementById('assignment-edit-cancel')?.addEventListener('click', closeAssignmentEditModal);
+    document.getElementById('assignment-edit-save')?.addEventListener('click', saveAssignmentEdit);
+    document.querySelectorAll('#assignment-priority-options [data-priority]').forEach(btn => {
+        btn.addEventListener('click', () => setAssignmentEditPriority(btn.dataset.priority));
+    });
+    document.getElementById('assignment-edit-overlay')?.addEventListener('click', (e) => {
+        if (e.target === document.getElementById('assignment-edit-overlay')) closeAssignmentEditModal();
+    });
 }
 
 function wireNoteModal() {
@@ -807,9 +946,7 @@ async function openChat(contact) {
                 let bannerHtml = '<i class="bi bi-clock-history me-1"></i>';
                 if (d.assignment.start_datetime) bannerHtml += '<span>Mulai: ' + formatDateTimeFull(d.assignment.start_datetime) + '</span>';
                 if (d.assignment.end_datetime) bannerHtml += '<span class="ms-2">Deadline: <b>' + formatDateTimeFull(d.assignment.end_datetime) + '</b></span>';
-                if (d.assignment.visibility_start && d.assignment.visibility_end) {
-                    bannerHtml += '<span class="ms-2"><i class="bi bi-eye me-1"></i>' + d.assignment.visibility_start + ' - ' + d.assignment.visibility_end + '</span>';
-                }
+                bannerHtml += '<span class="ms-2"><i class="bi bi-eye me-1"></i>Akses mengikuti jadwal pengerjaan</span>';
                 bannerEl.innerHTML = bannerHtml;
                 bannerEl.classList.remove('d-none');
             } else {
@@ -865,9 +1002,17 @@ function renderContactDetail(detail) {
     const isGroup = detail.isGroup || String(detail.contact || '').includes('@g.us');
     const displayName = contactDisplayName(detail.contact, detail);
     const phone = detail.phone || detail.contact || '-';
+    const phoneLabel = conversationPhoneLabel(detail.contact || phone, isGroup);
     const initials = isGroup ? 'GR' : cleanPhone(phone).slice(-2) || 'WA';
     const workers = Array.isArray(detail.assignedWorkers) ? detail.assignedWorkers : [];
     const assign = detail.assignment || getAssignmentNote(detail.sessionId || S.activeSession, detail.contact) || {};
+    S.currentAssignmentDetail = {
+        ...detail,
+        assignment: assign,
+        assignedWorkers: workers,
+        sessionId: detail.sessionId || S.activeSession,
+        contact: detail.contact,
+    };
 
     const assignEmptyState = document.getElementById('assign-empty-state');
     const assignDetailsCards = getAssignmentSections();
@@ -890,9 +1035,9 @@ function renderContactDetail(detail) {
     }
 
     setText('detail-name', displayName || '-');
-    setText('detail-phone', phone);
+    setText('detail-phone', phoneLabel);
     setText('detail-name-line', displayName || 'Kontak');
-    setText('detail-phone-line', phone || detail.contact || '');
+    setText('detail-phone-line', phoneLabel || '-');
     const session = S.sessions.find(s => s.id === (detail.sessionId || S.activeSession));
     setText('detail-session-name', session?.name || detail.sessionId || S.activeSession || '-');
     const avatar = document.getElementById('detail-avatar');
@@ -903,6 +1048,7 @@ function renderContactDetail(detail) {
     }
 
     renderAssignmentFields(detail, assign, workers);
+    updateAssignmentEditButton(S.currentAssignmentDetail);
 
     const note = document.getElementById('detail-note');
     if (note) {
@@ -981,7 +1127,7 @@ function renderAssignmentFields(detail, assign, workers) {
     setText('assign-end-time', assign.end_datetime ? formatDateTimeFull(assign.end_datetime) : '-');
     setText('assign-time-left', getTimeLeftText(assign.end_datetime));
 
-    const visibilityInfo = getVisibilityInfo(assign.visibility_start, assign.visibility_end);
+    const visibilityInfo = getScheduleAccessInfo(assign);
     setBadge('assign-vis-status', visibilityInfo.status, visibilityInfo.statusClass);
     const visRange = document.getElementById('assign-vis-range');
     if (visRange) visRange.innerHTML = visibilityInfo.rangeHtml;
@@ -1041,13 +1187,41 @@ function getTimeLeftText(endDatetime) {
     return `Sisa waktu: ${parts.join(' ') || 'kurang dari 1 menit'}`;
 }
 
-function getVisibilityInfo(start, end) {
+function getScheduleAccessInfo(assign = {}) {
+    const startDate = assign.start_datetime || null;
+    const endDate = assign.end_datetime || null;
+    const start = assign.visibility_start || null;
+    const end = assign.visibility_end || null;
+    if (startDate || endDate) {
+        const now = Date.now();
+        const startMs = parseDateMs(startDate);
+        const endMs = parseDateMs(endDate);
+        const active = (!startMs || startMs <= now) && (!endMs || endMs >= now);
+        const pending = startMs && startMs > now;
+        const expired = endMs && endMs < now;
+        const range = [
+            startDate ? `Mulai ${formatDateTimeFull(startDate)}` : 'Mulai tanpa batas',
+            endDate ? `Deadline ${formatDateTimeFull(endDate)}` : 'Deadline tanpa batas'
+        ].join(' - ');
+        return {
+            status: pending ? 'Belum mulai' : expired ? 'Berakhir' : active ? 'Aktif' : 'Terjadwal',
+            statusClass: pending ? 'bg-sky-100 text-sky-700' : expired ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700',
+            rangeHtml: `<i class="bi bi-calendar-check text-emerald-500"></i> ${escHtml(range)}`,
+            description: active
+                ? 'Worker sedang dapat mengakses chat karena jadwal pengerjaan aktif.'
+                : pending
+                    ? 'Worker baru dapat mengakses chat saat jadwal pengerjaan dimulai.'
+                    : expired
+                        ? 'Akses worker selesai karena jadwal pengerjaan sudah berakhir.'
+                        : 'Akses worker mengikuti jadwal pengerjaan yang ditentukan admin.'
+        };
+    }
     if (!start && !end) {
         return {
             status: 'Aktif',
             statusClass: 'bg-emerald-100 text-emerald-700',
             rangeHtml: '<i class="bi bi-infinity text-emerald-500"></i> Tanpa Batas Waktu',
-            description: 'Anda dapat melihat seluruh riwayat chat tanpa batasan jam kerja.'
+            description: 'Worker dapat mengakses chat tanpa batas jadwal pengerjaan.'
         };
     }
     const now = new Date();
@@ -1879,6 +2053,31 @@ function setupSocketListeners() {
         const userId = window.userId || (document.body.dataset.userId ? parseInt(document.body.dataset.userId) : null);
         const userRole = window.userRole || document.body.dataset.userRole;
         if (userRole === 'worker' && data.workerId !== userId) return;
+        loadConversations(true);
+        if (S.activeSession && S.activeContact) {
+            loadContactDetail(S.activeSession, S.activeContact, { force: true });
+        }
+    });
+
+    sock.on('assignment.updated', (data) => {
+        const userId = window.userId || (document.body.dataset.userId ? parseInt(document.body.dataset.userId) : null);
+        const userRole = window.userRole || document.body.dataset.userRole;
+        if (userRole === 'worker') {
+            if (Array.isArray(data.workerIds) && userId && !data.workerIds.includes(userId)) return;
+            if (data.workerId && data.workerId !== userId) return;
+        }
+        if (data.sessionId && data.contact && data.assignment) {
+            setAssignmentNote(data.sessionId, data.contact, data.assignment);
+            if (data.sessionId === S.activeSession && data.contact === S.activeContact) {
+                renderContactDetail({
+                    ...(S.currentAssignmentDetail || {}),
+                    sessionId: data.sessionId,
+                    contact: data.contact,
+                    assignment: data.assignment,
+                    assignedWorkers: data.assignment.assignedWorkers || S.currentAssignmentDetail?.assignedWorkers || []
+                });
+            }
+        }
         loadConversations(true);
         if (S.activeSession && S.activeContact) {
             loadContactDetail(S.activeSession, S.activeContact, { force: true });

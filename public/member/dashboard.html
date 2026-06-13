@@ -1063,7 +1063,7 @@
             font-weight: 700;
         }
 
-        .media-overlay, .note-modal-overlay, .report-modal-overlay, .tpl-overlay, .img-viewer {
+        .media-overlay, .note-modal-overlay, .report-modal-overlay, .assignment-edit-overlay, .tpl-overlay, .img-viewer {
             position: fixed;
             inset: 0;
             z-index: 200;
@@ -1073,8 +1073,9 @@
             background: rgba(15,23,42,.58);
             backdrop-filter: blur(8px);
         }
-        .media-overlay.show, .note-modal-overlay.show, .report-modal-overlay.show, .tpl-overlay.show, .img-viewer.show { display: flex; }
-        .media-box, .note-modal, .report-modal, .tpl-panel {
+        .assignment-edit-overlay { z-index: 350000; }
+        .media-overlay.show, .note-modal-overlay.show, .report-modal-overlay.show, .assignment-edit-overlay.show, .tpl-overlay.show, .img-viewer.show { display: flex; }
+        .media-box, .note-modal, .report-modal, .assignment-edit-modal, .tpl-panel {
             background: #fff;
             border: 1px solid #e5e7eb;
             border-radius: 18px;
@@ -1152,6 +1153,139 @@
         .note-content { color: #334155; line-height: 1.6; white-space: pre-wrap; }
         .report-modal-body label { display: block; margin: 12px 0 6px; color: #475569; font-size: 12px; font-weight: 800; }
         .report-modal-body textarea { min-height: 100px; resize: vertical; margin-bottom: 14px; }
+
+        .assignment-edit-trigger { transition: transform .16s ease, background .16s ease, border-color .16s ease; }
+        .assignment-edit-trigger:hover { transform: translateY(-1px); background: #ecfdf5; border-color: #86efac; }
+        .assignment-edit-modal {
+            width: min(520px, 94vw);
+            max-height: min(760px, 92vh);
+            display: flex;
+            flex-direction: column;
+        }
+        .assignment-edit-hdr {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 18px 20px;
+            border-bottom: 1px solid #eef2f7;
+        }
+        .assignment-edit-title { display: flex; align-items: center; gap: 10px; font-weight: 900; color: #0f172a; }
+        .assignment-edit-title i { color: #059669; }
+        .assignment-edit-close {
+            width: 36px;
+            height: 36px;
+            border: 0;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #f1f5f9;
+            color: #475569;
+            cursor: pointer;
+        }
+        .assignment-edit-body {
+            overflow-y: auto;
+            padding: 18px 20px 20px;
+        }
+        .assignment-edit-body label {
+            display: block;
+            margin: 14px 0 7px;
+            color: #475569;
+            font-size: 12px;
+            font-weight: 900;
+        }
+        .assignment-edit-client {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            border-radius: 14px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            padding: 12px 14px;
+        }
+        .assignment-edit-client span { font-weight: 900; color: #0f172a; }
+        .assignment-edit-client small { font-weight: 700; color: #64748b; }
+        .assignment-priority-options {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 8px;
+        }
+        .assignment-priority-options button {
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            background: #fff;
+            color: #475569;
+            padding: 10px 12px;
+            font-weight: 900;
+            cursor: pointer;
+        }
+        .assignment-priority-options button.active[data-priority="low"] { background: #ecfdf5; color: #047857; border-color: #86efac; }
+        .assignment-priority-options button.active[data-priority="medium"] { background: #fffbeb; color: #b45309; border-color: #fcd34d; }
+        .assignment-priority-options button.active[data-priority="critical"] { background: #fff1f2; color: #be123c; border-color: #fda4af; }
+        .assignment-edit-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+        .assignment-edit-body input,
+        .assignment-edit-body textarea {
+            width: 100%;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            background: #f8fafc;
+            padding: 11px 13px;
+            color: #0f172a;
+            font-weight: 700;
+            outline: none;
+        }
+        .assignment-edit-body textarea { min-height: 112px; resize: vertical; line-height: 1.5; }
+        .assignment-edit-body input:focus,
+        .assignment-edit-body textarea:focus { border-color: #86efac; box-shadow: 0 0 0 4px rgba(34,197,94,.12); background: #fff; }
+        .assignment-edit-visibility {
+            display: flex;
+            align-items: flex-start;
+            gap: 9px;
+            margin-top: 12px;
+            border-radius: 12px;
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            padding: 11px 12px;
+            color: #1e40af;
+            font-size: 12px;
+            font-weight: 800;
+            line-height: 1.45;
+        }
+        .assignment-edit-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            padding: 14px 20px 18px;
+            border-top: 1px solid #eef2f7;
+            background: #fff;
+        }
+        .assignment-edit-cancel,
+        .assignment-edit-save {
+            border: 0;
+            border-radius: 12px;
+            padding: 11px 16px;
+            font-weight: 900;
+            cursor: pointer;
+        }
+        .assignment-edit-cancel { background: #f1f5f9; color: #475569; }
+        .assignment-edit-save { display: inline-flex; align-items: center; gap: 8px; background: var(--wa-green); color: #fff; }
+        .assignment-edit-save:disabled { opacity: .65; cursor: wait; }
+
+        @media (max-width: 640px) {
+            .assignment-edit-overlay { align-items: flex-end; }
+            .assignment-edit-modal {
+                width: 100vw;
+                max-height: 88vh;
+                border-radius: 22px 22px 0 0;
+            }
+            .assignment-edit-grid { grid-template-columns: 1fr; }
+            .assignment-edit-footer { padding-bottom: max(18px, env(safe-area-inset-bottom)); }
+        }
 
         .tpl-overlay { z-index: 250; }
         .tpl-panel { width: min(540px, 92vw); max-height: 72vh; display: flex; flex-direction: column; }

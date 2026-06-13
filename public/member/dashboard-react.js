@@ -222,7 +222,10 @@
                     h('i', { className: 'bi bi-clipboard-check text-emerald-600 text-xl' }),
                     h('h2', { className: 'm-0 text-lg font-extrabold tracking-tight text-slate-900' }, 'Informasi Penugasan')
                 ]),
-                h('button', { key: 'close', id: 'btn-close-contact-detail', type: 'button', className: 'detail-close-btn hidden h-10 w-10 items-center justify-center rounded-xl bg-white shadow-sm text-slate-600 border border-slate-200' }, h('i', { className: 'bi bi-x-lg' }))
+                h('div', { key: 'actions', className: 'flex items-center gap-2' }, [
+                    h('button', { key: 'edit', id: 'btn-edit-assignment', type: 'button', className: 'assignment-edit-trigger hidden h-10 w-10 items-center justify-center rounded-xl bg-white shadow-sm text-emerald-700 border border-emerald-100', title: 'Edit penugasan' }, h('i', { className: 'bi bi-pencil-square' })),
+                    h('button', { key: 'close', id: 'btn-close-contact-detail', type: 'button', className: 'detail-close-btn hidden h-10 w-10 items-center justify-center rounded-xl bg-white shadow-sm text-slate-600 border border-slate-200' }, h('i', { className: 'bi bi-x-lg' }))
+                ])
             ]),
 
             // Empty state container
@@ -298,9 +301,9 @@
 
                 // Card 4: Visibility
                 h('section', { key: 'visibility', className: 'rounded-2xl bg-white p-4 shadow-sm border border-slate-200' }, [
-                    h('div', { className: 'mb-3 flex items-center justify-between' }, [
+                        h('div', { className: 'mb-3 flex items-center justify-between' }, [
                         h('div', { className: 'flex items-center gap-2 text-xs font-extrabold text-slate-400 uppercase tracking-wider' }, [
-                            h('i', { className: 'bi bi-eye-fill' }), 'Visibilitas Chat'
+                            h('i', { className: 'bi bi-eye-fill' }), 'Mengikuti Jadwal Pengerjaan'
                         ]),
                         h('span', { id: 'assign-vis-status', className: 'rounded-lg bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-600' }, 'Aktif')
                     ]),
@@ -309,7 +312,7 @@
                             h('i', { className: 'bi bi-infinity text-emerald-500' }), 'Tanpa Batas Waktu'
                         ]),
                         h('div', { id: 'assign-vis-desc', className: 'mt-1.5 text-xs font-medium leading-relaxed text-slate-500' }, 
-                            'Anda dapat melihat seluruh riwayat chat tanpa batasan jam kerja.'
+                            'Akses worker mengikuti jadwal pengerjaan yang ditentukan admin.'
                         )
                     ])
                 ]),
@@ -384,6 +387,55 @@
         );
     }
 
+    function AssignmentEditModal() {
+        return h('div', { className: 'assignment-edit-overlay', id: 'assignment-edit-overlay' },
+            h('div', { className: 'assignment-edit-modal', id: 'assignment-edit-modal', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Edit informasi penugasan' }, [
+                h('div', { key: 'h', className: 'assignment-edit-hdr' }, [
+                    h('div', { key: 'left', className: 'assignment-edit-title' }, [
+                        h('i', { className: 'bi bi-pencil-square' }),
+                        h('span', null, 'Edit Penugasan')
+                    ]),
+                    h('button', { key: 'x', className: 'assignment-edit-close', id: 'assignment-edit-close', type: 'button' }, h('i', { className: 'bi bi-x-lg' }))
+                ]),
+                h('div', { key: 'b', className: 'assignment-edit-body' }, [
+                    h('div', { key: 'client', className: 'assignment-edit-client' }, [
+                        h('span', { id: 'assignment-edit-client-name' }, '-'),
+                        h('small', { id: 'assignment-edit-client-phone' }, '-')
+                    ]),
+                    h('label', { key: 'lp' }, 'Prioritas'),
+                    h('div', { key: 'priority', className: 'assignment-priority-options', id: 'assignment-priority-options' }, [
+                        h('button', { key: 'low', type: 'button', 'data-priority': 'low' }, 'Low'),
+                        h('button', { key: 'medium', type: 'button', 'data-priority': 'medium' }, 'Medium'),
+                        h('button', { key: 'critical', type: 'button', 'data-priority': 'critical' }, 'Critical')
+                    ]),
+                    h('div', { key: 'grid', className: 'assignment-edit-grid' }, [
+                        h('div', { key: 'start' }, [
+                            h('label', null, 'Mulai'),
+                            h('input', { type: 'datetime-local', id: 'assignment-edit-start' })
+                        ]),
+                        h('div', { key: 'end' }, [
+                            h('label', null, 'Deadline'),
+                            h('input', { type: 'datetime-local', id: 'assignment-edit-end' })
+                        ])
+                    ]),
+                    h('div', { key: 'visibility', className: 'assignment-edit-visibility' }, [
+                        h('i', { className: 'bi bi-eye-fill' }),
+                        h('span', null, 'Worker hanya dapat mengakses chat saat jadwal pengerjaan aktif.')
+                    ]),
+                    h('label', { key: 'ln' }, 'Catatan Admin'),
+                    h('textarea', { key: 'notes', id: 'assignment-edit-notes', rows: 5, placeholder: 'Tambahkan instruksi untuk worker...' })
+                ]),
+                h('div', { key: 'f', className: 'assignment-edit-footer' }, [
+                    h('button', { key: 'cancel', type: 'button', id: 'assignment-edit-cancel', className: 'assignment-edit-cancel' }, 'Batal'),
+                    h('button', { key: 'save', type: 'button', id: 'assignment-edit-save', className: 'assignment-edit-save' }, [
+                        h('i', { key: 'i', className: 'bi bi-check2-circle' }),
+                        h('span', { key: 't' }, 'Simpan')
+                    ])
+                ])
+            ])
+        );
+    }
+
     function TemplatePicker() {
         return h('div', { className: 'tpl-overlay', id: 'tpl-overlay' },
             h('div', { className: 'tpl-panel' }, [
@@ -437,6 +489,7 @@
             h(ImageViewer, { key: 'viewer' }),
             h(NoteModal, { key: 'note' }),
             h(ReportModal, { key: 'report' }),
+            h(AssignmentEditModal, { key: 'assignment-edit' }),
             h(TemplatePicker, { key: 'tpl' }),
             h(PwaSheet, { key: 'pwa' })
         ]);
