@@ -785,23 +785,6 @@ export const messageLogDb = {
         raw.forEach((r: any) => { byHour[r.hour] = r })
         return Array.from({ length: 24 }, (_, h) => byHour[h] || { hour: h, total: 0, incoming: 0, outgoing: 0 })
     },
-
-    // ── NEW: Message type distribution (for bar chart)
-    getTypeStatistics: (sessionId?: string): any[] => {
-        const params: any[] = []
-        let filter = ''
-        if (sessionId) { filter = 'WHERE session_id = ?'; params.push(sessionId) }
-        return db.prepare(`
-            SELECT
-                COALESCE(message_type, 'text') as message_type,
-                COUNT(*) as count
-            FROM message_logs
-            ${filter}
-            GROUP BY message_type
-            ORDER BY count DESC
-            LIMIT 10
-        `).all(...params) as any[]
-    },
 }
 
 // Session Log Functions

@@ -1,14 +1,14 @@
 import { Boom } from '@hapi/boom'
 import P from 'pino'
-import makeWASocket, {
+import makeWASocket from './index'
+import type { AnyMessageContent, WASocket } from './index'
+import {
 	DisconnectReason,
 	fetchLatestBaileysVersion,
 	useMultiFileAuthState,
 	makeCacheableSignalKeyStore,
-	WASocket,
-	AnyMessageContent,
 	downloadMediaMessage
-} from './src'
+} from './index'
 import { logger as activityLogger } from './logger'
 import { messageLogDb, messageMutationDb, chatTemplateDb, autoReplyDb, autoReplyLogDb, autoReplyCooldownDb, autoForwardConfigDb, autoForwardTokenDb, autoForwardLogDb, db } from './database.js'
 import { getAuthorizedSocketIds } from './notification.js'
@@ -1367,9 +1367,9 @@ export class SessionManager {
 						import('./crm-sync.js').then(({ forwardMessageToCrm }) => {
 							forwardMessageToCrm(messageContent, clientPhone, sessionId)
 								.then((result: any) => {
-									// Kirim reply feedback ke client (baik sukses maupun gagal)
-									const reply = result.response?.reply
-									if (reply) {
+									// Laravel memiliki pesan bisnis; Node hanya mengirim hasilnya ke chat asal.
+									const reply = result.response?.reply || (result.forwarded ? result.response?.message : null)
+									if (reply && result.forwarded) {
 										sock.sendMessage(remoteJid, { text: reply })
 											.then(() => console.log(`📤 Feedback sent to ${clientPhone}`))
 											.catch((err: any) => console.error('⚠️ Failed to send feedback:', err))

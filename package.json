@@ -21,7 +21,7 @@
     "engine-requirements.js"
   ],
   "scripts": {
-    "start": "tsx --env-file=.env ./web-server.ts",
+    "start": "tsx --env-file=.env ./src/web-server.ts",
     "build:all": "npm run build && npm run build:docs",
     "build:docs": "typedoc",
     "build": "tsc -P tsconfig.build.json && tsc-esm-fix --tsconfig=tsconfig.build.json --ext=.js",
@@ -29,7 +29,7 @@
     "changelog:preview": "conventional-changelog -p angular -u",
     "changelog:update": "conventional-changelog -p angular -i CHANGELOG.md -s -r 0",
     "example": "tsx ./Example/example.ts",
-    "web": "tsx ./web-server.ts",
+    "web": "tsx --env-file=.env ./src/web-server.ts",
     "gen:protobuf": "sh WAProto/GenerateStatics.sh",
     "format": "prettier --write \"src/**/*.{ts,js,json,md}\"",
     "lint": "tsc && eslint src --ext .js,.ts",
@@ -49,7 +49,7 @@
     "@types/express": "^5.0.5",
     "@types/multer": "^2.1.0",
     "async-mutex": "^0.5.0",
-    "better-sqlite3": "^12.5.0",
+    "better-sqlite3": "^13.0.3",
     "cookie-parser": "^1.4.7",
     "express": "^5.1.0",
     "firebase-admin": "^13.7.0",
@@ -67,6 +67,7 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
     "@eslint/js": "^9.31.0",
+    "@types/better-sqlite3": "^9.6.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^20.9.0",
     "@types/ws": "^8.0.0",

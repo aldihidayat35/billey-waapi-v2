@@ -5,7 +5,7 @@ import process from 'node:process'
 const projectRoot = process.cwd()
 const publicDir = path.join(projectRoot, 'public')
 const adminDir = path.join(publicDir, 'admin')
-const serverSourcePath = path.join(projectRoot, 'web-server.ts')
+const serverSourcePath = path.join(projectRoot, 'src', 'web-server.ts')
 
 const requiredAdminFiles = [
 	'index.html',
@@ -26,7 +26,7 @@ const requiredPublicEntrypoints = [
 ]
 
 const requiredServerSnippets = [
-	"const publicDir = path.join(__dirname, 'public')",
+	"const publicDir = path.resolve(__dirname, '..', 'public')",
 	"const adminPublicDir = path.join(publicDir, 'admin')",
 	'app.use(express.static(publicDir))',
 	'app.use(express.static(adminPublicDir))'
@@ -49,7 +49,7 @@ for (const file of requiredPublicEntrypoints) {
 const serverSource = fs.existsSync(serverSourcePath) ? fs.readFileSync(serverSourcePath, 'utf8') : ''
 for (const snippet of requiredServerSnippets) {
 	if (!serverSource.includes(snippet)) {
-		missing.push(`web-server.ts snippet: ${snippet}`)
+		missing.push(`src/web-server.ts snippet: ${snippet}`)
 	}
 }
 

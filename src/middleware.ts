@@ -3,8 +3,9 @@
  * Handles session validation and role-based access control
  */
 
-import { Request, Response, NextFunction } from 'express'
-import { validateSession, User, UserRole, userOwnsSession } from './auth.js'
+import type { Request, Response, NextFunction } from 'express'
+import { validateSession, userOwnsSession } from './auth.js'
+import type { User, UserRole } from './auth.js'
 
 // Extend Express Request to include user
 declare global {

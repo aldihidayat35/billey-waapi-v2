@@ -1,7 +1,8 @@
 import * as fs from 'fs'
 import * as path from 'path'
 import { fileURLToPath } from 'url'
-import { messageLogDb, sessionLogDb, MessageLogEntry, SessionLogEntry } from './database.js'
+import { messageLogDb, sessionLogDb } from './database.js'
+import type { MessageLogEntry, SessionLogEntry } from './database.js'
 
 // Get __dirname equivalent in ES module
 const __filename = fileURLToPath(import.meta.url)

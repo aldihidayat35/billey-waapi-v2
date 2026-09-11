@@ -12,8 +12,9 @@ import cookieParser from 'cookie-parser'
 import { 
 	login, logout, validateSession, userDb, sessionDb, 
 	linkWaSessionToUser, unlinkWaSessionFromUser, getWaSessionsForUser, userOwnsSession,
-	User, UserRole, generateToken, hashPassword, workerAssignmentDb, assignmentLogDb, hiddenMessageDb
+	generateToken, hashPassword, workerAssignmentDb, assignmentLogDb, hiddenMessageDb
 } from './auth.js'
+import type { User, UserRole } from './auth.js'
 import { 
 	authMiddleware, adminMiddleware, adminOrApiKeyMiddleware, optionalAuthMiddleware, 
 	sessionOwnerMiddleware, tokenMiddleware, apiKeyMiddleware, SESSION_COOKIE_NAME,
@@ -26,7 +27,7 @@ import { filterMessagesByVisibilityRange } from './visibility-range.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
-const publicDir = path.join(__dirname, 'public')
+const publicDir = path.resolve(__dirname, '..', 'public')
 const adminPublicDir = path.join(publicDir, 'admin')
 
 // Create exports directory
@@ -1827,13 +1828,13 @@ function resolveSession(sessionId?: string): string | null {
 // ════════════════════════════════════════════════════════════════
 app.post('/api/webhook/order-status', apiKeyMiddleware, async (req, res) => {
 	try {
-		const { order_id, status, nomor_client } = req.body
+		const { order_id, status, nomor_client, message } = req.body
 		if (!order_id || !status || !nomor_client) {
 			return res.status(400).json({ success: false, error: 'order_id, status, nomor_client wajib diisi.' })
 		}
 
 		const { handleOrderStatusWebhook } = await import('./crm-sync.js')
-		const result = handleOrderStatusWebhook({ order_id, status, nomor_client })
+		const result = handleOrderStatusWebhook({ order_id, status, nomor_client, message })
 
 		// Auto-send WA message to client
 		if (result.sendMessage) {
@@ -1857,6 +1858,50 @@ app.post('/api/webhook/order-status', apiKeyMiddleware, async (req, res) => {
 
 // POST /api/wa/send — kirim pesan teks
 // Body (JSON): { to, message, session_id? }
+// Simulator integrasi: menjalankan alur Node -> Laravel tanpa mengirim WhatsApp.
+app.get('/api/integrations/crm', adminOrApiKeyMiddleware, async (_req, res) => {
+	const { getCrmCommands, getCrmIntegrationStatus } = await import('./crm-sync.js')
+	const integration = getCrmIntegrationStatus()
+	const commands = integration.enabled ? await getCrmCommands() : null
+
+	res.status(commands && !commands.success ? (commands.httpStatus || 502) : 200).json({
+		success: integration.enabled && (!commands || commands.success),
+		integration,
+		commands: commands?.response || null,
+		error: commands?.error
+	})
+})
+
+app.post('/api/integrations/crm/simulate', adminOrApiKeyMiddleware, async (req, res) => {
+	const message = typeof req.body.message === 'string' ? req.body.message.trim() : ''
+	const sender = typeof req.body.sender === 'string' ? req.body.sender.replace(/[^0-9]/g, '') : ''
+	const sessionId = typeof req.body.session_id === 'string' ? req.body.session_id.trim() : 'simulator'
+	const persist = req.body.persist === true
+
+	if (!message || !sender) {
+		return res.status(422).json({ success: false, error: 'Nomor pengirim dan pesan wajib diisi.' })
+	}
+
+	const { forwardMessageToCrm, isCrmCommand } = await import('./crm-sync.js')
+	if (!isCrmCommand(message)) {
+		return res.status(422).json({
+			success: false,
+			error: 'Pesan harus diawali command seperti *proses, *selesai, #payment, atau alias dari Laravel.'
+		})
+	}
+
+	const result = await forwardMessageToCrm(message, sender, sessionId, {
+		simulate: !persist,
+		source: 'whatsapp'
+	})
+
+	return res.status(result.httpStatus || (result.success ? 200 : 502)).json({
+		...result,
+		persisted: persist && result.success,
+		simulation: !persist
+	})
+})
+
 app.post('/api/wa/send', apiKeyMiddleware, async (req, res) => {
 	try {
 		const { to, message, session_id } = req.body

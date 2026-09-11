@@ -1,3 +1,4 @@
+npx tsx src/web-server.ts
 @echo off
 chcp 65001 >nul
 title ⚡ WhatsApp API Server
@@ -11,5 +12,5 @@ echo.
 
 echo [i] Memulai server...
 echo.
-npx tsx web-server.ts
+npx tsx src/new-path/web-server.ts
 pause

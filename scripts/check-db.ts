@@ -1,4 +1,5 @@
 import { db } from './database.js';
+import { db } from '../src/database.js';
 
 const phone = '6289529537100';
 const sessionId = 'joki-2';
