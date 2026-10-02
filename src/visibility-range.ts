@@ -1,4 +1,4 @@
-export function getTimestampHHMM(timestamp) {
+export function getTimestampHHMM(timestamp: any) {
     const date = new Date(timestamp)
     if (!Number.isNaN(date.getTime())) {
         return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
@@ -9,7 +9,7 @@ export function getTimestampHHMM(timestamp) {
     return match ? `${match[1]}:${match[2]}` : ''
 }
 
-export function isTimeInVisibilityRange(hhmm, start, end) {
+export function isTimeInVisibilityRange(hhmm: any, start: any, end: any) {
     if (!hhmm) return false
     const from = start || null
     const to = end || null
@@ -22,7 +22,7 @@ export function isTimeInVisibilityRange(hhmm, start, end) {
     return true
 }
 
-export function filterMessagesByVisibilityRange(messages, start, end) {
+export function filterMessagesByVisibilityRange(messages: any[], start: any, end: any) {
     if (!start && !end) return messages
-    return messages.filter(message => isTimeInVisibilityRange(getTimestampHHMM(message.timestamp), start, end))
+    return messages.filter((message: any) => isTimeInVisibilityRange(getTimestampHHMM(message.timestamp), start, end))
 }

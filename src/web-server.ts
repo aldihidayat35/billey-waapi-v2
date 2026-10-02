@@ -941,7 +941,7 @@ app.get('/api/member/sessions', authMiddleware, (req, res) => {
 
 		// Admin: only return sessions that are actually connected (active)
 		// Worker/Member: return all assigned sessions regardless of connection state
-		if (user.role === 'adminwa' || user.role === 'admin') {
+		if (user.role === 'adminwa') {
 			sessions = sessions.filter(s => s.isConnected)
 		}
 
@@ -1161,12 +1161,12 @@ app.get('/api/member/messages/:sessionId/:contact', authMiddleware, (req, res) =
 		const limit = parseInt(req.query.limit as string) || 100
 
 		// Check session access
-		if (!userOwnsSession(user.id, sessionId, user.role)) {
+		if (!userOwnsSession(user.id, sessionId!, user.role)) {
 			return res.status(403).json({ success: false, error: 'Anda tidak memiliki akses ke session ini' })
 		}
 
 		// Worker: check contact-level access (also enforces time range)
-		if (user.role === 'worker' && !workerAssignmentDb.hasAccess(user.id, sessionId, contact)) {
+		if (user.role === 'worker' && !workerAssignmentDb.hasAccess(user.id, sessionId!, contact)) {
 			return res.status(403).json({ success: false, error: 'Anda tidak memiliki akses ke kontak ini' })
 		}
 
@@ -1187,12 +1187,12 @@ app.get('/api/member/messages/:sessionId/:contact', authMiddleware, (req, res) =
 		`).all(sessionId, contact, contact, limit) as any[]
 
 		// Get hidden message IDs for this session+contact
-		const hiddenIds = hiddenMessageDb.getHiddenForContact(sessionId, contact)
+		const hiddenIds = hiddenMessageDb.getHiddenForContact(sessionId!, contact)
 
 		// Get assignment info to send to frontend for header/notes rendering
 		let assignmentInfo = null;
 		if (user.role === 'worker') {
-			const assignment = workerAssignmentDb.getAssignment(user.id, sessionId, contact)
+			const assignment = workerAssignmentDb.getAssignment(user.id, sessionId!, contact)
 			if (assignment) {
 				assignmentInfo = {
 					notes: assignment.notes,
@@ -1351,11 +1351,11 @@ app.post('/api/member/messages/:sessionId/:contact/read', authMiddleware, (req, 
 	try {
 		const user = req.user!
 		const { sessionId, contact } = req.params
-		if (!userOwnsSession(user.id, sessionId, user.role)) {
+		if (!userOwnsSession(user.id, sessionId!, user.role)) {
 			return res.status(403).json({ success: false, error: 'Akses ditolak' })
 		}
 		// Worker: check contact-level access
-		if (user.role === 'worker' && !workerAssignmentDb.hasAccess(user.id, sessionId, contact)) {
+		if (user.role === 'worker' && !workerAssignmentDb.hasAccess(user.id, sessionId!, contact)) {
 			return res.status(403).json({ success: false, error: 'Akses ditolak' })
 		}
 		const result = db.prepare(`
@@ -1406,10 +1406,10 @@ app.get('/api/member/contact-detail/:sessionId/:contact', authMiddleware, (req, 
 	try {
 		const user = req.user!
 		const { sessionId, contact } = req.params
-		if (!userOwnsSession(user.id, sessionId, user.role)) {
+		if (!userOwnsSession(user.id, sessionId!, user.role)) {
 			return res.status(403).json({ success: false, error: 'Anda tidak memiliki akses ke session ini' })
 		}
-		if (user.role === 'worker' && !workerAssignmentDb.hasAccess(user.id, sessionId, contact)) {
+		if (user.role === 'worker' && !workerAssignmentDb.hasAccess(user.id, sessionId!, contact)) {
 			return res.status(403).json({ success: false, error: 'Anda tidak memiliki akses ke kontak ini' })
 		}
 		const cleanJid = contact
@@ -1529,8 +1529,8 @@ app.get('/api/member/contact-detail/:sessionId/:contact', authMiddleware, (req, 
 			docCount: docCount?.total || 0,
 			lastSeen: latest?.timestamp || null,
 			assignment: assignmentInfoRaw || null,
-			isGroup: contact.includes('@g.us'),
-			displayName: contactNameRow?.sender_name || (contact.includes('@g.us') ? contact.replace('@g.us', '') : ''),
+			isGroup: contact?.includes('@g.us'),
+			displayName: contactNameRow?.sender_name || (contact?.includes('@g.us') ? contact?.replace('@g.us', '') : ''),
 			phone: contact,
 			assignedWorkers,
 			mediaItems,
@@ -2009,7 +2009,7 @@ app.post('/api/wa/forward', apiKeyMiddleware, upload.single('file'), async (req:
 				fileBuffer = Buffer.from(arrayBuf)
 				// Infer mimetype from response header
 				const ct = response.headers.get('content-type')
-				if (ct && !bodyMimetype) fileMimetype = ct.split(';')[0].trim()
+				if (ct && !bodyMimetype) fileMimetype = ct!.split(';')[0].trim()
 				// Infer filename from URL
 				if (!bodyFilename) {
 					const urlPath = new URL(file_url).pathname
@@ -2455,7 +2455,7 @@ app.get('/api/session/:sessionId', (req, res) => {
 app.get('/api/messages/conversations/:sessionId', adminOrApiKeyMiddleware, (req, res) => {
 	try {
 		const { sessionId } = req.params
-		const conversations = activityLogger.getConversations(sessionId)
+		const conversations = activityLogger.getConversations(sessionId!)
 		res.json({ success: true, conversations })
 	} catch (error: any) {
 		console.error('Error fetching conversations:', error)
@@ -2467,10 +2467,10 @@ app.get('/api/messages/conversations/:sessionId', adminOrApiKeyMiddleware, (req,
 app.get('/api/messages/chat/:sessionId/:phone', adminOrApiKeyMiddleware, (req, res) => {
 	try {
 		const { sessionId, phone } = req.params
-		const messages = activityLogger.getChatMessages(sessionId, phone)
+		const messages = activityLogger.getChatMessages(sessionId!, phone!)
 
 		// Mark hidden messages for admin/member UI
-		const hiddenIds = hiddenMessageDb.getHiddenForContact(sessionId, phone)
+		const hiddenIds = hiddenMessageDb.getHiddenForContact(sessionId!, phone!)
 		const enriched = messages.map((m: any) => ({
 			...m,
 			is_hidden: hiddenIds.has(m.message_id)
@@ -2487,7 +2487,7 @@ app.get('/api/messages/chat/:sessionId/:phone', adminOrApiKeyMiddleware, (req, r
 app.get('/api/contacts/:sessionId', adminOrApiKeyMiddleware, (req, res) => {
 	try {
 		const { sessionId } = req.params
-		const contacts = activityLogger.getContacts(sessionId)
+		const contacts = activityLogger.getContacts(sessionId!)
 		res.json({ success: true, data: contacts })
 	} catch (error: any) {
 		console.error('Error fetching contacts:', error)
@@ -2500,7 +2500,7 @@ app.get('/api/logs/date/:date', adminOrApiKeyMiddleware, (req, res) => {
 	try {
 		const date = req.params.date
 		const type = (req.query.type as 'session' | 'message') || 'message'
-		const logs = activityLogger.getLogsByDate(date, type)
+		const logs = activityLogger.getLogsByDate(date!, type!)
 		res.json({ success: true, data: logs, count: logs.length })
 	} catch (error: any) {
 		console.error('Error fetching logs by date:', error)
@@ -2592,7 +2592,7 @@ app.get('/api/notifications/unread-count', authMiddleware, (req, res) => {
 app.put('/api/notifications/:id/read', authMiddleware, (req, res) => {
 	try {
 		const user = (req as any).user as User
-		const notifId = parseInt(req.params.id)
+		const notifId = parseInt(req.params.id!)
 		notificationDb.markAsRead(notifId, user.id)
 		res.json({ success: true })
 	} catch (error: any) {
@@ -2806,7 +2806,7 @@ io.on('connection', (socket) => {
 			let match
 			
 			while ((match = templatePattern.exec(data.message)) !== null) {
-				foundCodes.push(match[1].toUpperCase())
+				foundCodes.push(match![1].toUpperCase())
 			}
 			
 			// Remove duplicates
@@ -3399,7 +3399,7 @@ app.post('/api/database/query', (req, res) => {
 		const data = stmt.all()
 		
 		// Get column names from first row
-		const columns = data.length > 0 ? Object.keys(data[0]) : []
+		const columns = data.length > 0 ? Object.keys(data[0] as object) : []
 		
 		res.json({
 			success: true,

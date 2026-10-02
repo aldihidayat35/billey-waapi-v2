@@ -20,7 +20,8 @@ if (!fs.existsSync(dataDir)) {
 }
 
 // Initialize database
-const db = new Database(DB_PATH)
+// @ts-ignore
+const db: any = new Database(DB_PATH)
 
 // Enable foreign keys and WAL mode for better performance
 db.pragma('journal_mode = WAL')
