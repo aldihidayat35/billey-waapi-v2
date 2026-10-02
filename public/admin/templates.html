@@ -223,11 +223,17 @@
                                         <li class="breadcrumb-item text-muted">Templates</li>
                                     </ul>
                                 </div>
-                                <div class="d-flex align-items-center gap-2">
-                                    <button class="btn btn-sm btn-light-primary" onclick="refreshTemplates()">
+                                <div class="d-flex align-items-center flex-wrap gap-2">
+                                    <button class="btn btn-sm btn-light-success fw-bold" onclick="exportTemplates()" title="Export backup semua template ke file JSON">
+                                        <i class="bi bi-download me-1"></i>Export Backup
+                                    </button>
+                                    <button class="btn btn-sm btn-light-primary fw-bold" onclick="openImportModal()" title="Import template dari file backup JSON">
+                                        <i class="bi bi-upload me-1"></i>Import Template
+                                    </button>
+                                    <button class="btn btn-sm btn-light" onclick="refreshTemplates()">
                                         <i class="bi bi-arrow-clockwise me-1"></i>Refresh
                                     </button>
-                                    <button class="btn btn-sm btn-primary" onclick="openCreateModal()">
+                                    <button class="btn btn-sm btn-primary fw-bold" onclick="openCreateModal()">
                                         <i class="bi bi-plus-lg me-1"></i>Tambah Template
                                     </button>
                                 </div>
@@ -473,6 +479,68 @@
                     <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
                     <button type="button" class="btn btn-danger" onclick="confirmDelete()" id="confirm-delete-btn">
                         <i class="bi bi-trash me-1"></i>Hapus
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Import Template Modal -->
+    <div class="modal fade" id="importModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title d-flex align-items-center">
+                        <i class="bi bi-file-earmark-arrow-up text-primary fs-3 me-2"></i>Import Chat Templates
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-light-primary d-flex align-items-center p-4 mb-4 rounded-3 border border-primary border-opacity-25">
+                        <i class="bi bi-info-circle text-primary fs-3 me-3"></i>
+                        <div class="fs-8 text-gray-700">
+                            Pilih file backup template berformat <code>.json</code> yang telah diexport sebelumnya untuk diimpor kembali ke database.
+                        </div>
+                    </div>
+
+                    <!-- File Input -->
+                    <div class="mb-4">
+                        <label class="form-label required fw-bold fs-7 text-gray-800">File Backup (.json)</label>
+                        <input type="file" id="import-file" class="form-control form-control-solid" accept=".json,application/json" onchange="handleImportFileSelect(event)">
+                    </div>
+
+                    <!-- Preview Info Box -->
+                    <div id="import-preview-box" class="d-none mb-4 p-4 bg-light rounded-3 border border-dashed border-gray-300">
+                        <div class="d-flex align-items-center justify-content-between mb-2 pb-2 border-bottom border-gray-200">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="bi bi-file-earmark-code text-success fs-3"></i>
+                                <div>
+                                    <div class="fw-bold fs-7 text-gray-800" id="import-filename">-</div>
+                                    <div class="text-muted fs-9" id="import-filesize">-</div>
+                                </div>
+                            </div>
+                            <span class="badge badge-success fs-8 fw-bold" id="import-template-count">0 Template</span>
+                        </div>
+                        <div class="fs-8 text-gray-600" id="import-file-meta">
+                            File valid dan siap diimpor.
+                        </div>
+                    </div>
+
+                    <!-- Overwrite checkbox option -->
+                    <div class="form-check form-check-custom form-check-solid mb-1">
+                        <input class="form-check-input" type="checkbox" id="import-overwrite" value="1">
+                        <label class="form-check-label fw-semibold fs-7 text-gray-800 cursor-pointer user-select-none" for="import-overwrite">
+                            Timpa template jika kode (<span class="font-monospace text-primary">#KODE</span>) sudah ada di database
+                        </label>
+                    </div>
+                    <div class="text-muted fs-9 ps-7">
+                        Jika tidak dicentang, template dengan kode yang sama akan otomatis dilewati (skip) agar data yang sudah ada tetap aman.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
+                    <button type="button" class="btn btn-primary" id="btn-submit-import" onclick="submitImportTemplates()" disabled>
+                        <i class="bi bi-upload me-1"></i>Mulai Import
                     </button>
                 </div>
             </div>

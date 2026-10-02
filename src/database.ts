@@ -1034,6 +1034,84 @@ export const chatTemplateDb = {
         
         const stmt = db.prepare(query)
         return stmt.get(...params) !== undefined
+    },
+
+    // Batch import templates with overwrite toggle
+    importTemplates: (templates: any[], overwrite: boolean = false): { imported: number; updated: number; skipped: number; total: number; errors: string[] } => {
+        let imported = 0
+        let updated = 0
+        let skipped = 0
+        const errors: string[] = []
+
+        const insertStmt = db.prepare(`
+            INSERT INTO chat_templates (code, title, content, description, media_data, media_mimetype, media_filename, is_active, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+        `)
+
+        const updateStmt = db.prepare(`
+            UPDATE chat_templates 
+            SET title = ?, content = ?, description = ?, media_data = ?, media_mimetype = ?, media_filename = ?, is_active = ?, updated_at = datetime('now')
+            WHERE code = ? COLLATE NOCASE
+        `)
+
+        const checkStmt = db.prepare('SELECT id FROM chat_templates WHERE code = ? COLLATE NOCASE')
+
+        const runImport = db.transaction((items: any[]) => {
+            for (const item of items) {
+                if (!item || !item.code || !item.content) {
+                    skipped++
+                    continue
+                }
+
+                const cleanCode = String(item.code).toUpperCase().trim()
+                if (!/^[A-Za-z0-9_]+$/.test(cleanCode)) {
+                    skipped++
+                    errors.push(`Format kode "${item.code}" tidak valid (hanya huruf, angka, underscore).`)
+                    continue
+                }
+
+                const existing = checkStmt.get(cleanCode) as any
+
+                if (existing) {
+                    if (overwrite) {
+                        updateStmt.run(
+                            item.title || null,
+                            item.content,
+                            item.description || null,
+                            item.media_data || null,
+                            item.media_mimetype || null,
+                            item.media_filename || null,
+                            item.is_active !== undefined ? (item.is_active ? 1 : 0) : 1,
+                            cleanCode
+                        )
+                        updated++
+                    } else {
+                        skipped++
+                    }
+                } else {
+                    insertStmt.run(
+                        cleanCode,
+                        item.title || null,
+                        item.content,
+                        item.description || null,
+                        item.media_data || null,
+                        item.media_mimetype || null,
+                        item.media_filename || null,
+                        item.is_active !== undefined ? (item.is_active ? 1 : 0) : 1
+                    )
+                    imported++
+                }
+            }
+        })
+
+        try {
+            runImport(templates)
+        } catch (e: any) {
+            console.error('Error during chatTemplateDb.importTemplates transaction:', e)
+            errors.push(e.message)
+        }
+
+        return { imported, updated, skipped, total: templates.length, errors }
     }
 }
 

@@ -13,7 +13,9 @@ const TemplateState = {
     templateModal: null,
     viewModal: null,
     deleteModal: null,
-    deleteId: null
+    deleteId: null,
+    importModal: null,
+    importedData: null
 };
 
 // ============================================
@@ -70,6 +72,10 @@ function initModals() {
     TemplateState.templateModal = new bootstrap.Modal(document.getElementById('templateModal'));
     TemplateState.viewModal = new bootstrap.Modal(document.getElementById('viewModal'));
     TemplateState.deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+    const importModalEl = document.getElementById('importModal');
+    if (importModalEl) {
+        TemplateState.importModal = new bootstrap.Modal(importModalEl);
+    }
 }
 
 function setupEventListeners() {
@@ -642,6 +648,216 @@ function showToast(type, message) {
     }
 }
 
+// ============================================
+// EXPORT & IMPORT TEMPLATES
+// ============================================
+
+async function exportTemplates() {
+    try {
+        showToast('info', 'Menyiapkan file export backup...');
+        const response = await fetch('/api/templates/export');
+        const data = await response.json();
+
+        if (!data.success || !data.templates) {
+            showToast('error', data.error || 'Gagal mengexport templates');
+            return;
+        }
+
+        if (data.templates.length === 0) {
+            showToast('warning', 'Belum ada data template untuk diexport.');
+            return;
+        }
+
+        const dateStr = new Date().toISOString().split('T')[0];
+        const fileName = `chat-templates-backup-${dateStr}.json`;
+        const jsonString = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data, null, 2));
+
+        const downloadAnchor = document.createElement('a');
+        downloadAnchor.setAttribute("href", jsonString);
+        downloadAnchor.setAttribute("download", fileName);
+        document.body.appendChild(downloadAnchor);
+        downloadAnchor.click();
+        downloadAnchor.remove();
+
+        showToast('success', `Berhasil mengexport ${data.templates.length} template (${fileName})`);
+    } catch (error) {
+        console.error('Error exporting templates:', error);
+        showToast('error', 'Terjadi kesalahan saat mengexport template');
+    }
+}
+
+function openImportModal() {
+    TemplateState.importedData = null;
+    const fileInput = document.getElementById('import-file');
+    if (fileInput) fileInput.value = '';
+
+    const previewBox = document.getElementById('import-preview-box');
+    if (previewBox) previewBox.classList.add('d-none');
+
+    const submitBtn = document.getElementById('btn-submit-import');
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="bi bi-upload me-1"></i>Mulai Import';
+    }
+
+    const overwriteCb = document.getElementById('import-overwrite');
+    if (overwriteCb) overwriteCb.checked = false;
+
+    if (TemplateState.importModal) {
+        TemplateState.importModal.show();
+    }
+}
+
+function handleImportFileSelect(event) {
+    const file = event.target.files?.[0];
+    const previewBox = document.getElementById('import-preview-box');
+    const submitBtn = document.getElementById('btn-submit-import');
+
+    if (!file) {
+        TemplateState.importedData = null;
+        if (previewBox) previewBox.classList.add('d-none');
+        if (submitBtn) submitBtn.disabled = true;
+        return;
+    }
+
+    if (!file.name.toLowerCase().endsWith('.json')) {
+        showToast('error', 'Harap pilih file dengan format .json');
+        event.target.value = '';
+        TemplateState.importedData = null;
+        if (previewBox) previewBox.classList.add('d-none');
+        if (submitBtn) submitBtn.disabled = true;
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const content = JSON.parse(e.target.result);
+            let templates = [];
+
+            if (Array.isArray(content)) {
+                templates = content;
+            } else if (content && Array.isArray(content.templates)) {
+                templates = content.templates;
+            } else {
+                throw new Error('Format file JSON tidak berisi array template yang dikenali.');
+            }
+
+            // Filter items that have at least code & content
+            const validTemplates = templates.filter(t => t && t.code && t.content);
+
+            if (validTemplates.length === 0) {
+                showToast('warning', 'File JSON valid namun tidak ditemukan template dengan #KODE dan isi.');
+                TemplateState.importedData = null;
+                if (previewBox) previewBox.classList.add('d-none');
+                if (submitBtn) submitBtn.disabled = true;
+                return;
+            }
+
+            TemplateState.importedData = validTemplates;
+
+            // Update UI preview
+            const nameEl = document.getElementById('import-filename');
+            const sizeEl = document.getElementById('import-filesize');
+            const countEl = document.getElementById('import-template-count');
+            const metaEl = document.getElementById('import-file-meta');
+
+            if (nameEl) nameEl.textContent = file.name;
+            if (sizeEl) sizeEl.textContent = (file.size / 1024).toFixed(1) + ' KB';
+            if (countEl) countEl.textContent = `${validTemplates.length} Template`;
+            
+            if (metaEl) {
+                let infoText = `Terdeteksi <strong>${validTemplates.length} template</strong> siap diimpor.`;
+                if (content.exported_at) {
+                    infoText += ` Dibuat pada: ${formatDate(content.exported_at)}.`;
+                }
+                metaEl.innerHTML = infoText;
+            }
+
+            if (previewBox) previewBox.classList.remove('d-none');
+            if (submitBtn) submitBtn.disabled = false;
+
+        } catch (err) {
+            console.error('JSON Parse error:', err);
+            showToast('error', 'File JSON rusak atau format tidak valid: ' + err.message);
+            event.target.value = '';
+            TemplateState.importedData = null;
+            if (previewBox) previewBox.classList.add('d-none');
+            if (submitBtn) submitBtn.disabled = true;
+        }
+    };
+    reader.readAsText(file);
+}
+
+async function submitImportTemplates() {
+    if (!TemplateState.importedData || TemplateState.importedData.length === 0) {
+        showToast('error', 'Tidak ada data template untuk diimpor.');
+        return;
+    }
+
+    const submitBtn = document.getElementById('btn-submit-import');
+    const overwrite = document.getElementById('import-overwrite')?.checked || false;
+
+    try {
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Mengimpor...';
+        }
+
+        const response = await fetch('/api/templates/import', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                templates: TemplateState.importedData,
+                overwrite: overwrite
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            if (TemplateState.importModal) {
+                TemplateState.importModal.hide();
+            }
+
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Import Selesai!',
+                    html: `
+                        <div class="text-start p-3 bg-light rounded-3 fs-7 mb-2">
+                            <div><i class="bi bi-check-circle-fill text-success me-2"></i>Ditambahkan: <strong>${data.imported || 0}</strong> template</div>
+                            <div><i class="bi bi-arrow-repeat text-primary me-2"></i>Diperbarui (Timpa): <strong>${data.updated || 0}</strong> template</div>
+                            <div><i class="bi bi-dash-circle text-muted me-2"></i>Dilewati (Skip): <strong>${data.skipped || 0}</strong> template</div>
+                            <div class="border-top mt-2 pt-2 fw-bold text-gray-800">Total diproses: ${data.total || 0} template</div>
+                        </div>
+                    `,
+                    confirmButtonText: 'Tutup'
+                });
+            } else {
+                showToast('success', data.message || 'Import template berhasil!');
+            }
+
+            loadTemplates();
+        } else {
+            showToast('error', data.error || 'Gagal mengimpor template.');
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="bi bi-upload me-1"></i>Mulai Import';
+            }
+        }
+    } catch (error) {
+        console.error('Error submitting import:', error);
+        showToast('error', 'Terjadi kesalahan koneksi saat mengimpor template');
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="bi bi-upload me-1"></i>Mulai Import';
+        }
+    }
+}
+
 // Global functions
 window.openCreateModal = openCreateModal;
 window.editTemplate = editTemplate;
@@ -652,3 +868,7 @@ window.deleteTemplate = deleteTemplate;
 window.confirmDelete = confirmDelete;
 window.toggleTemplate = toggleTemplate;
 window.refreshTemplates = refreshTemplates;
+window.exportTemplates = exportTemplates;
+window.openImportModal = openImportModal;
+window.handleImportFileSelect = handleImportFileSelect;
+window.submitImportTemplates = submitImportTemplates;

@@ -4241,6 +4241,66 @@ app.get('/api/templates', (req, res) => {
 	}
 })
 
+// Export all templates as structured JSON backup
+app.get('/api/templates/export', (req, res) => {
+	try {
+		const templates = chatTemplateDb.getAll()
+		const dateStr = new Date().toISOString().split('T')[0]
+		const exportData = {
+			version: '1.0',
+			app: 'Billey WhatsApp Gateway',
+			exported_at: new Date().toISOString(),
+			total_templates: templates.length,
+			templates: templates.map(t => ({
+				code: t.code,
+				title: t.title,
+				content: t.content,
+				description: t.description,
+				is_active: t.is_active,
+				media_data: t.media_data,
+				media_mimetype: t.media_mimetype,
+				media_filename: t.media_filename
+			}))
+		}
+		
+		res.setHeader('Content-Type', 'application/json')
+		res.setHeader('Content-Disposition', `attachment; filename="chat-templates-backup-${dateStr}.json"`)
+		res.json({ success: true, ...exportData })
+	} catch (error: any) {
+		console.error('Error exporting templates:', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Import templates from JSON backup
+app.post('/api/templates/import', (req, res) => {
+	try {
+		let templates = req.body.templates
+		if (!templates && Array.isArray(req.body)) {
+			templates = req.body
+		}
+
+		if (!Array.isArray(templates) || templates.length === 0) {
+			return res.status(400).json({ 
+				success: false, 
+				error: 'Data template tidak valid atau kosong. Pastikan file JSON berisi array "templates".' 
+			})
+		}
+
+		const overwrite = req.body.overwrite === true || req.body.overwrite === 'true'
+		const result = chatTemplateDb.importTemplates(templates, overwrite)
+
+		res.json({
+			success: true,
+			message: `Import selesai: ${result.imported} ditambahkan, ${result.updated} diperbarui, ${result.skipped} dilewati.`,
+			...result
+		})
+	} catch (error: any) {
+		console.error('Error importing templates:', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
 // Get single template by ID
 app.get('/api/templates/:id', (req, res) => {
 	try {
