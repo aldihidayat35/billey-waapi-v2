@@ -88,6 +88,9 @@ export function memberMiddleware(req: Request, res: Response, next: NextFunction
 
 /**
  * Middleware to verify user token (for API access)
+ * Note: This only validates Member/Worker/Admin tokens from users.json.
+ * Guest API tokens (WATOKEN-...) are stored in guest_sessions.sqlite and will
+ * intentionally fail this validation, ensuring Guest isolation.
  */
 export function tokenMiddleware(req: Request, res: Response, next: NextFunction): void {
     const token = req.headers['x-api-token'] as string || req.query.token as string
@@ -102,12 +105,13 @@ export function tokenMiddleware(req: Request, res: Response, next: NextFunction)
 
     // Import here to avoid circular dependency
     import('./auth.js').then(({ userDb }) => {
+        // [SECURITY] Guest tokens will not be found here, providing native isolation.
         const user = userDb.getByToken(token)
         
         if (!user) {
             res.status(401).json({ 
                 success: false, 
-                error: 'API token tidak valid' 
+                error: 'API token tidak valid atau tidak memiliki akses ke endpoint ini.' 
             })
             return
         }
@@ -322,6 +326,9 @@ export function getSessionFilter(user: User | undefined, sessionIdColumn: string
  * Combined middleware: accepts either a valid static API key (X-Api-Key / WA_API_KEY)
  * OR a session-authenticated admin user.
  * Used for user-management endpoints so external CRM integrations can call them.
+ * 
+ * Note: Guest API tokens are isolated and cannot bypass this check, because
+ * userDb.getByToken() (used by validateSession) only queries users.json.
  */
 export function adminOrApiKeyMiddleware(req: Request, res: Response, next: NextFunction): void {
     // ── Try API key first ──
@@ -344,10 +351,11 @@ export function adminOrApiKeyMiddleware(req: Request, res: Response, next: NextF
         return
     }
 
+    // [SECURITY] Guest tokens are not valid here, maintaining strict isolation
     const user = validateSession(sessionToken)
     if (!user) {
         res.clearCookie(SESSION_COOKIE_NAME)
-        res.status(401).json({ success: false, error: 'Sesi tidak valid atau sudah berakhir.' })
+        res.status(401).json({ success: false, error: 'Sesi tidak valid, sudah berakhir, atau tidak berhak mengakses endpoint ini.' })
         return
     }
     if (user.role !== 'adminwa') {

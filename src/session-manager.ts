@@ -609,6 +609,7 @@ export class SessionManager {
 
 		// Handle incoming messages
 		sock.ev.on('messages.upsert', async ({ messages }) => {
+			const isGuestSession = sessionId.startsWith('guest_')
 			for (const msg of messages) {
 				if (msg.message) {
 					// Convert timestamp to milliseconds (WhatsApp sends in seconds)
@@ -652,7 +653,7 @@ export class SessionManager {
 					const source = fromMe ? 'mobile' : 'contact'
 					
 					// Check if message from mobile contains template codes (#CODE pattern)
-					if (fromMe && messageType === 'text' && messageContent.includes('#')) {
+					if (!isGuestSession && fromMe && messageType === 'text' && messageContent.includes('#')) {
 						// Detect all template codes in the message
 						const templatePattern = /#([A-Za-z0-9_]+)/g
 						const foundCodes: string[] = []
@@ -866,7 +867,7 @@ export class SessionManager {
 					// AUTO REPLY HANDLER
 					// ============================================
 					// Only process incoming text messages (not fromMe)
-					if (!fromMe && messageType === 'text' && messageContent) {
+					if (!isGuestSession && !fromMe && messageType === 'text' && messageContent) {
 						try {
 							const isGroup = remoteJid.includes('@g.us')
 							const senderNumber = isGroup ? (msg.key.participant || remoteJid) : remoteJid
@@ -1055,6 +1056,7 @@ export class SessionManager {
 					// ============================================
 					// AUTO FORWARD HANDLER
 					// ============================================
+					if (!isGuestSession) {
 					try {
 						const workerForwardBody = messageContent || messageCaption || (
 							messageType !== 'text'
@@ -1317,6 +1319,7 @@ export class SessionManager {
 					} catch (autoForwardError) {
 						console.error('⚠️ Auto-forward processing error:', autoForwardError)
 					}
+					} // Close !isGuestSession
 					
 					// Emit message for real-time updates (TARGETED — only authorized users)
 					const authorizedSockets = getAuthorizedSocketIds(sessionId, remoteJid)
@@ -1344,14 +1347,14 @@ export class SessionManager {
 					}
 
 					// Trigger notification for incoming messages (not fromMe)
-					if (!fromMe && this._notificationService) {
+					if (!isGuestSession && !fromMe && this._notificationService) {
 						this._notificationService.notifyIncomingMessage(
 							sessionId, remoteJid, messageContent, messageType
 						).catch((err: any) => console.error('⚠️ Notification error:', err))
 					}
 
 					// ── CRM Contact Sync (1x saat pertama chat) ──
-					if (!fromMe && this._crmSyncEnabled) {
+					if (!isGuestSession && !fromMe && this._crmSyncEnabled) {
 						const phoneDigits = remoteJid.replace(/@.*$/, '')
 						import('./crm-sync.js').then(({ syncNewContact }) => {
 							syncNewContact(sessionId, phoneDigits, msg.pushName || undefined)
@@ -1362,7 +1365,7 @@ export class SessionManager {
 					// ── CRM Order Processing (perintah *proses, *selesai, dll) ──
 					// fromMe: admin kirim ke client → client number = remoteJid
 					// !fromMe: client kirim ke admin → client number = remoteJid (pengirim)
-					if (this._crmSyncEnabled && messageType === 'text' && messageContent) {
+					if (!isGuestSession && this._crmSyncEnabled && messageType === 'text' && messageContent) {
 						const clientPhone = remoteJid.replace(/@.*$/, '')
 						import('./crm-sync.js').then(({ forwardMessageToCrm }) => {
 							forwardMessageToCrm(messageContent, clientPhone, sessionId)

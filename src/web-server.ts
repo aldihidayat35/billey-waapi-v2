@@ -2508,6 +2508,163 @@ app.get('/api/logs/date/:date', adminOrApiKeyMiddleware, (req, res) => {
 	}
 })
 
+
+// ============================================
+// STORAGE MANAGEMENT API
+// ============================================
+app.get('/api/storage/stats', adminOrApiKeyMiddleware, (req, res) => {
+    try {
+        const mediaDir = path.join(process.cwd(), 'src', 'data', 'media');
+        let totalSize = 0;
+        let fileCount = 0;
+        let oldestFileDate = new Date();
+        let newestFileDate = new Date(0);
+        
+        const getAllFiles = (dirPath: string, arrayOfFiles: string[] = []) => {
+            if (!fs.existsSync(dirPath)) return arrayOfFiles;
+            const files = fs.readdirSync(dirPath);
+            for (const file of files) {
+                if (file === '.gitignore') continue;
+                const fullPath = path.join(dirPath, file);
+                if (fs.statSync(fullPath).isDirectory()) {
+                    arrayOfFiles = getAllFiles(fullPath, arrayOfFiles);
+                } else {
+                    arrayOfFiles.push(fullPath);
+                }
+            }
+            return arrayOfFiles;
+        };
+
+        if (fs.existsSync(mediaDir)) {
+            const allFiles = getAllFiles(mediaDir);
+            for (const filePath of allFiles) {
+                const stats = fs.statSync(filePath);
+                if (stats.isFile()) {
+                    totalSize += stats.size;
+                    fileCount++;
+                    if (stats.mtime < oldestFileDate) oldestFileDate = stats.mtime;
+                    if (stats.mtime > newestFileDate) newestFileDate = stats.mtime;
+                }
+            }
+        }
+        
+        res.json({
+            success: true,
+            data: {
+                totalSize,
+                fileCount,
+                oldestFileDate: fileCount > 0 ? oldestFileDate : null,
+                newestFileDate: fileCount > 0 ? newestFileDate : null
+            }
+        });
+    } catch (error: any) {
+        console.error('Error fetching storage stats:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+
+app.get('/api/storage/gallery', adminOrApiKeyMiddleware, (req, res) => {
+    try {
+        const mediaDir = path.join(process.cwd(), 'src', 'data', 'media');
+        
+        if (!fs.existsSync(mediaDir)) {
+            return res.json({ success: true, data: [] });
+        }
+
+        const folders = fs.readdirSync(mediaDir);
+        const gallery: any[] = [];
+
+        for (const folder of folders) {
+            if (folder === '.gitignore') continue;
+            
+            const folderPath = path.join(mediaDir, folder);
+            if (!fs.statSync(folderPath).isDirectory()) continue;
+            
+            const files = fs.readdirSync(folderPath);
+            const mediaFiles = files.filter(f => f !== '.gitignore').map(f => {
+                const filePath = path.join(folderPath, f);
+                const stats = fs.statSync(filePath);
+                return {
+                    name: f,
+                    url: `/media/${folder}/${f}`,
+                    size: stats.size,
+                    date: stats.mtime
+                };
+            }).sort((a, b) => b.date.getTime() - a.date.getTime());
+
+            if (mediaFiles.length > 0) {
+                gallery.push({
+                    session: folder,
+                    count: mediaFiles.length,
+                    totalSize: mediaFiles.reduce((acc: number, curr: any) => acc + curr.size, 0),
+                    files: mediaFiles
+                });
+            }
+        }
+        
+        gallery.sort((a, b) => b.files[0].date.getTime() - a.files[0].date.getTime());
+
+        res.json({ success: true, data: gallery });
+    } catch (error: any) {
+        console.error('Error fetching gallery:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+app.delete('/api/storage/media', adminOrApiKeyMiddleware, (req, res) => {
+    try {
+        const olderThanDays = parseInt(req.body.olderThanDays as string || '0', 10);
+        const mediaDir = path.join(process.cwd(), 'src', 'data', 'media');
+        let deletedCount = 0;
+        let deletedSize = 0;
+        
+        if (!fs.existsSync(mediaDir)) {
+            return res.json({ success: true, deletedCount, deletedSize, message: 'Folder media kosong.' });
+        }
+        
+        const getAllFiles = (dirPath: string, arrayOfFiles: string[] = []) => {
+            if (!fs.existsSync(dirPath)) return arrayOfFiles;
+            const files = fs.readdirSync(dirPath);
+            for (const file of files) {
+                if (file === '.gitignore') continue;
+                const fullPath = path.join(dirPath, file);
+                if (fs.statSync(fullPath).isDirectory()) {
+                    arrayOfFiles = getAllFiles(fullPath, arrayOfFiles);
+                } else {
+                    arrayOfFiles.push(fullPath);
+                }
+            }
+            return arrayOfFiles;
+        };
+
+        const allFiles = getAllFiles(mediaDir);
+        const cutoffTime = new Date().getTime() - (olderThanDays * 24 * 60 * 60 * 1000);
+        
+        for (const filePath of allFiles) {
+            const stats = fs.statSync(filePath);
+            
+            if (stats.isFile() && stats.mtime.getTime() <= cutoffTime) {
+                fs.unlinkSync(filePath);
+                deletedCount++;
+                deletedSize += stats.size;
+            }
+        }
+        
+        res.json({
+            success: true,
+            deletedCount,
+            deletedSize,
+            message: `Berhasil menghapus ${deletedCount} file media.`
+        });
+    } catch (error: any) {
+        console.error('Error deleting media files:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ============================================
+
 // Clear old logs (admin only)
 app.delete('/api/logs/clear', adminOrApiKeyMiddleware, (req, res) => {
 	try {
