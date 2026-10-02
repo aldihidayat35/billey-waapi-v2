@@ -569,3 +569,253 @@ function showToast(type, message) {
         timerProgressBar: true
     });
 }
+
+// ============================================================
+// Export & Import Auto Reply Rules
+// ============================================================
+let importedRulesData = null;
+let importModalInstance = null;
+
+async function exportAutoReplyRules() {
+    try {
+        const sessionFilter = document.getElementById('filter-session')?.value || '';
+        let url = '/api/auto-reply/export';
+        if (sessionFilter) {
+            url += `?sessionId=${encodeURIComponent(sessionFilter)}`;
+        }
+
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (!data.success || !Array.isArray(data.rules)) {
+            Swal.fire('Error', data.error || 'Gagal mengexport rules', 'error');
+            return;
+        }
+
+        if (data.rules.length === 0) {
+            Swal.fire('Informasi', 'Belum ada rules auto reply untuk diexport.', 'info');
+            return;
+        }
+
+        const dateStr = new Date().toISOString().split('T')[0];
+        const sessionSuffix = sessionFilter ? `-${sessionFilter}` : '';
+        const fileName = `auto-reply-rules-backup${sessionSuffix}-${dateStr}.json`;
+        const jsonString = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data, null, 2));
+
+        const downloadAnchor = document.createElement('a');
+        downloadAnchor.setAttribute("href", jsonString);
+        downloadAnchor.setAttribute("download", fileName);
+        document.body.appendChild(downloadAnchor);
+        downloadAnchor.click();
+        downloadAnchor.remove();
+
+        showToast('success', `Berhasil mengexport ${data.rules.length} rules (${fileName})`);
+    } catch (error) {
+        console.error('Error exporting auto reply rules:', error);
+        Swal.fire('Error', 'Terjadi kesalahan saat mengexport rules', 'error');
+    }
+}
+
+function openImportModal() {
+    importedRulesData = null;
+    const fileInput = document.getElementById('import-file');
+    if (fileInput) fileInput.value = '';
+
+    const previewBox = document.getElementById('import-preview-box');
+    if (previewBox) previewBox.classList.add('d-none');
+
+    const submitBtn = document.getElementById('btn-submit-import');
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="bi bi-upload me-1"></i>Mulai Import';
+    }
+
+    const overwriteCb = document.getElementById('import-overwrite');
+    if (overwriteCb) overwriteCb.checked = false;
+
+    // Populate session options in import modal
+    const sessionTargetSelect = document.getElementById('import-session-target');
+    if (sessionTargetSelect) {
+        sessionTargetSelect.innerHTML = `
+            <option value="__keep__">Sesuai file backup (asli)</option>
+            <option value="">Semua Session (Global)</option>
+        `;
+        if (Array.isArray(sessions)) {
+            sessions.forEach(session => {
+                const opt = document.createElement('option');
+                opt.value = session.id;
+                opt.textContent = `${session.id} ${session.isConnected ? '🟢' : '🔴'} ${session.phoneNumber || ''}`;
+                sessionTargetSelect.appendChild(opt);
+            });
+        }
+    }
+
+    if (!importModalInstance) {
+        const el = document.getElementById('importModal');
+        if (el) importModalInstance = new bootstrap.Modal(el);
+    }
+    if (importModalInstance) {
+        importModalInstance.show();
+    }
+}
+
+function handleImportFileSelect(event) {
+    const file = event.target.files?.[0];
+    const previewBox = document.getElementById('import-preview-box');
+    const submitBtn = document.getElementById('btn-submit-import');
+
+    if (!file) {
+        importedRulesData = null;
+        if (previewBox) previewBox.classList.add('d-none');
+        if (submitBtn) submitBtn.disabled = true;
+        return;
+    }
+
+    if (!file.name.toLowerCase().endsWith('.json')) {
+        Swal.fire('Format Salah', 'Harap pilih file backup dengan format .json', 'warning');
+        event.target.value = '';
+        importedRulesData = null;
+        if (previewBox) previewBox.classList.add('d-none');
+        if (submitBtn) submitBtn.disabled = true;
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const content = JSON.parse(e.target.result);
+            let rawRules = [];
+
+            if (Array.isArray(content)) {
+                rawRules = content;
+            } else if (content && Array.isArray(content.rules)) {
+                rawRules = content.rules;
+            } else {
+                throw new Error('Format file JSON tidak berisi array "rules" yang dikenali.');
+            }
+
+            // Filter valid rules (requires name and response_content)
+            const validRules = rawRules.filter(r => r && r.name && r.response_content);
+
+            if (validRules.length === 0) {
+                Swal.fire('File Kosong', 'File JSON valid namun tidak ditemukan rule dengan nama dan isi balasan yang lengkap.', 'warning');
+                importedRulesData = null;
+                if (previewBox) previewBox.classList.add('d-none');
+                if (submitBtn) submitBtn.disabled = true;
+                return;
+            }
+
+            importedRulesData = validRules;
+
+            // Update UI preview
+            const nameEl = document.getElementById('import-filename');
+            const sizeEl = document.getElementById('import-filesize');
+            const countEl = document.getElementById('import-rule-count');
+            const metaEl = document.getElementById('import-file-meta');
+
+            if (nameEl) nameEl.textContent = file.name;
+            if (sizeEl) sizeEl.textContent = (file.size / 1024).toFixed(1) + ' KB';
+            if (countEl) countEl.textContent = `${validRules.length} Rules`;
+
+            if (metaEl) {
+                let infoText = `Terdeteksi <strong>${validRules.length} rule</strong> siap diimpor.`;
+                if (content.exported_at) {
+                    const d = new Date(content.exported_at);
+                    infoText += ` Dibuat pada: ${d.toLocaleString('id-ID')}.`;
+                }
+                metaEl.innerHTML = infoText;
+            }
+
+            if (previewBox) previewBox.classList.remove('d-none');
+            if (submitBtn) submitBtn.disabled = false;
+
+        } catch (err) {
+            console.error('JSON Parse error:', err);
+            Swal.fire('Format Tidak Valid', 'File JSON rusak atau tidak valid: ' + err.message, 'error');
+            event.target.value = '';
+            importedRulesData = null;
+            if (previewBox) previewBox.classList.add('d-none');
+            if (submitBtn) submitBtn.disabled = true;
+        }
+    };
+    reader.readAsText(file);
+}
+
+async function submitImportRules() {
+    if (!importedRulesData || importedRulesData.length === 0) {
+        Swal.fire('Error', 'Tidak ada data rules untuk diimpor.', 'error');
+        return;
+    }
+
+    const submitBtn = document.getElementById('btn-submit-import');
+    const overwrite = document.getElementById('import-overwrite')?.checked || false;
+    const targetSessionVal = document.getElementById('import-session-target')?.value;
+
+    const payload = {
+        rules: importedRulesData,
+        overwrite: overwrite
+    };
+
+    if (targetSessionVal && targetSessionVal !== '__keep__') {
+        payload.session_id = targetSessionVal;
+    } else if (targetSessionVal === '') {
+        payload.session_id = null; // force global
+    }
+
+    try {
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Mengimpor...';
+        }
+
+        const response = await fetch('/api/auto-reply/import', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            if (importModalInstance) {
+                importModalInstance.hide();
+            }
+
+            Swal.fire({
+                icon: 'success',
+                title: 'Import Selesai!',
+                html: `
+                    <div class="text-start p-3 bg-light rounded-3 fs-7 mb-2">
+                        <div><i class="bi bi-check-circle-fill text-success me-2"></i>Ditambahkan: <strong>${data.imported || 0}</strong> rule</div>
+                        <div><i class="bi bi-arrow-repeat text-primary me-2"></i>Diperbarui (Timpa): <strong>${data.updated || 0}</strong> rule</div>
+                        <div><i class="bi bi-dash-circle text-muted me-2"></i>Dilewati (Skip): <strong>${data.skipped || 0}</strong> rule</div>
+                        <div class="border-top mt-2 pt-2 fw-bold text-gray-800">Total diproses: ${data.total || 0} rule</div>
+                    </div>
+                `,
+                confirmButtonText: 'Tutup'
+            });
+
+            loadRules();
+            loadStats();
+        } else {
+            Swal.fire('Gagal Import', data.error || 'Gagal mengimpor rules.', 'error');
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="bi bi-upload me-1"></i>Mulai Import';
+            }
+        }
+    } catch (error) {
+        console.error('Error submitting import:', error);
+        Swal.fire('Error', 'Terjadi kesalahan koneksi saat mengimpor rules', 'error');
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="bi bi-upload me-1"></i>Mulai Import';
+        }
+    }
+}
+
+window.exportAutoReplyRules = exportAutoReplyRules;
+window.openImportModal = openImportModal;
+window.handleImportFileSelect = handleImportFileSelect;
+window.submitImportRules = submitImportRules;
+

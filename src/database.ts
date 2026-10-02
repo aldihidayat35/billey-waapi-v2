@@ -1651,6 +1651,182 @@ export const autoReplyDb = {
         }
         
         return null
+    },
+
+    // Import auto reply rules from backup
+    importRules: (rules: any[], overwrite: boolean = false, targetSessionId?: string | null): {
+        imported: number
+        updated: number
+        skipped: number
+        total: number
+        errors: string[]
+    } => {
+        const result = {
+            imported: 0,
+            updated: 0,
+            skipped: 0,
+            total: rules.length,
+            errors: [] as string[]
+        }
+
+        const findExistingStmt = db.prepare(`
+            SELECT id FROM auto_reply_rules 
+            WHERE LOWER(name) = LOWER(?)
+            AND (
+                (session_id IS NULL AND ? IS NULL) 
+                OR session_id = ?
+            )
+            LIMIT 1
+        `)
+
+        const insertStmt = db.prepare(`
+            INSERT INTO auto_reply_rules (
+                session_id, name, trigger_type, trigger_value, match_case,
+                response_type, response_content, response_media_url, response_media_data,
+                response_media_filename, response_media_mimetype,
+                scope, enabled, priority, cooldown_seconds, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+        `)
+
+        const updateStmt = db.prepare(`
+            UPDATE auto_reply_rules SET
+                trigger_type = ?,
+                trigger_value = ?,
+                match_case = ?,
+                response_type = ?,
+                response_content = ?,
+                response_media_url = ?,
+                response_media_data = ?,
+                response_media_filename = ?,
+                response_media_mimetype = ?,
+                scope = ?,
+                enabled = ?,
+                priority = ?,
+                cooldown_seconds = ?,
+                updated_at = datetime('now')
+            WHERE id = ?
+        `)
+
+        const importTx = db.transaction((ruleList: any[]) => {
+            for (let i = 0; i < ruleList.length; i++) {
+                const r = ruleList[i]
+                try {
+                    const name = String(r.name || '').trim()
+                    if (!name) {
+                        result.errors.push(`Baris #${i + 1}: Nama rule kosong, dilewati.`)
+                        result.skipped++
+                        continue
+                    }
+
+                    let triggerType = r.trigger_type || 'contains'
+                    const validTriggerTypes = ['exact', 'contains', 'starts_with', 'ends_with', 'regex']
+                    if (!validTriggerTypes.includes(triggerType)) {
+                        triggerType = 'contains'
+                    }
+
+                    // Format trigger_value
+                    let triggerVal = r.trigger_value
+                    if (Array.isArray(triggerVal)) {
+                        triggerVal = JSON.stringify(triggerVal.map((v: any) => String(v).trim()).filter(Boolean))
+                    } else if (typeof triggerVal === 'string') {
+                        try {
+                            const parsed = JSON.parse(triggerVal)
+                            if (Array.isArray(parsed)) {
+                                triggerVal = JSON.stringify(parsed.map((v: any) => String(v).trim()).filter(Boolean))
+                            } else {
+                                triggerVal = JSON.stringify([triggerVal.trim()])
+                            }
+                        } catch {
+                            triggerVal = JSON.stringify([triggerVal.trim()])
+                        }
+                    } else {
+                        triggerVal = JSON.stringify([String(triggerVal || '').trim()])
+                    }
+
+                    if (!triggerVal || triggerVal === '[]') {
+                        result.errors.push(`Rule "${name}": Trigger value kosong, dilewati.`)
+                        result.skipped++
+                        continue
+                    }
+
+                    const content = String(r.response_content || '').trim()
+                    if (!content) {
+                        result.errors.push(`Rule "${name}": Isi respon kosong, dilewati.`)
+                        result.skipped++
+                        continue
+                    }
+
+                    let responseType = r.response_type || 'text'
+                    const validResponseTypes = ['text', 'template', 'image', 'document', 'audio', 'video']
+                    if (!validResponseTypes.includes(responseType)) {
+                        responseType = 'text'
+                    }
+
+                    const sessionId = targetSessionId !== undefined ? (targetSessionId || null) : (r.session_id || null)
+
+                    let scope = r.scope || 'all'
+                    if (scope === 'both') scope = 'all'
+                    if (!['all', 'private', 'group'].includes(scope)) scope = 'all'
+
+                    const existing = findExistingStmt.get(name, sessionId, sessionId) as any
+
+                    if (existing) {
+                        if (overwrite) {
+                            updateStmt.run(
+                                triggerType,
+                                triggerVal,
+                                r.match_case ? 1 : 0,
+                                responseType,
+                                content,
+                                r.response_media_url || null,
+                                r.response_media_data || null,
+                                r.response_media_filename || null,
+                                r.response_media_mimetype || null,
+                                scope,
+                                r.enabled !== undefined ? (r.enabled ? 1 : 0) : 1,
+                                Number(r.priority) || 0,
+                                Number(r.cooldown_seconds) || 0,
+                                existing.id
+                            )
+                            result.updated++
+                        } else {
+                            result.skipped++
+                        }
+                    } else {
+                        insertStmt.run(
+                            sessionId,
+                            name,
+                            triggerType,
+                            triggerVal,
+                            r.match_case ? 1 : 0,
+                            responseType,
+                            content,
+                            r.response_media_url || null,
+                            r.response_media_data || null,
+                            r.response_media_filename || null,
+                            r.response_media_mimetype || null,
+                            scope,
+                            r.enabled !== undefined ? (r.enabled ? 1 : 0) : 1,
+                            Number(r.priority) || 0,
+                            Number(r.cooldown_seconds) || 0
+                        )
+                        result.imported++
+                    }
+                } catch (err: any) {
+                    result.errors.push(`Error pada rule #${i + 1} (${r.name || 'unnamed'}): ${err.message}`)
+                    result.skipped++
+                }
+            }
+        })
+
+        try {
+            importTx(rules)
+        } catch (e: any) {
+            console.error('Error during autoReplyDb.importRules transaction:', e)
+            result.errors.push('Transaksi database gagal: ' + e.message)
+        }
+
+        return result
     }
 }
 

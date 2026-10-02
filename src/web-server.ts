@@ -4590,6 +4590,79 @@ app.get('/api/auto-reply', (req, res) => {
 	}
 })
 
+// Export auto reply rules as JSON backup
+app.get('/api/auto-reply/export', (req, res) => {
+	try {
+		const { sessionId } = req.query
+		const rules = autoReplyDb.getAll({
+			sessionId: sessionId ? String(sessionId) : undefined
+		})
+		const dateStr = new Date().toISOString().split('T')[0]
+		const exportData = {
+			version: '1.0',
+			app: 'Billey WhatsApp Gateway',
+			type: 'auto_reply_rules',
+			exported_at: new Date().toISOString(),
+			session_id: sessionId || null,
+			total_rules: rules.length,
+			rules: rules.map(r => ({
+				name: r.name,
+				session_id: r.session_id,
+				trigger_type: r.trigger_type,
+				trigger_value: r.trigger_value,
+				match_case: r.match_case,
+				response_type: r.response_type,
+				response_content: r.response_content,
+				response_media_url: r.response_media_url,
+				response_media_data: r.response_media_data,
+				response_media_filename: r.response_media_filename,
+				response_media_mimetype: r.response_media_mimetype,
+				scope: r.scope,
+				enabled: r.enabled,
+				priority: r.priority,
+				cooldown_seconds: r.cooldown_seconds
+			}))
+		}
+		
+		res.setHeader('Content-Type', 'application/json')
+		res.setHeader('Content-Disposition', `attachment; filename="auto-reply-rules-backup-${dateStr}.json"`)
+		res.json({ success: true, ...exportData })
+	} catch (error: any) {
+		console.error('Error exporting auto reply rules:', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Import auto reply rules from JSON backup
+app.post('/api/auto-reply/import', (req, res) => {
+	try {
+		let rules = req.body.rules
+		if (!rules && Array.isArray(req.body)) {
+			rules = req.body
+		}
+
+		if (!Array.isArray(rules) || rules.length === 0) {
+			return res.status(400).json({ 
+				success: false, 
+				error: 'Data rules tidak valid atau kosong. Pastikan file JSON berisi array "rules".' 
+			})
+		}
+
+		const overwrite = req.body.overwrite === true || req.body.overwrite === 'true'
+		const targetSessionId = req.body.session_id !== undefined ? req.body.session_id : undefined
+		const result = autoReplyDb.importRules(rules, overwrite, targetSessionId)
+
+		res.json({
+			success: true,
+			message: `Import selesai: ${result.imported} ditambahkan, ${result.updated} diperbarui, ${result.skipped} dilewati.`,
+			...result
+		})
+	} catch (error: any) {
+		console.error('Error importing auto reply rules:', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
 // Get single auto reply rule by ID
 app.get('/api/auto-reply/:id', (req, res) => {
 	try {

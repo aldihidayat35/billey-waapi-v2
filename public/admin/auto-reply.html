@@ -614,10 +614,16 @@
                                     <div class="rules-header">
                                         <h5><i class="bi bi-gear me-2"></i>Daftar Auto Reply Rules</h5>
                                         <div class="rules-toolbar">
-                                            <button class="btn btn-sm btn-light-primary" onclick="loadRules()">
+                                            <button class="btn btn-sm btn-light-success fw-bold" onclick="exportAutoReplyRules()" title="Export backup semua rules ke file JSON">
+                                                <i class="bi bi-download me-1"></i>Export Backup
+                                            </button>
+                                            <button class="btn btn-sm btn-light-primary fw-bold" onclick="openImportModal()" title="Import rules dari file backup JSON">
+                                                <i class="bi bi-upload me-1"></i>Import Rules
+                                            </button>
+                                            <button class="btn btn-sm btn-light-secondary" onclick="loadRules()">
                                                 <i class="bi bi-arrow-clockwise me-1"></i>Refresh
                                             </button>
-                                            <button class="btn btn-sm btn-primary" onclick="openCreateModal()">
+                                            <button class="btn btn-sm btn-primary fw-bold" onclick="openCreateModal()">
                                                 <i class="bi bi-plus-lg me-1"></i>Tambah Rule
                                             </button>
                                         </div>
@@ -811,6 +817,78 @@
                     <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
                     <button type="button" class="btn btn-primary" onclick="saveRule()">
                         <i class="bi bi-check-lg me-1"></i>Simpan Rule
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Import Auto Reply Rules Modal -->
+    <div class="modal fade" id="importModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title d-flex align-items-center">
+                        <i class="bi bi-file-earmark-arrow-up text-primary fs-3 me-2"></i>Import Auto Reply Rules
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-light-primary d-flex align-items-center p-4 mb-4 rounded-3 border border-primary border-opacity-25">
+                        <i class="bi bi-info-circle text-primary fs-3 me-3"></i>
+                        <div class="fs-8 text-gray-700">
+                            Pilih file backup auto reply rules berformat <code>.json</code> yang telah diexport sebelumnya untuk diimpor kembali ke database.
+                        </div>
+                    </div>
+
+                    <!-- File Input -->
+                    <div class="mb-4">
+                        <label class="form-label required fw-bold fs-7 text-gray-800">File Backup (.json)</label>
+                        <input type="file" id="import-file" class="form-control form-control-solid" accept=".json,application/json" onchange="handleImportFileSelect(event)">
+                    </div>
+
+                    <!-- Target Session Option -->
+                    <div class="mb-4">
+                        <label class="form-label fw-bold fs-7 text-gray-800">Terapkan ke Session</label>
+                        <select class="form-select form-select-solid" id="import-session-target">
+                            <option value="__keep__">Sesuai file backup (asli)</option>
+                            <option value="">Semua Session (Global)</option>
+                        </select>
+                        <div class="text-muted fs-9 mt-1">Pilih apakah session mengikuti data di file backup atau dialihkan ke session tertentu.</div>
+                    </div>
+
+                    <!-- Preview Info Box -->
+                    <div id="import-preview-box" class="d-none mb-4 p-4 bg-light rounded-3 border border-dashed border-gray-300">
+                        <div class="d-flex align-items-center justify-content-between mb-2 pb-2 border-bottom border-gray-200">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="bi bi-file-earmark-code text-success fs-3"></i>
+                                <div>
+                                    <div class="fw-bold fs-7 text-gray-800" id="import-filename">-</div>
+                                    <div class="text-muted fs-9" id="import-filesize">-</div>
+                                </div>
+                            </div>
+                            <span class="badge bg-success fs-8 fw-bold" id="import-rule-count">0 Rules</span>
+                        </div>
+                        <div class="fs-8 text-gray-600" id="import-file-meta">
+                            File valid dan siap diimpor.
+                        </div>
+                    </div>
+
+                    <!-- Overwrite checkbox option -->
+                    <div class="form-check mb-1">
+                        <input class="form-check-input" type="checkbox" id="import-overwrite" value="1">
+                        <label class="form-check-label fw-semibold fs-7 text-gray-800 cursor-pointer user-select-none" for="import-overwrite">
+                            Timpa rule jika nama rule sudah ada di database
+                        </label>
+                    </div>
+                    <div class="text-muted fs-9 ps-4">
+                        Jika tidak dicentang, rule dengan nama yang sama akan otomatis dilewati (skip) agar konfigurasi yang sudah ada tetap aman.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
+                    <button type="button" class="btn btn-primary" id="btn-submit-import" onclick="submitImportRules()" disabled>
+                        <i class="bi bi-upload me-1"></i>Mulai Import
                     </button>
                 </div>
             </div>
@@ -1365,6 +1443,274 @@
                     }
                 } catch (error) {
                     Swal.fire('Error', 'Gagal membuat default rules', 'error');
+                }
+            }
+        }
+
+        // ============================================================
+        // Export & Import Auto Reply Rules
+        // ============================================================
+        let importedRulesData = null;
+        let importModalInstance = null;
+
+        function showToast(type, message) {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    toast: true,
+                    position: 'top-end',
+                    icon: type,
+                    title: message,
+                    showConfirmButton: false,
+                    timer: 3000,
+                    timerProgressBar: true
+                });
+            } else {
+                console.log(`[Toast ${type}]: ${message}`);
+            }
+        }
+
+        async function exportAutoReplyRules() {
+            try {
+                const sessionFilter = document.getElementById('filter-session')?.value || '';
+                let url = '/api/auto-reply/export';
+                if (sessionFilter) {
+                    url += `?sessionId=${encodeURIComponent(sessionFilter)}`;
+                }
+
+                const response = await fetch(url, { credentials: 'include' });
+                if (!response.ok) {
+                    const errData = await response.json().catch(() => ({}));
+                    Swal.fire('Error', errData.error || `HTTP Error ${response.status}`, 'error');
+                    return;
+                }
+
+                const data = await response.json();
+
+                if (!data.success || !Array.isArray(data.rules)) {
+                    Swal.fire('Error', data.error || 'Gagal mengexport rules', 'error');
+                    return;
+                }
+
+                if (data.rules.length === 0) {
+                    Swal.fire('Informasi', 'Belum ada rules auto reply untuk diexport.', 'info');
+                    return;
+                }
+
+                const dateStr = new Date().toISOString().split('T')[0];
+                const sessionSuffix = sessionFilter ? `-${sessionFilter}` : '';
+                const fileName = `auto-reply-rules-backup${sessionSuffix}-${dateStr}.json`;
+
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const blobUrl = URL.createObjectURL(blob);
+                const downloadAnchor = document.createElement('a');
+                downloadAnchor.href = blobUrl;
+                downloadAnchor.download = fileName;
+                document.body.appendChild(downloadAnchor);
+                downloadAnchor.click();
+                downloadAnchor.remove();
+                setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+
+                showToast('success', `Berhasil mengexport ${data.rules.length} rules (${fileName})`);
+            } catch (error) {
+                console.error('Error exporting auto reply rules:', error);
+                Swal.fire('Error', 'Terjadi kesalahan saat mengexport rules: ' + (error.message || error), 'error');
+            }
+        }
+
+        function openImportModal() {
+            importedRulesData = null;
+            const fileInput = document.getElementById('import-file');
+            if (fileInput) fileInput.value = '';
+
+            const previewBox = document.getElementById('import-preview-box');
+            if (previewBox) previewBox.classList.add('d-none');
+
+            const submitBtn = document.getElementById('btn-submit-import');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="bi bi-upload me-1"></i>Mulai Import';
+            }
+
+            const overwriteCb = document.getElementById('import-overwrite');
+            if (overwriteCb) overwriteCb.checked = false;
+
+            // Populate session options in import modal
+            const sessionTargetSelect = document.getElementById('import-session-target');
+            if (sessionTargetSelect) {
+                sessionTargetSelect.innerHTML = `
+                    <option value="__keep__">Sesuai file backup (asli)</option>
+                    <option value="">Semua Session (Global)</option>
+                `;
+                if (Array.isArray(sessions)) {
+                    sessions.forEach(session => {
+                        const opt = document.createElement('option');
+                        opt.value = session.id;
+                        opt.textContent = `${session.id} ${session.isConnected ? '🟢' : '🔴'} ${session.phoneNumber || ''}`;
+                        sessionTargetSelect.appendChild(opt);
+                    });
+                }
+            }
+
+            if (!importModalInstance) {
+                const el = document.getElementById('importModal');
+                if (el) importModalInstance = new bootstrap.Modal(el);
+            }
+            if (importModalInstance) {
+                importModalInstance.show();
+            }
+        }
+
+        function handleImportFileSelect(event) {
+            const file = event.target.files?.[0];
+            const previewBox = document.getElementById('import-preview-box');
+            const submitBtn = document.getElementById('btn-submit-import');
+
+            if (!file) {
+                importedRulesData = null;
+                if (previewBox) previewBox.classList.add('d-none');
+                if (submitBtn) submitBtn.disabled = true;
+                return;
+            }
+
+            if (!file.name.toLowerCase().endsWith('.json')) {
+                Swal.fire('Format Salah', 'Harap pilih file backup dengan format .json', 'warning');
+                event.target.value = '';
+                importedRulesData = null;
+                if (previewBox) previewBox.classList.add('d-none');
+                if (submitBtn) submitBtn.disabled = true;
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const content = JSON.parse(e.target.result);
+                    let rawRules = [];
+
+                    if (Array.isArray(content)) {
+                        rawRules = content;
+                    } else if (content && Array.isArray(content.rules)) {
+                        rawRules = content.rules;
+                    } else {
+                        throw new Error('Format file JSON tidak berisi array "rules" yang dikenali.');
+                    }
+
+                    // Filter valid rules (requires name and response_content)
+                    const validRules = rawRules.filter(r => r && r.name && r.response_content);
+
+                    if (validRules.length === 0) {
+                        Swal.fire('File Kosong', 'File JSON valid namun tidak ditemukan rule dengan nama dan isi balasan yang lengkap.', 'warning');
+                        importedRulesData = null;
+                        if (previewBox) previewBox.classList.add('d-none');
+                        if (submitBtn) submitBtn.disabled = true;
+                        return;
+                    }
+
+                    importedRulesData = validRules;
+
+                    // Update UI preview
+                    const nameEl = document.getElementById('import-filename');
+                    const sizeEl = document.getElementById('import-filesize');
+                    const countEl = document.getElementById('import-rule-count');
+                    const metaEl = document.getElementById('import-file-meta');
+
+                    if (nameEl) nameEl.textContent = file.name;
+                    if (sizeEl) sizeEl.textContent = (file.size / 1024).toFixed(1) + ' KB';
+                    if (countEl) countEl.textContent = `${validRules.length} Rules`;
+
+                    if (metaEl) {
+                        let infoText = `Terdeteksi <strong>${validRules.length} rule</strong> siap diimpor.`;
+                        if (content.exported_at) {
+                            const d = new Date(content.exported_at);
+                            infoText += ` Dibuat pada: ${d.toLocaleString('id-ID')}.`;
+                        }
+                        metaEl.innerHTML = infoText;
+                    }
+
+                    if (previewBox) previewBox.classList.remove('d-none');
+                    if (submitBtn) submitBtn.disabled = false;
+
+                } catch (err) {
+                    console.error('JSON Parse error:', err);
+                    Swal.fire('Format Tidak Valid', 'File JSON rusak atau tidak valid: ' + err.message, 'error');
+                    event.target.value = '';
+                    importedRulesData = null;
+                    if (previewBox) previewBox.classList.add('d-none');
+                    if (submitBtn) submitBtn.disabled = true;
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        async function submitImportRules() {
+            if (!importedRulesData || importedRulesData.length === 0) {
+                Swal.fire('Error', 'Tidak ada data rules untuk diimpor.', 'error');
+                return;
+            }
+
+            const submitBtn = document.getElementById('btn-submit-import');
+            const overwrite = document.getElementById('import-overwrite')?.checked || false;
+            const targetSessionVal = document.getElementById('import-session-target')?.value;
+
+            const payload = {
+                rules: importedRulesData,
+                overwrite: overwrite
+            };
+
+            if (targetSessionVal && targetSessionVal !== '__keep__') {
+                payload.session_id = targetSessionVal;
+            } else if (targetSessionVal === '') {
+                payload.session_id = null; // force global
+            }
+
+            try {
+                if (submitBtn) {
+                    submitBtn.disabled = true;
+                    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Mengimpor...';
+                }
+
+                const response = await fetch('/api/auto-reply/import', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    if (importModalInstance) {
+                        importModalInstance.hide();
+                    }
+
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Import Selesai!',
+                        html: `
+                            <div class="text-start p-3 bg-light rounded-3 fs-7 mb-2">
+                                <div><i class="bi bi-check-circle-fill text-success me-2"></i>Ditambahkan: <strong>${data.imported || 0}</strong> rule</div>
+                                <div><i class="bi bi-arrow-repeat text-primary me-2"></i>Diperbarui (Timpa): <strong>${data.updated || 0}</strong> rule</div>
+                                <div><i class="bi bi-dash-circle text-muted me-2"></i>Dilewati (Skip): <strong>${data.skipped || 0}</strong> rule</div>
+                                <div class="border-top mt-2 pt-2 fw-bold text-gray-800">Total diproses: ${data.total || 0} rule</div>
+                            </div>
+                        `,
+                        confirmButtonText: 'Tutup'
+                    });
+
+                    loadRules();
+                    loadStats();
+                } else {
+                    Swal.fire('Gagal Import', data.error || 'Gagal mengimpor rules.', 'error');
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = '<i class="bi bi-upload me-1"></i>Mulai Import';
+                    }
+                }
+            } catch (error) {
+                console.error('Error submitting import:', error);
+                Swal.fire('Error', 'Terjadi kesalahan koneksi saat mengimpor rules', 'error');
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="bi bi-upload me-1"></i>Mulai Import';
                 }
             }
         }

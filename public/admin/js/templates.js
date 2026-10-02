@@ -670,14 +670,15 @@ async function exportTemplates() {
 
         const dateStr = new Date().toISOString().split('T')[0];
         const fileName = `chat-templates-backup-${dateStr}.json`;
-        const jsonString = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data, null, 2));
-
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const blobUrl = URL.createObjectURL(blob);
         const downloadAnchor = document.createElement('a');
-        downloadAnchor.setAttribute("href", jsonString);
-        downloadAnchor.setAttribute("download", fileName);
+        downloadAnchor.href = blobUrl;
+        downloadAnchor.download = fileName;
         document.body.appendChild(downloadAnchor);
         downloadAnchor.click();
         downloadAnchor.remove();
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
 
         showToast('success', `Berhasil mengexport ${data.templates.length} template (${fileName})`);
     } catch (error) {
