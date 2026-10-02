@@ -1506,6 +1506,9 @@ function buildMessageActionItems(ctx) {
     if (!ctx.isDeleted && ctx.fromMe) {
         items.push({ action: 'edit', className: 'action-menu-edit', icon: 'bi-pencil', label: 'Edit', attrs: common });
     }
+    if (!ctx.isDeleted && (ctx.fromMe || ctx.remoteJid.endsWith('@g.us'))) {
+        items.push({ action: 'delete-for-everyone', className: 'action-menu-delete-everyone text-danger', icon: 'bi-trash3', label: 'Hapus untuk semua orang', attrs: common });
+    }
     if (!ctx.isDeleted) {
         items.push({ action: 'forward', className: 'action-menu-forward', icon: 'bi-forward-fill', label: 'Forward', attrs: common });
     }
@@ -1573,6 +1576,7 @@ function openMessageActionMenu(anchor) {
             }
             closeMessageActionMenu();
             if (action === 'edit') return startEditMessage(btn.dataset);
+            if (action === 'delete-for-everyone') return confirmDeleteForEveryone(btn.dataset);
             if (action === 'forward') return openForwardPrompt(btn.dataset);
             if (action === 'copy') {
                 await navigator.clipboard?.writeText(btn.dataset.text || '');
@@ -1582,6 +1586,47 @@ function openMessageActionMenu(anchor) {
             if (action === 'hide') return toggleHideMsg(btn);
         });
     });
+}
+
+async function confirmDeleteForEveryone(data) {
+    if (!S.socket || !S.activeSession || !data.msgid || !data.remotejid) return;
+    const res = await Swal.fire({
+        title: 'Hapus untuk semua orang?',
+        text: 'Pesan ini akan ditarik dan dihapus untuk semua orang di obrolan ini.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc2626',
+        cancelButtonColor: '#6b7280',
+        confirmButtonText: '<i class="bi bi-trash3 me-1"></i> Hapus Pesan',
+        cancelButtonText: 'Batal',
+        reverseButtons: true,
+        focusCancel: true
+    });
+
+    if (res.isConfirmed) {
+        Swal.fire({
+            title: 'Menghapus pesan...',
+            text: 'Mohon tunggu sebentar',
+            allowOutsideClick: false,
+            didOpen: () => {
+                Swal.showLoading();
+            }
+        });
+
+        S.socket.emit('delete-message', {
+            sessionId: S.activeSession,
+            remoteJid: data.remotejid,
+            messageId: data.msgid,
+            fromMe: data.fromme === '1',
+            participant: data.participant || null
+        });
+
+        setTimeout(() => {
+            if (Swal.isVisible() && Swal.isLoading()) {
+                Swal.close();
+            }
+        }, 1500);
+    }
 }
 
 function openReactionPicker(anchor) {
@@ -2202,6 +2247,13 @@ function setupSocketListeners() {
     sock.on('message.reaction.updated', data => applyMessageMutation('reaction', data));
     sock.on('message.deleted', data => applyMessageMutation('deleted', data));
     sock.on('message.edited', data => applyMessageMutation('edited', data));
+    sock.on('delete-error', data => {
+        Swal.fire({
+            icon: 'error',
+            title: 'Gagal Menghapus Pesan',
+            text: data.error || 'Terjadi kesalahan saat menghapus pesan untuk semua orang.'
+        });
+    });
 }
 
 function applyMessageMutation(type, data) {
@@ -2226,6 +2278,7 @@ function applyMessageMutation(type, data) {
         msg.is_deleted = true;
         msg.deleted_at = updated.deleted_at || new Date().toISOString();
         msg.status = 'deleted';
+        Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Pesan telah dihapus untuk semua orang', timer: 2000, showConfirmButton: false });
     } else if (type === 'edited') {
         msg.is_edited = true;
         msg.edited_at = updated.edited_at || new Date().toISOString();

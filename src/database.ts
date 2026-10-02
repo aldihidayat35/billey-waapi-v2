@@ -2827,7 +2827,10 @@ export const messageMutationDb = {
     },
 
     markDeleted: (sessionId: string, remoteJid: string, messageId: string, fromMe?: boolean, participant?: string | null, deletedBy?: string | null): any => {
-        const existing = messageMutationDb.findByMessageKey(sessionId, remoteJid, messageId, fromMe, participant)
+        let existing = messageMutationDb.findByMessageKey(sessionId, remoteJid, messageId, fromMe, participant)
+        if (!existing) {
+            existing = messageMutationDb.findByMessageKey(sessionId, '', messageId)
+        }
         if (!existing) return null
         db.prepare(`
             UPDATE message_logs

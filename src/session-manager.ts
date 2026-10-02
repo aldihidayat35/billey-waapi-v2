@@ -710,6 +710,34 @@ export class SessionManager {
 						remoteJid = this.resolveLidToPhone(sessionId, remoteJid)
 					}
 					
+					// Check if message is a protocol REVOKE message
+					const protocolType = msg.message?.protocolMessage?.type
+					const isRevokeProtocol = Number(protocolType) === 0 || String(protocolType || '').toLowerCase().includes('revoke')
+					if (isRevokeProtocol && msg.message?.protocolMessage?.key) {
+						const revKey = msg.message.protocolMessage.key
+						const revMsgId = revKey.id
+						const revRemoteJid = revKey.remoteJid ? this.normalizeChatJid(revKey.remoteJid) : remoteJid
+						if (revMsgId) {
+							console.log('🗑️ Incoming revoke protocol message for ' + revMsgId + ' in ' + revRemoteJid)
+							const updated = messageMutationDb.markDeleted(
+								sessionId,
+								revRemoteJid,
+								revMsgId,
+								revKey.fromMe ?? undefined,
+								revKey.participant || null,
+								msg.key.participant || null
+							)
+							if (updated) {
+								this.emitMessageMutation(sessionId, revRemoteJid, 'message.deleted', {
+									messageId: revMsgId,
+									isDeleted: true,
+									updatedMessage: updated
+								})
+							}
+						}
+						continue
+					}
+
 					const messageType = this.getMessageType(msg.message)
 					const messageContent = this.getMessageContent(msg.message)
 					const messageCaption = this.getMessageCaption(msg.message)
@@ -1615,6 +1643,54 @@ export class SessionManager {
 			text,
 			edit: messageKey
 		})
+	}
+
+	async deleteMessage(
+		sessionId: string,
+		chatJid: string,
+		messageKey: any
+	): Promise<any> {
+		const session = this.getSession(sessionId)
+		if (!session || !session.sock || !session.isConnected) {
+			throw new Error('Session not connected')
+		}
+
+		const normalizedChatJid = this.normalizeChatJid(chatJid)
+		const key: any = {
+			remoteJid: messageKey.remoteJid ? this.normalizeChatJid(messageKey.remoteJid) : normalizedChatJid,
+			id: messageKey.id,
+			fromMe: messageKey.fromMe !== false
+		}
+		if (messageKey.participant) {
+			key.participant = this.normalizeChatJid(messageKey.participant)
+		}
+
+		console.log('🗑️ Deleting message for everyone in ' + normalizedChatJid + ':', key)
+		const result = await session.sock.sendMessage(normalizedChatJid, {
+			delete: key
+		})
+
+		try {
+			const updated = messageMutationDb.markDeleted(
+				sessionId,
+				normalizedChatJid,
+				key.id,
+				key.fromMe,
+				key.participant || null,
+				key.participant || null
+			)
+			if (updated) {
+				this.emitMessageMutation(sessionId, normalizedChatJid, 'message.deleted', {
+					messageId: key.id,
+					isDeleted: true,
+					updatedMessage: updated
+				})
+			}
+		} catch (error) {
+			console.error('⚠️ Error marking deleted locally:', error)
+		}
+
+		return result
 	}
 
 	async sendImage(

@@ -21,7 +21,7 @@ import {
 	getUserSessionIds, getSessionFilter, getUserFilter
 } from './middleware.js'
 import multer from 'multer'
-import { NotificationService, registerUserSocket, unregisterUserSocket, registerAdminSocket, unregisterAdminSocket, isUserOnline, getOnlineUserCount } from './notification.js'
+import { NotificationService, registerUserSocket, unregisterUserSocket, registerAdminSocket, unregisterAdminSocket, isUserOnline, getOnlineUserCount, getAuthorizedSocketIds } from './notification.js'
 import { saveMedia, saveMediaBase64, getMediaDir, getMediaPath, cleanupOldMedia, migrateMediaFromDb, MEDIA_RETENTION_DAYS } from './media-storage.js'
 import { filterMessagesByVisibilityRange } from './visibility-range.js'
 
@@ -2549,6 +2549,79 @@ app.post('/api/chat/send-media', authMiddleware, upload.single('file'), async (r
 	}
 })
 
+// POST /api/chat/send-message — Send text message
+app.post('/api/chat/send-message', authMiddleware, async (req: any, res) => {
+	try {
+		const { sessionId, phone, message } = req.body
+		if (!sessionId || !phone || !message) {
+			return res.status(400).json({ success: false, error: 'sessionId, phone, dan message wajib diisi.' })
+		}
+		const sid = resolveSession(sessionId)
+		if (!sid) {
+			return res.status(503).json({ success: false, error: 'Tidak ada sesi WhatsApp yang terhubung.' })
+		}
+		const result = await sessionManager.sendMessage(sid, phone, message)
+		const messageId = result?.key?.id || `msg_${Date.now()}`
+		const jid = phone.includes('@') ? phone : `${phone.replace(/[^0-9]/g, '')}@s.whatsapp.net`
+		try {
+			messageLogDb.insert({
+				message_id: messageId,
+				session_id: sid,
+				direction: 'outgoing',
+				from_number: sid,
+				to_number: jid,
+				remote_jid: jid,
+				message_type: 'text',
+				content: message,
+				caption: '',
+				timestamp: new Date().toISOString(),
+				status: 'sent',
+				source: 'ui'
+			})
+		} catch (dbErr) {}
+		res.json({ success: true, messageId, result })
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// POST /api/chat/delete-message — Delete message for everyone (revoke)
+app.post('/api/chat/delete-message', authMiddleware, async (req: any, res) => {
+	try {
+		const { sessionId, phone, remoteJid, messageId, fromMe, participant } = req.body
+		if (!sessionId || (!phone && !remoteJid) || !messageId) {
+			return res.status(400).json({ success: false, error: 'sessionId, remoteJid/phone, dan messageId wajib diisi.' })
+		}
+		const sid = resolveSession(sessionId)
+		if (!sid) {
+			return res.status(503).json({ success: false, error: 'Tidak ada sesi WhatsApp yang terhubung.' })
+		}
+		const targetJid = remoteJid || phone
+		const key = {
+			remoteJid: targetJid,
+			id: messageId,
+			fromMe: fromMe !== false,
+			participant: participant || undefined
+		}
+		await sessionManager.deleteMessage(sid, targetJid, key)
+		const updated = messageMutationDb.markDeleted(sid, targetJid, messageId, fromMe, participant || null, participant || null)
+		const payload = {
+			sessionId: sid,
+			remoteJid: targetJid,
+			messageId,
+			isDeleted: true,
+			updatedMessage: updated
+		}
+		const authorizedSockets = getAuthorizedSocketIds(sid, targetJid)
+		for (const sidSocket of authorizedSockets) io.to(sidSocket).emit('message.deleted', payload)
+		io.emit('message.deleted', payload)
+		res.json({ success: true, message: 'Pesan berhasil dihapus untuk semua orang' })
+	} catch (error: any) {
+		console.error('[/api/chat/delete-message]', error.message)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
 // Get chat history for a contact
 app.get('/api/chat/history/:sessionId/:contactNumber', (req, res) => {
 	try {
@@ -3631,6 +3704,36 @@ io.on('connection', (socket) => {
 			const authorizedSockets = getAuthorizedSocketIds(data.sessionId, data.remoteJid)
 			for (const sid of authorizedSockets) io.to(sid).emit('message.edited', payload)
 		} catch (error: any) {
+			socket.emit('send-error', { messageId: data.messageId, error: error.message })
+		}
+	})
+
+	socket.on('delete-message', async (data: { sessionId: string, remoteJid: string, messageId: string, fromMe?: boolean, participant?: string | null }) => {
+		try {
+			if (!data.sessionId || !data.remoteJid || !data.messageId) {
+				throw new Error('sessionId, remoteJid, dan messageId wajib diisi')
+			}
+			const key = {
+				remoteJid: data.remoteJid,
+				id: data.messageId,
+				fromMe: data.fromMe !== false,
+				participant: data.participant || undefined
+			}
+			await sessionManager.deleteMessage(data.sessionId, data.remoteJid, key)
+			const updated = messageMutationDb.markDeleted(data.sessionId, data.remoteJid, data.messageId, data.fromMe, data.participant || null, data.participant || null)
+			const payload = {
+				sessionId: data.sessionId,
+				remoteJid: data.remoteJid,
+				messageId: data.messageId,
+				isDeleted: true,
+				updatedMessage: updated
+			}
+			socket.emit('message.deleted', payload)
+			const authorizedSockets = getAuthorizedSocketIds(data.sessionId, data.remoteJid)
+			for (const sid of authorizedSockets) io.to(sid).emit('message.deleted', payload)
+		} catch (error: any) {
+			console.error('❌ Error deleting message via socket:', error)
+			socket.emit('delete-error', { messageId: data.messageId, error: error.message })
 			socket.emit('send-error', { messageId: data.messageId, error: error.message })
 		}
 	})
