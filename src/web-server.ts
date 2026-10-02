@@ -54,6 +54,20 @@ sessionManager.setNotificationService(notificationService)
 app.use(cookieParser()) // Parse cookies for session management
 app.use(express.json({ limit: '50mb' })) // Increase limit for media uploads
 
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } })
+
+/**
+ * Helper: pilih session yang aktif.
+ * Jika sessionId diberikan, pakai itu.
+ * Jika tidak, pilih sesi pertama yang terkoneksi.
+ */
+function resolveSession(sessionId?: string): string | null {
+	if (sessionId) return sessionId
+	const all = sessionManager.getAllSessions()
+	const connected = all.find(s => s.isConnected)
+	return connected?.id ?? null
+}
+
 // ============================================
 // Authentication Middleware for Static Files
 // ============================================
@@ -489,37 +503,153 @@ app.delete('/api/guest-session/:sessionId', async (req, res) => {
 	}
 })
 
-app.post('/api/send-message', async (req, res) => {
+app.post('/api/send-message', async (req: any, res: any) => {
 	try {
-		const row = getGuestSessionByToken(getGuestBearerToken(req))
-		if (!row) return res.status(401).json({ success: false, error: 'Bearer token guest tidak valid.' })
-		const { session_id, to, message } = req.body
+		const { session_id, sessionId, to, message } = req.body
+		const targetSessionId = session_id || sessionId
 		if (!to || !message) return res.status(400).json({ success: false, error: 'Field "to" dan "message" wajib diisi.' })
-		if (session_id && session_id !== row.session_id) return res.status(403).json({ success: false, error: 'Token tidak memiliki akses ke session ini.' })
-		const info = updateGuestSessionFromRuntime(row.session_id) || row
-		if (info.status !== 'connected') return res.status(409).json({ success: false, error: 'Session belum connected.' })
 
-		const result = await sessionManager.sendMessage(row.session_id, to, message)
+		// Authenticate: Guest Bearer Token OR API Key / Token / Admin Session
+		const guestToken = getGuestBearerToken(req)
+		const guestRow = guestToken ? getGuestSessionByToken(guestToken) : null
+
+		let sid = ''
+		if (guestRow) {
+			if (targetSessionId && targetSessionId !== guestRow.session_id) {
+				return res.status(403).json({ success: false, error: 'Token tidak memiliki akses ke session ini.' })
+			}
+			const info = updateGuestSessionFromRuntime(guestRow.session_id) || guestRow
+			if (info.status !== 'connected') return res.status(409).json({ success: false, error: 'Session belum connected.' })
+			sid = guestRow.session_id
+		} else {
+			const providedKey = (req.headers['x-api-key'] as string) || (req.query.api_key as string) || (req.headers['x-api-token'] as string) || (req.query.token as string)
+			const envKey = process.env.WA_API_KEY
+			const sessionCookie = req.cookies?.[SESSION_COOKIE_NAME] || req.headers['x-session-token'] || req.headers.authorization?.replace('Bearer ', '')
+
+			let isAuthorized = false
+			if (envKey && providedKey === envKey) isAuthorized = true
+			if (!isAuthorized && providedKey) {
+				const u = userDb.getByToken(String(providedKey))
+				if (u && u.status === 'aktif') isAuthorized = true
+			}
+			if (!isAuthorized && sessionCookie) {
+				const u = validateSession(String(sessionCookie))
+				if (u) isAuthorized = true
+			}
+
+			if (!isAuthorized) {
+				return res.status(401).json({ success: false, error: 'Autentikasi diperlukan. Gunakan header X-Api-Key atau Bearer token.' })
+			}
+
+			const resolved = resolveSession(targetSessionId)
+			if (!resolved) {
+				return res.status(503).json({ success: false, error: 'Tidak ada sesi WhatsApp yang terhubung.' })
+			}
+			sid = resolved
+		}
+
+		const result = await sessionManager.sendMessage(sid, to, message)
 		const jid = to.includes('@') ? to : `${String(to).replace(/[^0-9]/g, '')}@s.whatsapp.net`
 		try {
 			messageLogDb.insert({
-				message_id: result?.key?.id || `guest_${Date.now()}`,
-				session_id: row.session_id,
+				message_id: result?.key?.id || `msg_${Date.now()}`,
+				session_id: sid,
 				direction: 'outgoing',
-				from_number: row.session_id,
+				from_number: sid,
 				to_number: jid,
 				remote_jid: jid,
 				message_type: 'text',
 				content: message,
 				timestamp: new Date().toISOString(),
 				status: 'sent',
-				source: 'guest_api'
+				source: guestRow ? 'guest_api' : 'rest_api'
 			})
 		} catch (dbError) {
-			console.error('[guest-send-message/log]', dbError)
+			console.error('[send-message/log]', dbError)
 		}
-		res.json({ success: true, message: 'Pesan berhasil dikirim.', data: { session_id: row.session_id, to, msg_id: result?.key?.id } })
+		res.json({ success: true, message: 'Pesan berhasil dikirim.', data: { session_id: sid, to, msg_id: result?.key?.id } })
 	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// POST /api/send-image — Universal & Guest image send endpoint
+app.post('/api/send-image', upload.single('file'), async (req: any, res: any) => {
+	try {
+		const { session_id, sessionId, to, caption, imageUrl, image } = req.body
+		const targetSessionId = session_id || sessionId
+		const file = req.file
+
+		if (!to || (!file && !imageUrl && !image)) {
+			return res.status(400).json({ success: false, error: 'Field "to" dan file gambar/imageUrl wajib diisi.' })
+		}
+
+		// Authenticate: Guest Bearer Token OR API Key / Token / Admin Session
+		const guestToken = getGuestBearerToken(req)
+		const guestRow = guestToken ? getGuestSessionByToken(guestToken) : null
+
+		let sid = ''
+		if (guestRow) {
+			if (targetSessionId && targetSessionId !== guestRow.session_id) {
+				return res.status(403).json({ success: false, error: 'Token tidak memiliki akses ke session ini.' })
+			}
+			const info = updateGuestSessionFromRuntime(guestRow.session_id) || guestRow
+			if (info.status !== 'connected') return res.status(409).json({ success: false, error: 'Session belum connected.' })
+			sid = guestRow.session_id
+		} else {
+			const providedKey = (req.headers['x-api-key'] as string) || (req.query.api_key as string) || (req.headers['x-api-token'] as string) || (req.query.token as string)
+			const envKey = process.env.WA_API_KEY
+			const sessionCookie = req.cookies?.[SESSION_COOKIE_NAME] || req.headers['x-session-token'] || req.headers.authorization?.replace('Bearer ', '')
+
+			let isAuthorized = false
+			if (envKey && providedKey === envKey) isAuthorized = true
+			if (!isAuthorized && providedKey) {
+				const u = userDb.getByToken(String(providedKey))
+				if (u && u.status === 'aktif') isAuthorized = true
+			}
+			if (!isAuthorized && sessionCookie) {
+				const u = validateSession(String(sessionCookie))
+				if (u) isAuthorized = true
+			}
+
+			if (!isAuthorized) {
+				return res.status(401).json({ success: false, error: 'Autentikasi diperlukan. Gunakan header X-Api-Key atau Bearer token.' })
+			}
+
+			const resolved = resolveSession(targetSessionId)
+			if (!resolved) {
+				return res.status(503).json({ success: false, error: 'Tidak ada sesi WhatsApp yang terhubung.' })
+			}
+			sid = resolved
+		}
+
+		let imgBuffer: Buffer | null = null
+		let mimetype = 'image/jpeg'
+		let filename = 'image.jpg'
+
+		if (file) {
+			imgBuffer = file.buffer
+			mimetype = file.mimetype || mimetype
+			filename = file.originalname || filename
+		} else if (imageUrl) {
+			const imgRes = await fetch(imageUrl)
+			if (!imgRes.ok) throw new Error(`Gagal mendownload gambar dari imageUrl: ${imgRes.statusText}`)
+			const arrayBuf = await imgRes.arrayBuffer()
+			imgBuffer = Buffer.from(arrayBuf)
+			mimetype = imgRes.headers.get('content-type') || mimetype
+		} else if (image) {
+			const base64Data = image.replace(/^data:image\/\w+;base64,/, '')
+			imgBuffer = Buffer.from(base64Data, 'base64')
+		}
+
+		if (!imgBuffer) {
+			return res.status(400).json({ success: false, error: 'Data gambar tidak valid.' })
+		}
+
+		const result = await sessionManager.sendImage(sid, to, imgBuffer, caption || undefined, mimetype, filename)
+		res.json({ success: true, message: 'Gambar berhasil dikirim.', data: { to, session_id: sid, filename, msg_id: result?.key?.id } })
+	} catch (error: any) {
+		console.error('[/api/send-image]', error.message)
 		res.status(500).json({ success: false, error: error.message })
 	}
 })
@@ -1836,19 +1966,7 @@ app.get('/dashboard', (req, res) => {
 //
 // Jika WA_API_KEY belum di-set, gunakan X-Api-Token (user token)
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } })
-
-/**
- * Helper: pilih session yang aktif.
- * Jika sessionId diberikan, pakai itu.
- * Jika tidak, pilih sesi pertama yang terkoneksi.
- */
-function resolveSession(sessionId?: string): string | null {
-	if (sessionId) return sessionId
-	const all = sessionManager.getAllSessions()
-	const connected = all.find(s => s.isConnected)
-	return connected?.id ?? null
-}
+// (upload & resolveSession moved to top)
 
 // ════════════════════════════════════════════════════════════════
 //  WEBHOOK: Order Status from Jokiin CRM
@@ -1931,11 +2049,11 @@ app.post('/api/integrations/crm/simulate', adminOrApiKeyMiddleware, async (req, 
 
 app.post('/api/wa/send', apiKeyMiddleware, async (req, res) => {
 	try {
-		const { to, message, session_id } = req.body
+		const { to, message, session_id, sessionId } = req.body
 		if (!to || !message) {
 			return res.status(400).json({ success: false, error: 'Field "to" dan "message" wajib diisi.' })
 		}
-		const sid = resolveSession(session_id)
+		const sid = resolveSession(session_id || sessionId)
 		if (!sid) {
 			return res.status(503).json({ success: false, error: 'Tidak ada sesi WhatsApp yang terhubung.' })
 		}
@@ -1951,17 +2069,41 @@ app.post('/api/wa/send', apiKeyMiddleware, async (req, res) => {
 // Multipart form-data: to, caption?(opsional), session_id?(opsional), file
 app.post('/api/wa/send-image', apiKeyMiddleware, upload.single('file'), async (req: any, res) => {
 	try {
-		const { to, caption, session_id } = req.body
+		const { to, caption, session_id, sessionId, imageUrl, image } = req.body
 		const file = req.file
-		if (!to || !file) {
-			return res.status(400).json({ success: false, error: 'Field "to" dan "file" (gambar) wajib diisi.' })
+		if (!to || (!file && !imageUrl && !image)) {
+			return res.status(400).json({ success: false, error: 'Field "to" dan "file" (gambar) atau "imageUrl" wajib diisi.' })
 		}
-		const sid = resolveSession(session_id)
+		const sid = resolveSession(session_id || sessionId)
 		if (!sid) {
 			return res.status(503).json({ success: false, error: 'Tidak ada sesi WhatsApp yang terhubung.' })
 		}
-		const result = await sessionManager.sendImage(sid, to, file.buffer, caption || undefined, file.mimetype, file.originalname)
-		res.json({ success: true, message: 'Gambar berhasil dikirim.', data: { to, session_id: sid, filename: file.originalname, msg_id: result?.key?.id } })
+
+		let imgBuffer: Buffer | null = null
+		let mimetype = 'image/jpeg'
+		let filename = 'image.jpg'
+
+		if (file) {
+			imgBuffer = file.buffer
+			mimetype = file.mimetype || mimetype
+			filename = file.originalname || filename
+		} else if (imageUrl) {
+			const imgRes = await fetch(imageUrl)
+			if (!imgRes.ok) throw new Error(`Gagal mendownload gambar dari imageUrl: ${imgRes.statusText}`)
+			const arrayBuf = await imgRes.arrayBuffer()
+			imgBuffer = Buffer.from(arrayBuf)
+			mimetype = imgRes.headers.get('content-type') || mimetype
+		} else if (image) {
+			const base64Data = image.replace(/^data:image\/\w+;base64,/, '')
+			imgBuffer = Buffer.from(base64Data, 'base64')
+		}
+
+		if (!imgBuffer) {
+			return res.status(400).json({ success: false, error: 'Data gambar tidak valid.' })
+		}
+
+		const result = await sessionManager.sendImage(sid, to, imgBuffer, caption || undefined, mimetype, filename)
+		res.json({ success: true, message: 'Gambar berhasil dikirim.', data: { to, session_id: sid, filename, msg_id: result?.key?.id } })
 	} catch (error: any) {
 		console.error('[/api/wa/send-image]', error.message)
 		res.status(500).json({ success: false, error: error.message })
@@ -4841,7 +4983,8 @@ app.get('/api/groups/:sessionId', async (req, res) => {
 		})
 	} catch (error: any) {
 		console.error('Error fetching groups:', error)
-		res.status(500).json({ success: false, error: error.message })
+		const status = error.message?.includes('not connected') ? 503 : (error.message?.includes('not found') ? 404 : 500)
+		res.status(status).json({ success: false, error: error.message })
 	}
 })
 
@@ -5190,6 +5333,20 @@ app.get('/api/group-exports', (req, res) => {
 	}
 })
 
+// Get export statistics
+app.get('/api/group-exports/statistics', (req, res) => {
+	try {
+		const stats = groupExportDb.getStats()
+		res.json({
+			success: true,
+			stats: stats
+		})
+	} catch (error: any) {
+		console.error('Error fetching export statistics:', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
 // Get single export by ID
 app.get('/api/group-exports/:id', (req, res) => {
 	try {
@@ -5381,19 +5538,7 @@ app.post('/api/group-exports/bulk-delete', (req, res) => {
 	}
 })
 
-// Get export statistics
-app.get('/api/group-exports/statistics', (req, res) => {
-	try {
-		const stats = groupExportDb.getStats()
-		res.json({
-			success: true,
-			stats: stats
-		})
-	} catch (error: any) {
-		console.error('Error fetching export statistics:', error)
-		res.status(500).json({ success: false, error: error.message })
-	}
-})
+// (group-exports/statistics moved above :id route)
 
 // ============================================
 // User Frontend API Endpoints

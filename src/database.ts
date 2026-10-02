@@ -285,6 +285,19 @@ try {
     `)
     console.log('✅ Contacts table initialized')
 } catch (e) { /* table may already exist */ }
+// ── Migration: Add link_sent column to guest_sessions ───────────────────────
+try {
+    const guestTableInfo = db.prepare("PRAGMA table_info(guest_sessions)").all() as any[]
+    const guestCols = guestTableInfo.map(col => col.name)
+    if (!guestCols.includes('link_sent')) {
+        console.log('🔄 Migrating guest_sessions: Adding link_sent column...')
+        db.exec('ALTER TABLE guest_sessions ADD COLUMN link_sent INTEGER DEFAULT 0')
+        db.exec("UPDATE guest_sessions SET link_sent = 1 WHERE status = 'connected'")
+    }
+} catch (e) {
+    console.error('Migration error for guest_sessions.link_sent:', e)
+}
+
 
 // Migration: Add media columns to chat_templates if they don't exist
 try {

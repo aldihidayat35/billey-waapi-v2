@@ -1,0 +1,1676 @@
+const fs = require('fs');
+const path = require('path');
+
+// Complete specifications for all 97 endpoints
+const endpoints = [
+    // 1. AUTHENTICATION (4)
+    {
+        cat: 'api-auth',
+        method: 'POST',
+        path: '/api/auth/login',
+        summary: 'Login user dan dapatkan session cookie',
+        desc: 'Autentikasi akun pengguna dengan email dan password. Mengembalikan cookie sesi wa_session serta data profil pengguna.',
+        auth: 'Publik (Tidak Butuh Auth)',
+        authType: 'none',
+        params: [
+            { name: 'email', in: 'body', type: 'string', required: true, desc: 'Alamat email pengguna terdaftar (contoh: admin@admin.com)' },
+            { name: 'password', in: 'body', type: 'string', required: true, desc: 'Kata sandi pengguna' }
+        ],
+        body: { email: 'admin@admin.com', password: 'admin123' },
+        responses: {
+            200: { success: true, message: 'Login berhasil', user: { id: 1, name: 'Administrator', email: 'admin@admin.com', role: 'adminwa', token: 'WATOKEN-...' } },
+            400: { success: false, error: 'Email dan password wajib diisi' },
+            401: { success: false, error: 'Email atau password salah' }
+        }
+    },
+    {
+        cat: 'api-auth',
+        method: 'POST',
+        path: '/api/auth/logout',
+        summary: 'Logout user dan hapus session',
+        desc: 'Mengakhiri sesi login aktif dan menghapus cookie sesi wa_session.',
+        auth: 'Session Cookie (wa_session)',
+        authType: 'session',
+        params: [],
+        body: null,
+        responses: {
+            200: { success: true, message: 'Logout berhasil' }
+        }
+    },
+    {
+        cat: 'api-auth',
+        method: 'GET',
+        path: '/api/auth/me',
+        summary: 'Dapatkan info user yang sedang login',
+        desc: 'Mengambil profil akun yang sedang terautentikasi melalui cookie sesi atau header X-Session-Token.',
+        auth: 'Session Cookie / X-Session-Token',
+        authType: 'session',
+        params: [],
+        body: null,
+        responses: {
+            200: { success: true, user: { id: 1, name: 'Administrator', email: 'admin@admin.com', role: 'adminwa', token: 'WATOKEN-...', status: 'aktif' } },
+            401: { success: false, error: 'Silakan login terlebih dahulu' }
+        }
+    },
+    {
+        cat: 'api-auth',
+        method: 'POST',
+        path: '/api/auth/change-password',
+        summary: 'Ganti password user sendiri',
+        desc: 'Memperbarui kata sandi pengguna yang sedang login saat ini.',
+        auth: 'Session Cookie / X-Session-Token',
+        authType: 'session',
+        params: [
+            { name: 'currentPassword', in: 'body', type: 'string', required: true, desc: 'Password lama pengguna' },
+            { name: 'newPassword', in: 'body', type: 'string', required: true, desc: 'Password baru (minimal 6 karakter)' },
+            { name: 'confirmPassword', in: 'body', type: 'string', required: true, desc: 'Konfirmasi password baru (harus sama)' }
+        ],
+        body: { currentPassword: 'admin123', newPassword: 'admin Baru123', confirmPassword: 'adminBaru123' },
+        responses: {
+            200: { success: true, message: 'Password berhasil diubah' },
+            400: { success: false, error: 'Password baru tidak cocok dengan konfirmasi' }
+        }
+    },
+
+    // 2. USER MANAGEMENT (10)
+    {
+        cat: 'api-users',
+        method: 'GET',
+        path: '/api/users',
+        summary: 'Dapatkan semua user dengan pagination & filter',
+        desc: 'Menampilkan daftar seluruh pengguna terdaftar, dilengkapi pagination, pencarian nama/email, dan filter role/status.',
+        auth: 'Admin Cookie / X-Api-Key',
+        authType: 'admin',
+        params: [
+            { name: 'page', in: 'query', type: 'number', required: false, desc: 'Nomor halaman pagination (default: 1)' },
+            { name: 'limit', in: 'query', type: 'number', required: false, desc: 'Jumlah user per halaman (default: 10)' },
+            { name: 'role', in: 'query', type: 'string', required: false, desc: 'Filter role: adminwa, memberwa, worker' },
+            { name: 'status', in: 'query', type: 'string', required: false, desc: 'Filter status: aktif, non-aktif' },
+            { name: 'search', in: 'query', type: 'string', required: false, desc: 'Kata kunci pencarian nama atau email' }
+        ],
+        body: null,
+        responses: {
+            200: { success: true, users: [{ id: 1, name: 'Administrator', email: 'admin@admin.com', role: 'adminwa', status: 'aktif' }], pagination: { page: 1, limit: 10, total: 1, totalPages: 1 } }
+        }
+    },
+    {
+        cat: 'api-users',
+        method: 'GET',
+        path: '/api/users/stats',
+        summary: 'Statistik jumlah user per role',
+        desc: 'Menghitung total pengguna terdaftar serta pembagiannya berdasarkan role (admin, member, worker) dan status aktif.',
+        auth: 'Admin Cookie / X-Api-Key',
+        authType: 'admin',
+        params: [],
+        body: null,
+        responses: {
+            200: { success: true, stats: { total: 2, aktif: 2, non_aktif: 0, adminwa: 2, memberwa: 0, worker: 0 } }
+        }
+    },
+    {
+        cat: 'api-users',
+        method: 'GET',
+        path: '/api/users/:id',
+        summary: 'Dapatkan detail user berdasarkan ID',
+        desc: 'Mengambil data lengkap profil pengguna berdasarkan ID numerik.',
+        auth: 'Admin Cookie / X-Api-Key',
+        authType: 'admin',
+        params: [
+            { name: 'id', in: 'path', type: 'number', required: true, desc: 'ID user yang dicari' }
+        ],
+        body: null,
+        responses: {
+            200: { success: true, user: { id: 1, name: 'Administrator', email: 'admin@admin.com', role: 'adminwa', token: 'WATOKEN-...' } },
+            404: { success: false, error: 'User tidak ditemukan' }
+        }
+    },
+    {
+        cat: 'api-users',
+        method: 'POST',
+        path: '/api/users',
+        summary: 'Buat user baru',
+        desc: 'Mendaftarkan pengguna baru ke dalam database dengan role dan token otomatis.',
+        auth: 'Admin Cookie / X-Api-Key',
+        authType: 'admin',
+        params: [
+            { name: 'name', in: 'body', type: 'string', required: true, desc: 'Nama lengkap user' },
+            { name: 'email', in: 'body', type: 'string', required: true, desc: 'Alamat email unik' },
+            { name: 'password', in: 'body', type: 'string', required: true, desc: 'Password awal (min. 6 karakter)' },
+            { name: 'role', in: 'body', type: 'string', required: false, desc: 'adminwa, memberwa (default), worker' },
+            { name: 'status', in: 'body', type: 'string', required: false, desc: 'aktif (default), non-aktif' }
+        ],
+        body: { name: 'Operator 1', email: 'operator@example.com', password: 'password123', role: 'memberwa', status: 'aktif' },
+        responses: {
+            200: { success: true, message: 'User berhasil dibuat', user: { id: 3, name: 'Operator 1', email: 'operator@example.com', role: 'memberwa' } },
+            400: { success: false, error: 'Nama, email, dan password wajib diisi' }
+        }
+    },
+    {
+        cat: 'api-users',
+        method: 'PUT',
+        path: '/api/users/:id',
+        summary: 'Update data user',
+        desc: 'Memperbarui informasi profil pengguna seperti nama, email, role, atau status aktif.',
+        auth: 'Admin Cookie / X-Api-Key',
+        authType: 'admin',
+        params: [
+            { name: 'id', in: 'path', type: 'number', required: true, desc: 'ID user yang ingin diupdate' },
+            { name: 'name', in: 'body', type: 'string', required: false, desc: 'Nama lengkap baru' },
+            { name: 'email', in: 'body', type: 'string', required: false, desc: 'Alamat email baru' },
+            { name: 'role', in: 'body', type: 'string', required: false, desc: 'Role baru' },
+            { name: 'status', in: 'body', type: 'string', required: false, desc: 'Status aktif/non-aktif' }
+        ],
+        body: { name: 'Operator Updated', status: 'aktif' },
+        responses: {
+            200: { success: true, message: 'User berhasil diupdate' },
+            404: { success: false, error: 'User tidak ditemukan' }
+        }
+    },
+    {
+        cat: 'api-users',
+        method: 'DELETE',
+        path: '/api/users/:id',
+        summary: 'Hapus user berdasarkan ID',
+        desc: 'Menghapus akun pengguna dari database beserta relasi session-nya.',
+        auth: 'Admin Cookie / X-Api-Key',
+        authType: 'admin',
+        params: [
+            { name: 'id', in: 'path', type: 'number', required: true, desc: 'ID user yang akan dihapus' }
+        ],
+        body: null,
+        responses: {
+            200: { success: true, message: 'User berhasil dihapus' },
+            404: { success: false, error: 'User tidak ditemukan' }
+        }
+    },
+    {
+        cat: 'api-users',
+        method: 'POST',
+        path: '/api/users/:id/reset-password',
+        summary: 'Reset password user oleh admin',
+        desc: 'Menyetel ulang password akun pengguna tertentu ke password baru yang ditentukan admin.',
+        auth: 'Admin Cookie / X-Api-Key',
+        authType: 'admin',
+        params: [
+            { name: 'id', in: 'path', type: 'number', required: true, desc: 'ID user' },
+            { name: 'password', in: 'body', type: 'string', required: true, desc: 'Password baru (min. 6 karakter)' }
+        ],
+        body: { password: 'newPassword123' },
+        responses: {
+            200: { success: true, message: 'Password user berhasil direset' },
+            400: { success: false, error: 'Password minimal 6 karakter' }
+        }
+    },
+    {
+        cat: 'api-users',
+        method: 'POST',
+        path: '/api/users/:id/regenerate-token',
+        summary: 'Generate ulang API token user',
+        desc: 'Membuat token WATOKEN baru untuk akses API pengguna dan membatalkan token sebelumnya.',
+        auth: 'Admin Cookie / X-Api-Key',
+        authType: 'admin',
+        params: [
+            { name: 'id', in: 'path', type: 'number', required: true, desc: 'ID user' }
+        ],
+        body: null,
+        responses: {
+            200: { success: true, message: 'Token berhasil digenerate ulang', token: 'WATOKEN-C7A8B9D0E1F2-2026' }
+        }
+    },
+    {
+        cat: 'api-users',
+        method: 'POST',
+        path: '/api/users/:id/link-session',
+        summary: 'Tautkan WhatsApp session ke user',
+        desc: 'Memberikan hak akses sesi WhatsApp tertentu kepada pengguna.',
+        auth: 'Admin Cookie / X-Api-Key',
+        authType: 'admin',
+        params: [
+            { name: 'id', in: 'path', type: 'number', required: true, desc: 'ID user' },
+            { name: 'sessionId', in: 'body', type: 'string', required: true, desc: 'ID sesi WhatsApp yang ditautkan' }
+        ],
+        body: { sessionId: 'gudangtoko-main' },
+        responses: {
+            200: { success: true, message: 'Session berhasil ditautkan ke user' },
+            400: { success: false, error: 'Session ID wajib diisi' }
+        }
+    },
+    {
+        cat: 'api-users',
+        method: 'GET',
+        path: '/api/users/:id/sessions',
+        summary: 'Dapatkan daftar sessions milik user',
+        desc: 'Mengambil seluruh ID sesi WhatsApp yang berhak diakses dan dikelola oleh user tertentu.',
+        auth: 'Admin Cookie / X-Api-Key',
+        authType: 'admin',
+        params: [
+            { name: 'id', in: 'path', type: 'number', required: true, desc: 'ID user' }
+        ],
+        body: null,
+        responses: {
+            200: { success: true, sessions: ['gudangtoko-main', 'wa-utama'] }
+        }
+    },
+
+    // 3. SESSIONS API (6)
+    {
+        cat: 'api-sessions',
+        method: 'GET',
+        path: '/api/sessions',
+        summary: 'Dapatkan semua sessions aktif & status',
+        desc: 'Mengembalikan daftar semua sesi WhatsApp yang sedang berjalan di memory server beserta status koneksi dan nomor teleponnya.',
+        auth: 'Publik / Opsional Auth',
+        authType: 'optional',
+        params: [
+            { name: 'userId', in: 'query', type: 'number', required: false, desc: 'Filter sesi berdasarkan kepemilikan user' }
+        ],
+        body: null,
+        responses: {
+            200: { success: true, sessions: [{ id: 'gudangtoko-main', name: 'Gudang Toko', isConnected: true, phoneNumber: '628123456789' }] }
+        }
+    },
+    {
+        cat: 'api-sessions',
+        method: 'GET',
+        path: '/api/sessions/list',
+        summary: 'Daftar sessions dari database',
+        desc: 'Mengambil daftar sesi tersimpan dari database SQLite, baik yang sedang terhubung maupun yang tersimpan riwayatnya.',
+        auth: 'Publik / Opsional Auth',
+        authType: 'optional',
+        params: [],
+        body: null,
+        responses: {
+            200: { success: true, sessions: [{ id: 'gudangtoko-main', status: 'connected', created_at: '2026-09-01T00:00:00Z' }] }
+        }
+    },
+    {
+        cat: 'api-sessions',
+        method: 'GET',
+        path: '/api/session/:sessionId',
+        summary: 'Info detail session tertentu',
+        desc: 'Mengambil informasi status realtime sesi spesifik berdasarkan ID sesi.',
+        auth: 'Publik / Opsional Auth',
+        authType: 'optional',
+        params: [
+            { name: 'sessionId', in: 'path', type: 'string', required: true, desc: 'ID sesi WhatsApp' }
+        ],
+        body: null,
+        responses: {
+            200: { success: true, session: { id: 'gudangtoko-main', isConnected: true, status: 'connected', phoneNumber: '628123456789' } },
+            404: { success: false, error: 'Session not found' }
+        }
+    },
+    {
+        cat: 'api-sessions',
+        method: 'POST',
+        path: '/api/sessions/:sessionId/connect',
+        summary: 'Connect / start session dengan QR Code',
+        desc: 'Memulai proses inisialisasi koneksi sesi WhatsApp dan menghasilkan QR code untuk discan.',
+        auth: 'Session Owner / Admin',
+        authType: 'session',
+        params: [
+            { name: 'sessionId', in: 'path', type: 'string', required: true, desc: 'ID sesi WhatsApp' },
+            { name: 'type', in: 'body', type: 'string', required: false, desc: 'Tipe koneksi: qr (default) atau pairing' },
+            { name: 'phoneNumber', in: 'body', type: 'string', required: false, desc: 'Nomor telepon (wajib jika type=pairing)' }
+        ],
+        body: { type: 'qr' },
+        responses: {
+            200: { success: true, message: 'Session gudangtoko-main connecting...', status: 'connecting' }
+        }
+    },
+    {
+        cat: 'api-sessions',
+        method: 'GET',
+        path: '/api/sessions/:sessionId/groups',
+        summary: 'Dapatkan grup dari session',
+        desc: 'Mengambil daftar grup WhatsApp yang diikuti oleh sesi WhatsApp tersebut.',
+        auth: 'Session Owner / Admin',
+        authType: 'session',
+        params: [
+            { name: 'sessionId', in: 'path', type: 'string', required: true, desc: 'ID sesi WhatsApp' }
+        ],
+        body: null,
+        responses: {
+            200: { success: true, groups: [{ id: '12036304@g.us', subject: 'Grup Pelanggan VIP', size: 45 }] },
+            503: { success: false, error: 'Session not connected' }
+        }
+    },
+    {
+        cat: 'api-sessions',
+        method: 'GET',
+        path: '/api/sessions/:sessionId/detail',
+        summary: 'Detail session lengkap (Runtime & Database)',
+        desc: 'Menggabungkan data runtime memori Baileys dan record database SQLite untuk memberikan profil komprehensif sesi.',
+        auth: 'Publik / Opsional Auth',
+        authType: 'optional',
+        params: [
+            { name: 'sessionId', in: 'path', type: 'string', required: true, desc: 'ID sesi WhatsApp' }
+        ],
+        body: null,
+        responses: {
+            200: { success: true, session: { id: 'gudangtoko-main', name: 'Gudang Utama', status: 'connected', device_info: { platform: 'Chrome (Linux)', phone: '6281234567890' } } }
+        }
+    },
+
+    // 4. MESSAGES & WHATSAPP SEND (10)
+    {
+        cat: 'api-messages',
+        method: 'POST',
+        path: '/api/wa/send',
+        summary: 'Kirim pesan teks WhatsApp (Auth: X-Api-Key)',
+        desc: 'Endpoint standar untuk mengirim pesan teks WhatsApp melalui integrasi aplikasi pihak ketiga (CRM, sistem POS, Webhook, dll).',
+        auth: 'Header: X-Api-Key / X-Api-Token',
+        authType: 'apiKey',
+        params: [
+            { name: 'to', in: 'body', type: 'string', required: true, desc: 'Nomor tujuan (format: 628123456789 atau 628123456789@s.whatsapp.net)' },
+            { name: 'message', in: 'body', type: 'string', required: true, desc: 'Isi pesan teks yang ingin dikirim' },
+            { name: 'sessionId', in: 'body', type: 'string', required: false, desc: 'ID sesi WhatsApp pengirim (opsional, jika kosong menggunakan sesi aktif pertama)' }
+        ],
+        body: { sessionId: 'gudangtoko-main', to: '6281234567890', message: 'Halo! Pesan konfirmasi pesanan Anda telah diproses.' },
+        responses: {
+            200: { success: true, message: 'Pesan berhasil dikirim.', data: { to: '6281234567890', session_id: 'gudangtoko-main', msg_id: '3EB0...' } },
+            400: { success: false, error: 'Field "to" dan "message" wajib diisi.' },
+            401: { success: false, error: 'API Key diperlukan. Sertakan header X-Api-Key.' },
+            503: { success: false, error: 'Tidak ada sesi WhatsApp yang terhubung.' }
+        }
+    },
+    {
+        cat: 'api-messages',
+        method: 'POST',
+        path: '/api/wa/send-image',
+        summary: 'Kirim gambar WhatsApp (Multipart atau JSON imageUrl)',
+        desc: 'Mengirimkan berkas gambar ke nomor WhatsApp tujuan. Mendukung upload file multipart/form-data maupun via JSON dengan URL gambar.',
+        auth: 'Header: X-Api-Key / X-Api-Token',
+        authType: 'apiKey',
+        params: [
+            { name: 'to', in: 'body', type: 'string', required: true, desc: 'Nomor WhatsApp penerima' },
+            { name: 'imageUrl', in: 'body', type: 'string', required: false, desc: 'URL gambar publik (contoh: https://images.unsplash.com/...)' },
+            { name: 'file', in: 'body', type: 'file', required: false, desc: 'Upload file gambar (jika menggunakan multipart/form-data)' },
+            { name: 'caption', in: 'body', type: 'string', required: false, desc: 'Keterangan / caption di bawah gambar' },
+            { name: 'sessionId', in: 'body', type: 'string', required: false, desc: 'ID sesi WhatsApp pengirim' }
+        ],
+        body: { sessionId: 'gudangtoko-main', to: '6281234567890', imageUrl: 'https://images.unsplash.com/photo-1579202673506-ca3ce28943ef', caption: 'Bukti transfer invoice #INV-2026' },
+        responses: {
+            200: { success: true, message: 'Gambar berhasil dikirim.', data: { to: '6281234567890', session_id: 'gudangtoko-main', filename: 'image.jpg', msg_id: '3EB0...' } },
+            400: { success: false, error: 'Field "to" dan "file" (gambar) atau "imageUrl" wajib diisi.' },
+            503: { success: false, error: 'Tidak ada sesi WhatsApp yang terhubung.' }
+        }
+    },
+    {
+        cat: 'api-messages',
+        method: 'POST',
+        path: '/api/wa/send-document',
+        summary: 'Kirim dokumen PDF, DOC, Excel (Multipart form-data)',
+        desc: 'Mengirimkan berkas dokumen digital (PDF, XLS, DOCX, ZIP) langsung ke kontak WhatsApp.',
+        auth: 'Header: X-Api-Key / X-Api-Token',
+        authType: 'apiKey',
+        params: [
+            { name: 'to', in: 'body', type: 'string', required: true, desc: 'Nomor WhatsApp penerima' },
+            { name: 'file', in: 'body', type: 'file', required: true, desc: 'File dokumen yang diupload via multipart/form-data' },
+            { name: 'filename', in: 'body', type: 'string', required: false, desc: 'Nama file tampilan (contoh: Laporan_Bulanan.pdf)' },
+            { name: 'caption', in: 'body', type: 'string', required: false, desc: 'Teks caption pendamping berkas' },
+            { name: 'sessionId', in: 'body', type: 'string', required: false, desc: 'ID sesi pengirim' }
+        ],
+        body: { sessionId: 'gudangtoko-main', to: '6281234567890', filename: 'invoice.pdf', caption: 'Silakan unduh invoice Anda' },
+        responses: {
+            200: { success: true, message: 'Dokumen berhasil dikirim.', data: { to: '6281234567890', filename: 'invoice.pdf', msg_id: '3EB0...' } },
+            400: { success: false, error: 'Field "to" dan "file" wajib diisi.' }
+        }
+    },
+    {
+        cat: 'api-messages',
+        method: 'POST',
+        path: '/api/send-message',
+        summary: 'Kirim pesan teks universal (Support API Key & Guest Bearer Token)',
+        desc: 'Endpoint fleksibel serbaguna yang dapat digunakan baik oleh Guest Scanner (menggunakan Bearer WATOKEN-...) maupun integrasi eksternal (menggunakan header X-Api-Key).',
+        auth: 'Bearer Token (Guest) ATAU X-Api-Key',
+        authType: 'apiKey',
+        params: [
+            { name: 'to', in: 'body', type: 'string', required: true, desc: 'Nomor tujuan (format angka murni atau JID)' },
+            { name: 'message', in: 'body', type: 'string', required: true, desc: 'Teks pesan' },
+            { name: 'sessionId', in: 'body', type: 'string', required: false, desc: 'ID sesi WhatsApp (opsional)' }
+        ],
+        body: { to: '6281234567890', message: 'Halo dari API Universal Billey!' },
+        responses: {
+            200: { success: true, message: 'Pesan berhasil dikirim.', data: { session_id: 'gudangtoko-main', to: '6281234567890', msg_id: '3EB0...' } },
+            401: { success: false, error: 'Autentikasi diperlukan. Gunakan header X-Api-Key atau Bearer token.' }
+        }
+    },
+    {
+        cat: 'api-messages',
+        method: 'POST',
+        path: '/api/send-image',
+        summary: 'Kirim gambar universal (Support API Key & Guest Bearer Token)',
+        desc: 'Endpoint fleksibel untuk mengirim gambar, menerima upload file, imageUrl, atau base64.',
+        auth: 'Bearer Token (Guest) ATAU X-Api-Key',
+        authType: 'apiKey',
+        params: [
+            { name: 'to', in: 'body', type: 'string', required: true, desc: 'Nomor WhatsApp penerima' },
+            { name: 'imageUrl', in: 'body', type: 'string', required: false, desc: 'URL file gambar publik' },
+            { name: 'caption', in: 'body', type: 'string', required: false, desc: 'Caption gambar' },
+            { name: 'sessionId', in: 'body', type: 'string', required: false, desc: 'ID sesi WhatsApp' }
+        ],
+        body: { to: '6281234567890', imageUrl: 'https://images.unsplash.com/photo-1579202673506-ca3ce28943ef', caption: 'Katalog Produk Terbaru' },
+        responses: {
+            200: { success: true, message: 'Gambar berhasil dikirim.', data: { to: '6281234567890', filename: 'image.jpg', msg_id: '3EB0...' } },
+            400: { success: false, error: 'Field "to" dan file gambar/imageUrl wajib diisi.' }
+        }
+    },
+    {
+        cat: 'api-messages',
+        method: 'GET',
+        path: '/api/wa/status',
+        summary: 'Cek status koneksi WhatsApp & nomor aktif',
+        desc: 'Memeriksa apakah server WhatsApp API terhubung dan menampilkan nomor aktif sesi default.',
+        auth: 'Header: X-Api-Key',
+        authType: 'apiKey',
+        params: [],
+        body: null,
+        responses: {
+            200: { success: true, connected: true, session: 'gudangtoko-main', user: { id: '628123456789:1@s.whatsapp.net', name: 'Billey Bot' } }
+        }
+    },
+    {
+        cat: 'api-messages',
+        method: 'GET',
+        path: '/api/messages/conversations/:sessionId',
+        summary: 'Daftar percakapan session',
+        desc: 'Mengambil riwayat kontak dan chat yang pernah berinteraksi dengan sesi WhatsApp tertentu.',
+        auth: 'Admin Cookie / X-Api-Key',
+        authType: 'admin',
+        params: [
+            { name: 'sessionId', in: 'path', type: 'string', required: true, desc: 'ID sesi WhatsApp' }
+        ],
+        body: null,
+        responses: {
+            200: { success: true, conversations: [{ jid: '628123456789@s.whatsapp.net', name: 'Budi Santoso', lastMessage: 'Terima kasih', timestamp: '2026-10-02T10:00:00Z', unreadCount: 0 }] }
+        }
+    },
+    {
+        cat: 'api-messages',
+        method: 'GET',
+        path: '/api/messages/chat/:sessionId/:phone',
+        summary: 'Riwayat chat dengan nomor tertentu',
+        desc: 'Mengambil seluruh riwayat pesan teks dan media masuk/keluar antara sesi dengan satu nomor kontak spesifik.',
+        auth: 'Admin Cookie / X-Api-Key',
+        authType: 'admin',
+        params: [
+            { name: 'sessionId', in: 'path', type: 'string', required: true, desc: 'ID sesi WhatsApp' },
+            { name: 'phone', in: 'path', type: 'string', required: true, desc: 'Nomor telepon tujuan (format 628...)' }
+        ],
+        body: null,
+        responses: {
+            200: { success: true, messages: [{ id: 'msg_1', direction: 'incoming', content: 'Halo admin', timestamp: '2026-10-02T12:00:00Z' }] }
+        }
+    },
+    {
+        cat: 'api-messages',
+        method: 'GET',
+        path: '/api/chat/history/:sessionId/:contactNumber',
+        summary: 'History chat dengan contact (dengan limit)',
+        desc: 'Mengambil history chat dengan filter jumlah limit dan order urutan waktu.',
+        auth: 'Admin Cookie / X-Api-Key',
+        authType: 'admin',
+        params: [
+            { name: 'sessionId', in: 'path', type: 'string', required: true, desc: 'ID sesi WhatsApp' },
+            { name: 'contactNumber', in: 'path', type: 'string', required: true, desc: 'Nomor kontak WhatsApp' },
+            { name: 'limit', in: 'query', type: 'number', required: false, desc: 'Limit pesan yang diambil (default: 50)' }
+        ],
+        body: null,
+        responses: {
+            200: { success: true, history: [{ id: 1, message_id: '3EB...', direction: 'outgoing', content: 'Halo!' }] }
+        }
+    },
+    {
+        cat: 'api-messages',
+        method: 'GET',
+        path: '/api/contacts/:sessionId',
+        summary: 'Daftar kontak dari session',
+        desc: 'Mengambil daftar seluruh nomor kontak yang tercatat di database untuk sesi ini.',
+        auth: 'Admin Cookie / X-Api-Key',
+        authType: 'admin',
+        params: [
+            { name: 'sessionId', in: 'path', type: 'string', required: true, desc: 'ID sesi WhatsApp' }
+        ],
+        body: null,
+        responses: {
+            200: { success: true, contacts: [{ jid: '628123456789@s.whatsapp.net', name: 'Andi Wijaya', phone: '628123456789' }] }
+        }
+    },
+
+    // 5. LOGS API (5)
+    {
+        cat: 'api-logs',
+        method: 'GET',
+        path: '/api/logs/messages',
+        summary: 'Daftar log pesan WhatsApp lengkap',
+        desc: 'Menampilkan log riwayat seluruh pesan yang dikirim dan diterima oleh aplikasi.',
+        auth: 'Publik / Opsional Auth',
+        authType: 'optional',
+        params: [
+            { name: 'sessionId', in: 'query', type: 'string', required: false, desc: 'Filter berdasarkan ID sesi' },
+            { name: 'direction', in: 'query', type: 'string', required: false, desc: 'incoming atau outgoing' },
+            { name: 'limit', in: 'query', type: 'number', required: false, desc: 'Jumlah record (default: 50)' },
+            { name: 'offset', in: 'query', type: 'number', required: false, desc: 'Offset pagination' }
+        ],
+        body: null,
+        responses: {
+            200: { success: true, logs: [{ id: 1, session_id: 'gudangtoko-main', direction: 'outgoing', to_number: '628123456789@s.whatsapp.net', content: 'Halo' }], count: 1 }
+        }
+    },
+    {
+        cat: 'api-logs',
+        method: 'GET',
+        path: '/api/logs/sessions',
+        summary: 'Log aktivitas session (connect, disconnect, qr)',
+        desc: 'Menampilkan riwayat kejadian pada sesi WhatsApp seperti waktu login, logout, atau reconnect.',
+        auth: 'Publik / Opsional Auth',
+        authType: 'optional',
+        params: [
+            { name: 'sessionId', in: 'query', type: 'string', required: false, desc: 'Filter berdasarkan ID sesi' },
+            { name: 'limit', in: 'query', type: 'number', required: false, desc: 'Limit record' }
+        ],
+        body: null,
+        responses: {
+            200: { success: true, logs: [{ id: 1, session_id: 'gudangtoko-main', action: 'connect', timestamp: '2026-10-02T10:00:00Z' }] }
+        }
+    },
+    {
+        cat: 'api-logs',
+        method: 'GET',
+        path: '/api/logs/statistics',
+        summary: 'Statistik agregat pesan dan performa',
+        desc: 'Menghasilkan total pesan terkirim, pesan gagal, pesan masuk, serta rasio keberhasilan pengiriman.',
+        auth: 'Publik / Opsional Auth',
+        authType: 'optional',
+        params: [],
+        body: null,
+        responses: {
+            200: { success: true, statistics: { total_messages: 1250, sent: 800, received: 450, failed: 0 } }
+        }
+    },
+    {
+        cat: 'api-logs',
+        method: 'GET',
+        path: '/api/logs/date/:date',
+        summary: 'Log aktivitas berdasarkan tanggal',
+        desc: 'Mengambil log pesan dan session yang terjadi pada tanggal tertentu (format YYYY-MM-DD).',
+        auth: 'Admin Cookie / X-Api-Key',
+        authType: 'admin',
+        params: [
+            { name: 'date', in: 'path', type: 'string', required: true, desc: 'Tanggal dalam format YYYY-MM-DD' }
+        ],
+        body: null,
+        responses: {
+            200: { success: true, date: '2026-10-02', logs: [] }
+        }
+    },
+    {
+        cat: 'api-logs',
+        method: 'DELETE',
+        path: '/api/logs/clear',
+        summary: 'Bersihkan log lama (Retention Cleanup)',
+        desc: 'Menghapus log pesan yang lebih tua dari jumlah hari tertentu untuk menghemat kapasitas database.',
+        auth: 'Admin Cookie / X-Api-Key',
+        authType: 'admin',
+        params: [
+            { name: 'days', in: 'body', type: 'number', required: false, desc: 'Hapus log yang lebih tua dari N hari (default: 30)' }
+        ],
+        body: { days: 30 },
+        responses: {
+            200: { success: true, message: 'Deleted 0 old logs' }
+        }
+    },
+
+    // 6. DATABASE API (11)
+    {
+        cat: 'api-database',
+        method: 'GET',
+        path: '/api/database/info',
+        summary: 'Info database (tables, size)',
+        desc: 'Menampilkan informasi file database SQLite, ukuran file, mode WAL, dan daftar tabel.',
+        auth: 'Admin Cookie / X-Api-Key',
+        authType: 'admin',
+        params: [],
+        body: null,
+        responses: {
+            200: { success: true, database: { file: 'whatsapp.db', size: '1.2 MB', totalTables: 15, tables: ['users', 'message_logs', 'chat_templates'] } }
+        }
+    },
+    {
+        cat: 'api-database',
+        method: 'GET',
+        path: '/api/database/stats',
+        summary: 'Statistik database lengkap per tabel',
+        desc: 'Menghitung jumlah baris data (row count) pada setiap tabel yang ada di sistem.',
+        auth: 'Admin Cookie / X-Api-Key',
+        authType: 'admin',
+        params: [],
+        body: null,
+        responses: {
+            200: { success: true, stats: { tables: { users: 2, message_logs: 1250, chat_templates: 5 } } }
+        }
+    },
+    {
+        cat: 'api-database',
+        method: 'GET',
+        path: '/api/database/schema/:tableName',
+        summary: 'Schema / struktur kolom tabel',
+        desc: 'Melihat definisi kolom, tipe data, nullable, default value, dan primary key pada tabel.',
+        auth: 'Admin Cookie / X-Api-Key',
+        authType: 'admin',
+        params: [
+            { name: 'tableName', in: 'path', type: 'string', required: true, desc: 'Nama tabel (contoh: users, message_logs)' }
+        ],
+        body: null,
+        responses: {
+            200: { success: true, table: 'users', schema: [{ cid: 0, name: 'id', type: 'INTEGER', pk: 1 }, { cid: 1, name: 'email', type: 'TEXT' }] }
+        }
+    },
+    {
+        cat: 'api-database',
+        method: 'GET',
+        path: '/api/database/table/:tableName',
+        summary: 'Data dari tabel dengan pagination',
+        desc: 'Mengambil isi baris data dari tabel tertentu dengan dukungan sorting dan pagination.',
+        auth: 'Admin Cookie / X-Api-Key',
+        authType: 'admin',
+        params: [
+            { name: 'tableName', in: 'path', type: 'string', required: true, desc: 'Nama tabel' },
+            { name: 'limit', in: 'query', type: 'number', required: false, desc: 'Limit baris (default: 20)' },
+            { name: 'offset', in: 'query', type: 'number', required: false, desc: 'Offset baris' },
+            { name: 'orderBy', in: 'query', type: 'string', required: false, desc: 'Nama kolom pengurutan' },
+            { name: 'orderDir', in: 'query', type: 'string', required: false, desc: 'Arah pengurutan: ASC atau DESC' }
+        ],
+        body: null,
+        responses: {
+            200: { success: true, data: [{ id: 1, name: 'Administrator' }], total: 1 }
+        }
+    },
+    {
+        cat: 'api-database',
+        method: 'POST',
+        path: '/api/database/query',
+        summary: 'Eksekusi SQL Query (SELECT only)',
+        desc: 'Menjalankan query custom SQL SELECT untuk keperluan analisis data internal.',
+        auth: 'Admin Cookie / X-Api-Key',
+        authType: 'admin',
+        params: [
+            { name: 'query', in: 'body', type: 'string', required: true, desc: 'Kueri SQL SELECT (Hanya perintah SELECT yang diizinkan)' }
+        ],
+        body: { query: 'SELECT id, name, email, role FROM users LIMIT 5' },
+        responses: {
+            200: { success: true, rows: [{ id: 1, name: 'Administrator', email: 'admin@admin.com', role: 'adminwa' }], count: 1 },
+            400: { success: false, error: 'Hanya query SELECT yang diperbolehkan' }
+        }
+    },
+    {
+        cat: 'api-database',
+        method: 'GET',
+        path: '/api/database/export',
+        summary: 'Download file database backup (.db)',
+        desc: 'Mengunduh salinan berkas biner SQLite whatsapp.db saat ini sebagai backup.',
+        auth: 'Admin Cookie / X-Api-Key',
+        authType: 'admin',
+        params: [],
+        body: null,
+        responses: {
+            200: { description: 'Mengembalikan file binary SQLite (application/octet-stream)' }
+        }
+    },
+    {
+        cat: 'api-database',
+        method: 'DELETE',
+        path: '/api/database/delete/:tableName/:id',
+        summary: 'Hapus record berdasarkan ID',
+        desc: 'Menghapus satu baris data tertentu dari tabel yang diizinkan.',
+        auth: 'Admin Cookie / X-Api-Key',
+        authType: 'admin',
+        params: [
+            { name: 'tableName', in: 'path', type: 'string', required: true, desc: 'Nama tabel' },
+            { name: 'id', in: 'path', type: 'number', required: true, desc: 'ID record yang akan dihapus' }
+        ],
+        body: null,
+        responses: {
+            200: { success: true, message: 'Record berhasil dihapus' },
+            403: { success: false, error: 'Table not allowed for deletion' }
+        }
+    },
+    {
+        cat: 'api-database',
+        method: 'POST',
+        path: '/api/database/delete-bulk/:tableName',
+        summary: 'Hapus banyak record sekaligus (Bulk Delete)',
+        desc: 'Menghapus sekumpulan ID baris data sekaligus dari tabel.',
+        auth: 'Admin Cookie / X-Api-Key',
+        authType: 'admin',
+        params: [
+            { name: 'tableName', in: 'path', type: 'string', required: true, desc: 'Nama tabel' },
+            { name: 'ids', in: 'body', type: 'array', required: true, desc: 'Array ID yang akan dihapus (contoh: [1, 2, 3])' }
+        ],
+        body: { ids: [101, 102] },
+        responses: {
+            200: { success: true, deleted: 2 },
+            400: { success: false, error: 'IDs array is required' }
+        }
+    },
+    {
+        cat: 'api-database',
+        method: 'DELETE',
+        path: '/api/database/truncate/:tableName',
+        summary: 'Kosongkan seluruh data tabel (Truncate)',
+        desc: 'Menghapus seluruh record pada tabel yang diizinkan (kecuali tabel penting seperti users).',
+        auth: 'Admin Cookie / X-Api-Key',
+        authType: 'admin',
+        params: [
+            { name: 'tableName', in: 'path', type: 'string', required: true, desc: 'Nama tabel yang akan dikosongkan' }
+        ],
+        body: null,
+        responses: {
+            200: { success: true, message: 'Table truncated successfully' },
+            403: { success: false, error: 'Table not allowed for truncation' }
+        }
+    },
+    {
+        cat: 'api-database',
+        method: 'POST',
+        path: '/api/database/cleanup',
+        summary: 'Pembersihan database otomatis (WAL Checkpoint)',
+        desc: 'Menjalankan proses checkpoint WAL dan membersihkan data kadaluarsa.',
+        auth: 'Admin Cookie / X-Api-Key',
+        authType: 'admin',
+        params: [],
+        body: null,
+        responses: {
+            200: { success: true, message: 'Database cleanup completed' }
+        }
+    },
+    {
+        cat: 'api-database',
+        method: 'POST',
+        path: '/api/database/vacuum',
+        summary: 'Optimasi & defrag database (VACUUM)',
+        desc: 'Menjalankan perintah VACUUM untuk mereklamasi ruang penyimpanan disk yang terbuang.',
+        auth: 'Admin Cookie / X-Api-Key',
+        authType: 'admin',
+        params: [],
+        body: null,
+        responses: {
+            200: { success: true, message: 'Database vacuumed and optimized' }
+        }
+    },
+
+    // 7. CHAT TEMPLATES API (8)
+    {
+        cat: 'api-templates',
+        method: 'GET',
+        path: '/api/templates',
+        summary: 'Dapatkan semua template pesan',
+        desc: 'Mengambil daftar template pesan cepat (quick replies) yang dapat digunakan operator atau sistem.',
+        auth: 'Session Cookie / API Key',
+        authType: 'optional',
+        params: [
+            { name: 'activeOnly', in: 'query', type: 'boolean', required: false, desc: 'Hanya ambil template berstatus aktif (true/false)' }
+        ],
+        body: null,
+        responses: {
+            200: { success: true, templates: [{ id: 1, code: 'WELCOME', title: 'Welcome Message', content: 'Halo, selamat datang!', is_active: 1 }] }
+        }
+    },
+    {
+        cat: 'api-templates',
+        method: 'GET',
+        path: '/api/templates/:id',
+        summary: 'Detail template berdasarkan ID',
+        desc: 'Mengambil rincian satu template pesan berdasarkan ID uniknya.',
+        auth: 'Session Cookie / API Key',
+        authType: 'optional',
+        params: [
+            { name: 'id', in: 'path', type: 'number', required: true, desc: 'ID template' }
+        ],
+        body: null,
+        responses: {
+            200: { success: true, template: { id: 1, code: 'WELCOME', title: 'Welcome Message', content: 'Halo, selamat datang!', is_active: 1 } },
+            404: { success: false, error: 'Template tidak ditemukan' }
+        }
+    },
+    {
+        cat: 'api-templates',
+        method: 'GET',
+        path: '/api/templates/code/:code',
+        summary: 'Cari template berdasarkan kode unik',
+        desc: 'Mengambil template aktif dengan mencocokkan kode pintas (shortcode).',
+        auth: 'Session Cookie / API Key',
+        authType: 'optional',
+        params: [
+            { name: 'code', in: 'path', type: 'string', required: true, desc: 'Kode unik template (contoh: WELCOME, INVOICE)' }
+        ],
+        body: null,
+        responses: {
+            200: { success: true, template: { id: 1, code: 'WELCOME', title: 'Welcome Message', content: 'Halo!' } },
+            404: { success: false, error: 'Template dengan kode "WELCOME" tidak ditemukan' }
+        }
+    },
+    {
+        cat: 'api-templates',
+        method: 'GET',
+        path: '/api/templates/search/:query',
+        summary: 'Pencarian template pesan',
+        desc: 'Mencari template berdasarkan judul atau isi pesan.',
+        auth: 'Session Cookie / API Key',
+        authType: 'optional',
+        params: [
+            { name: 'query', in: 'path', type: 'string', required: true, desc: 'Kata kunci pencarian' }
+        ],
+        body: null,
+        responses: {
+            200: { success: true, results: [{ id: 1, title: 'Welcome Template', content: 'Halo!' }] }
+        }
+    },
+    {
+        cat: 'api-templates',
+        method: 'POST',
+        path: '/api/templates',
+        summary: 'Buat template pesan baru',
+        desc: 'Menambahkan template balasan baru ke sistem.',
+        auth: 'Admin / Member Auth',
+        authType: 'session',
+        params: [
+            { name: 'code', in: 'body', type: 'string', required: true, desc: 'Kode template (huruf kapital tanpa spasi)' },
+            { name: 'title', in: 'body', type: 'string', required: true, desc: 'Judul template' },
+            { name: 'content', in: 'body', type: 'string', required: true, desc: 'Isi teks pesan template' },
+            { name: 'description', in: 'body', type: 'string', required: false, desc: 'Keterangan tambahan template' },
+            { name: 'is_active', in: 'body', type: 'number', required: false, desc: '1 untuk aktif, 0 untuk non-aktif' }
+        ],
+        body: { code: 'PROMO_BULANAN', title: 'Promo Diskon 50%', content: 'Dapatkan diskon 50% untuk pesanan hari ini!', description: 'Pesan broadcast promo' },
+        responses: {
+            200: { success: true, message: 'Template berhasil dibuat', template: { id: 2, code: 'PROMO_BULANAN' } },
+            400: { success: false, error: 'Kode template wajib diisi' }
+        }
+    },
+    {
+        cat: 'api-templates',
+        method: 'PUT',
+        path: '/api/templates/:id',
+        summary: 'Update template pesan',
+        desc: 'Memperbarui judul, kode, atau isi teks template yang sudah ada.',
+        auth: 'Admin / Member Auth',
+        authType: 'session',
+        params: [
+            { name: 'id', in: 'path', type: 'number', required: true, desc: 'ID template' },
+            { name: 'title', in: 'body', type: 'string', required: false, desc: 'Judul baru' },
+            { name: 'content', in: 'body', type: 'string', required: false, desc: 'Isi konten baru' }
+        ],
+        body: { title: 'Promo Diskon Diperpanjang', content: 'Diskon 50% masih berlaku sampai akhir pekan!' },
+        responses: {
+            200: { success: true, message: 'Template berhasil diupdate' }
+        }
+    },
+    {
+        cat: 'api-templates',
+        method: 'DELETE',
+        path: '/api/templates/:id',
+        summary: 'Hapus template pesan',
+        desc: 'Menghapus satu template dari database.',
+        auth: 'Admin / Member Auth',
+        authType: 'session',
+        params: [
+            { name: 'id', in: 'path', type: 'number', required: true, desc: 'ID template' }
+        ],
+        body: null,
+        responses: {
+            200: { success: true, message: 'Template berhasil dihapus' }
+        }
+    },
+    {
+        cat: 'api-templates',
+        method: 'PATCH',
+        path: '/api/templates/:id/toggle',
+        summary: 'Aktifkan / Nonaktifkan template',
+        desc: 'Mengubah status keaktifan template antara aktif (1) dan non-aktif (0).',
+        auth: 'Admin / Member Auth',
+        authType: 'session',
+        params: [
+            { name: 'id', in: 'path', type: 'number', required: true, desc: 'ID template' }
+        ],
+        body: null,
+        responses: {
+            200: { success: true, message: 'Template diaktifkan' }
+        }
+    },
+
+    // 8. AUTO REPLY API (12)
+    {
+        cat: 'api-autoreply',
+        method: 'GET',
+        path: '/api/auto-reply',
+        summary: 'Dapatkan semua rule auto reply',
+        desc: 'Mengambil daftar seluruh aturan bot balasan otomatis (auto reply rules).',
+        auth: 'Publik / Opsional Auth',
+        authType: 'optional',
+        params: [
+            { name: 'sessionId', in: 'query', type: 'string', required: false, desc: 'Filter rule untuk sesi tertentu' }
+        ],
+        body: null,
+        responses: {
+            200: { success: true, rules: [{ id: 1, name: 'Salam Pagi', trigger_type: 'contains', trigger_value: 'pagi,halo', response_type: 'text', response_content: 'Selamat pagi! Ada yang bisa kami bantu?', enabled: 1 }] }
+        }
+    },
+    {
+        cat: 'api-autoreply',
+        method: 'GET',
+        path: '/api/auto-reply/:id',
+        summary: 'Detail rule auto reply by ID',
+        desc: 'Mengambil konfigurasi rinci satu rule bot auto reply.',
+        auth: 'Publik / Opsional Auth',
+        authType: 'optional',
+        params: [
+            { name: 'id', in: 'path', type: 'number', required: true, desc: 'ID rule auto reply' }
+        ],
+        body: null,
+        responses: {
+            200: { success: true, rule: { id: 1, name: 'Salam Pagi', trigger_value: 'pagi,halo' } }
+        }
+    },
+    {
+        cat: 'api-autoreply',
+        method: 'POST',
+        path: '/api/auto-reply',
+        summary: 'Buat rule auto reply baru',
+        desc: 'Menambahkan aturan balasan otomatis baru berdasarkan trigger kata kunci atau regex.',
+        auth: 'Admin / Member Auth',
+        authType: 'session',
+        params: [
+            { name: 'name', in: 'body', type: 'string', required: true, desc: 'Nama aturan balasan' },
+            { name: 'trigger_type', in: 'body', type: 'string', required: true, desc: 'exact, contains, starts_with, regex' },
+            { name: 'trigger_value', in: 'body', type: 'string', required: true, desc: 'Kata kunci pemicu (pisahkan koma jika banyak)' },
+            { name: 'response_type', in: 'body', type: 'string', required: true, desc: 'text atau image' },
+            { name: 'response_content', in: 'body', type: 'string', required: true, desc: 'Teks balasan yang dikirim bot' },
+            { name: 'session_id', in: 'body', type: 'string', required: false, desc: 'ID sesi khusus (kosongkan jika berlaku global)' }
+        ],
+        body: { name: 'Info Jam Buka', trigger_type: 'contains', trigger_value: 'jam buka,buka jam', response_type: 'text', response_content: 'Kami buka setiap hari pukul 08:00 - 21:00 WIB.' },
+        responses: {
+            200: { success: true, message: 'Rule auto reply berhasil dibuat', ruleId: 2 },
+            400: { success: false, error: 'Nama rule wajib diisi' }
+        }
+    },
+    {
+        cat: 'api-autoreply',
+        method: 'PUT',
+        path: '/api/auto-reply/:id',
+        summary: 'Update rule auto reply',
+        desc: 'Memperbarui kata kunci pemicu atau isi balasan pada aturan yang ada.',
+        auth: 'Admin / Member Auth',
+        authType: 'session',
+        params: [
+            { name: 'id', in: 'path', type: 'number', required: true, desc: 'ID rule' },
+            { name: 'name', in: 'body', type: 'string', required: false, desc: 'Nama rule baru' },
+            { name: 'response_content', in: 'body', type: 'string', required: false, desc: 'Isi balasan baru' }
+        ],
+        body: { response_content: 'Jam operasional kami: Senin-Minggu 08.00-22.00 WIB.' },
+        responses: {
+            200: { success: true, message: 'Rule berhasil diupdate' }
+        }
+    },
+    {
+        cat: 'api-autoreply',
+        method: 'DELETE',
+        path: '/api/auto-reply/:id',
+        summary: 'Hapus rule auto reply',
+        desc: 'Menghapus aturan balasan otomatis dari sistem.',
+        auth: 'Admin / Member Auth',
+        authType: 'session',
+        params: [
+            { name: 'id', in: 'path', type: 'number', required: true, desc: 'ID rule' }
+        ],
+        body: null,
+        responses: {
+            200: { success: true, message: 'Rule berhasil dihapus' }
+        }
+    },
+    {
+        cat: 'api-autoreply',
+        method: 'POST',
+        path: '/api/auto-reply/bulk-delete',
+        summary: 'Hapus banyak rule sekaligus',
+        desc: 'Menghapus beberapa aturan auto reply secara bersamaan dengan mengirim array ID.',
+        auth: 'Admin / Member Auth',
+        authType: 'session',
+        params: [
+            { name: 'ids', in: 'body', type: 'array', required: true, desc: 'Array ID rule (contoh: [1, 2])' }
+        ],
+        body: { ids: [1, 2] },
+        responses: {
+            200: { success: true, message: '2 rule berhasil dihapus' },
+            400: { success: false, error: 'ID rule tidak valid' }
+        }
+    },
+    {
+        cat: 'api-autoreply',
+        method: 'PATCH',
+        path: '/api/auto-reply/:id/toggle',
+        summary: 'Aktifkan / Matikan rule auto reply',
+        desc: 'Mengubah status on/off pemicu bot balasan otomatis.',
+        auth: 'Admin / Member Auth',
+        authType: 'session',
+        params: [
+            { name: 'id', in: 'path', type: 'number', required: true, desc: 'ID rule' }
+        ],
+        body: null,
+        responses: {
+            200: { success: true, message: 'Rule diaktifkan' }
+        }
+    },
+    {
+        cat: 'api-autoreply',
+        method: 'POST',
+        path: '/api/auto-reply/:id/test',
+        summary: 'Simulasi / Test pemicu rule auto reply',
+        desc: 'Menguji apakah sebuah pesan masuk cocok dengan aturan auto reply tertentu tanpa mengirimkan pesan nyata.',
+        auth: 'Admin / Member Auth',
+        authType: 'session',
+        params: [
+            { name: 'id', in: 'path', type: 'number', required: true, desc: 'ID rule' },
+            { name: 'message', in: 'body', type: 'string', required: true, desc: 'Teks pesan masuk yang ingin disimulasikan' }
+        ],
+        body: { message: 'halo admin buka jam berapa ya?' },
+        responses: {
+            200: { success: true, matched: true, rule: { name: 'Info Jam Buka' }, response: 'Kami buka setiap hari pukul 08:00 - 21:00 WIB.' }
+        }
+    },
+    {
+        cat: 'api-autoreply',
+        method: 'POST',
+        path: '/api/auto-reply/seed-defaults',
+        summary: 'Generate rule default otomatis',
+        desc: 'Membuat kumpulan rule standar (salam, info bantuan, jam kerja) jika belum ada di database.',
+        auth: 'Admin Auth',
+        authType: 'admin',
+        params: [],
+        body: {},
+        responses: {
+            200: { success: true, message: '5 rule default berhasil dibuat, 0 sudah ada' }
+        }
+    },
+    {
+        cat: 'api-autoreply',
+        method: 'GET',
+        path: '/api/auto-reply-logs',
+        summary: 'Log eksekusi auto reply bot',
+        desc: 'Melihat riwayat pesan apa saja yang dijawab secara otomatis oleh bot beserta nomor penerimanya.',
+        auth: 'Publik / Opsional Auth',
+        authType: 'optional',
+        params: [
+            { name: 'limit', in: 'query', type: 'number', required: false, desc: 'Jumlah baris data' }
+        ],
+        body: null,
+        responses: {
+            200: { success: true, logs: [{ id: 1, rule_name: 'Salam Pagi', incoming_message: 'pagi', recipient: '628123456789', timestamp: '2026-10-02T10:00:00Z' }] }
+        }
+    },
+    {
+        cat: 'api-autoreply',
+        method: 'GET',
+        path: '/api/auto-reply-stats',
+        summary: 'Statistik balasan otomatis bot',
+        desc: 'Menghitung total rule aktif, total balasan yang telah dieksekusi, dan trigger terpopuler.',
+        auth: 'Publik / Opsional Auth',
+        authType: 'optional',
+        params: [
+            { name: 'sessionId', in: 'query', type: 'string', required: false, desc: 'ID sesi spesifik' }
+        ],
+        body: null,
+        responses: {
+            200: { success: true, stats: { total_rules: 5, active_rules: 5, total_triggered: 340 } }
+        }
+    },
+    {
+        cat: 'api-autoreply',
+        method: 'DELETE',
+        path: '/api/auto-reply-logs/cleanup',
+        summary: 'Bersihkan log eksekusi bot lama',
+        desc: 'Menghapus riwayat eksekusi bot yang lebih lama dari N hari.',
+        auth: 'Admin Auth',
+        authType: 'admin',
+        params: [
+            { name: 'days', in: 'body', type: 'number', required: false, desc: 'Batas hari retensi (default: 30)' }
+        ],
+        body: { days: 30 },
+        responses: {
+            200: { success: true, message: '0 log berhasil dihapus' }
+        }
+    },
+
+    // 9. GROUPS API (16)
+    {
+        cat: 'api-groups',
+        method: 'GET',
+        path: '/api/groups/:sessionId',
+        summary: 'Dapatkan seluruh grup dari session',
+        desc: 'Mengambil seluruh daftar grup WhatsApp yang diikuti oleh akun WhatsApp sesi tersebut.',
+        auth: 'Publik / Opsional Auth',
+        authType: 'optional',
+        params: [
+            { name: 'sessionId', in: 'path', type: 'string', required: true, desc: 'ID sesi WhatsApp' }
+        ],
+        body: null,
+        responses: {
+            200: { success: true, groups: [{ id: '12036304@g.us', subject: 'Grup Komunitas', participantsCount: 150 }], count: 1 }
+        }
+    },
+    {
+        cat: 'api-groups',
+        method: 'GET',
+        path: '/api/groups/:sessionId/:groupId/metadata',
+        summary: 'Metadata lengkap grup (peserta & status admin)',
+        desc: 'Mengambil daftar seluruh peserta grup, nomor telepon, dan siapa yang berstatus admin.',
+        auth: 'Publik / Opsional Auth',
+        authType: 'optional',
+        params: [
+            { name: 'sessionId', in: 'path', type: 'string', required: true, desc: 'ID sesi' },
+            { name: 'groupId', in: 'path', type: 'string', required: true, desc: 'JID grup (contoh: 12036304@g.us)' }
+        ],
+        body: null,
+        responses: {
+            200: { success: true, group: { id: '12036304@g.us', subject: 'Grup Komunitas', owner: '628123456789@s.whatsapp.net', participants: [{ id: '628123456789@s.whatsapp.net', admin: 'admin' }] } }
+        }
+    },
+    {
+        cat: 'api-groups',
+        method: 'GET',
+        path: '/api/groups/:sessionId/:groupId/invite',
+        summary: 'Dapatkan link invite grup WhatsApp',
+        desc: 'Mengambil kode tautan undangan grup (invite code) untuk bergabung ke grup.',
+        auth: 'Publik / Opsional Auth',
+        authType: 'optional',
+        params: [
+            { name: 'sessionId', in: 'path', type: 'string', required: true, desc: 'ID sesi' },
+            { name: 'groupId', in: 'path', type: 'string', required: true, desc: 'JID grup' }
+        ],
+        body: null,
+        responses: {
+            200: { success: true, code: 'AbCdEf12345', inviteLink: 'https://chat.whatsapp.com/AbCdEf12345' }
+        }
+    },
+    {
+        cat: 'api-groups',
+        method: 'POST',
+        path: '/api/groups/:sessionId/:groupId/revoke-invite',
+        summary: 'Reset / Cabut link invite grup',
+        desc: 'Membatalkan kode tautan undangan grup saat ini dan membuat kode tautan baru.',
+        auth: 'Publik / Opsional Auth',
+        authType: 'optional',
+        params: [
+            { name: 'sessionId', in: 'path', type: 'string', required: true, desc: 'ID sesi' },
+            { name: 'groupId', in: 'path', type: 'string', required: true, desc: 'JID grup' }
+        ],
+        body: {},
+        responses: {
+            200: { success: true, code: 'NewCode98765', message: 'Link invite berhasil direset' }
+        }
+    },
+    {
+        cat: 'api-groups',
+        method: 'POST',
+        path: '/api/groups/:sessionId/join',
+        summary: 'Gabung grup via kode invite',
+        desc: 'Membuat akun WhatsApp pada sesi bergabung ke suatu grup menggunakan kode invite.',
+        auth: 'Publik / Opsional Auth',
+        authType: 'optional',
+        params: [
+            { name: 'sessionId', in: 'path', type: 'string', required: true, desc: 'ID sesi' },
+            { name: 'inviteCode', in: 'body', type: 'string', required: true, desc: 'Kode invite (contoh: AbCdEf12345)' }
+        ],
+        body: { inviteCode: 'AbCdEf12345' },
+        responses: {
+            200: { success: true, groupId: '12036304@g.us', message: 'Berhasil bergabung ke grup' }
+        }
+    },
+    {
+        cat: 'api-groups',
+        method: 'POST',
+        path: '/api/groups/:sessionId/create',
+        summary: 'Buat grup WhatsApp baru',
+        desc: 'Membuat grup WhatsApp baru dengan nama dan daftar nomor peserta awal.',
+        auth: 'Publik / Opsional Auth',
+        authType: 'optional',
+        params: [
+            { name: 'sessionId', in: 'path', type: 'string', required: true, desc: 'ID sesi' },
+            { name: 'subject', in: 'body', type: 'string', required: true, desc: 'Nama judul grup baru' },
+            { name: 'participants', in: 'body', type: 'array', required: false, desc: 'Daftar nomor kontak peserta awal' }
+        ],
+        body: { subject: 'Grup Diskusi Internal', participants: ['6281234567890@s.whatsapp.net'] },
+        responses: {
+            200: { success: true, group: { id: '12036304@g.us', subject: 'Grup Diskusi Internal' }, message: 'Grup berhasil dibuat' }
+        }
+    },
+    {
+        cat: 'api-groups',
+        method: 'POST',
+        path: '/api/groups/:sessionId/:groupId/leave',
+        summary: 'Keluar dari grup WhatsApp',
+        desc: 'Membuat sesi WhatsApp keluar dari keanggotaan grup yang ditentukan.',
+        auth: 'Publik / Opsional Auth',
+        authType: 'optional',
+        params: [
+            { name: 'sessionId', in: 'path', type: 'string', required: true, desc: 'ID sesi' },
+            { name: 'groupId', in: 'path', type: 'string', required: true, desc: 'JID grup' }
+        ],
+        body: {},
+        responses: {
+            200: { success: true, message: 'Berhasil keluar dari grup' }
+        }
+    },
+    {
+        cat: 'api-groups',
+        method: 'PUT',
+        path: '/api/groups/:sessionId/:groupId/subject',
+        summary: 'Ubah judul / nama grup',
+        desc: 'Mengganti nama subjek grup WhatsApp.',
+        auth: 'Publik / Opsional Auth',
+        authType: 'optional',
+        params: [
+            { name: 'sessionId', in: 'path', type: 'string', required: true, desc: 'ID sesi' },
+            { name: 'groupId', in: 'path', type: 'string', required: true, desc: 'JID grup' },
+            { name: 'subject', in: 'body', type: 'string', required: true, desc: 'Nama subjek baru grup' }
+        ],
+        body: { subject: 'Grup Pengumuman Resmi 2026' },
+        responses: {
+            200: { success: true, message: 'Judul grup berhasil diubah' }
+        }
+    },
+    {
+        cat: 'api-groups',
+        method: 'PUT',
+        path: '/api/groups/:sessionId/:groupId/description',
+        summary: 'Ubah deskripsi grup',
+        desc: 'Memperbarui teks deskripsi informasi di dalam grup WhatsApp.',
+        auth: 'Publik / Opsional Auth',
+        authType: 'optional',
+        params: [
+            { name: 'sessionId', in: 'path', type: 'string', required: true, desc: 'ID sesi' },
+            { name: 'groupId', in: 'path', type: 'string', required: true, desc: 'JID grup' },
+            { name: 'description', in: 'body', type: 'string', required: true, desc: 'Teks deskripsi baru' }
+        ],
+        body: { description: 'Aturan grup: Dilarang spam dan promosi tanpa izin admin.' },
+        responses: {
+            200: { success: true, message: 'Deskripsi grup berhasil diubah' }
+        }
+    },
+    {
+        cat: 'api-groups',
+        method: 'PUT',
+        path: '/api/groups/:sessionId/:groupId/settings',
+        summary: 'Ubah setelan izin grup (announcement / locked)',
+        desc: 'Mengatur apakah hanya admin yang boleh kirim pesan (announcement) atau hanya admin yang boleh edit info grup (locked).',
+        auth: 'Publik / Opsional Auth',
+        authType: 'optional',
+        params: [
+            { name: 'sessionId', in: 'path', type: 'string', required: true, desc: 'ID sesi' },
+            { name: 'groupId', in: 'path', type: 'string', required: true, desc: 'JID grup' },
+            { name: 'setting', in: 'body', type: 'string', required: true, desc: 'announcement, not_announcement, locked, unlocked' }
+        ],
+        body: { setting: 'announcement' },
+        responses: {
+            200: { success: true, message: 'Pengaturan grup berhasil diubah' }
+        }
+    },
+    {
+        cat: 'api-groups',
+        method: 'GET',
+        path: '/api/groups/:sessionId/:groupId/picture',
+        summary: 'Dapatkan URL foto profil grup',
+        desc: 'Mengambil tautan gambar profil (avatar) grup WhatsApp.',
+        auth: 'Publik / Opsional Auth',
+        authType: 'optional',
+        params: [
+            { name: 'sessionId', in: 'path', type: 'string', required: true, desc: 'ID sesi' },
+            { name: 'groupId', in: 'path', type: 'string', required: true, desc: 'JID grup' }
+        ],
+        body: null,
+        responses: {
+            200: { success: true, url: 'https://pps.whatsapp.net/v/...' }
+        }
+    },
+    {
+        cat: 'api-groups',
+        method: 'POST',
+        path: '/api/groups/:sessionId/:groupId/send',
+        summary: 'Kirim pesan ke grup WhatsApp',
+        desc: 'Mengirimkan pesan teks langsung ke dalam grup WhatsApp yang ditentukan.',
+        auth: 'Publik / Opsional Auth',
+        authType: 'optional',
+        params: [
+            { name: 'sessionId', in: 'path', type: 'string', required: true, desc: 'ID sesi' },
+            { name: 'groupId', in: 'path', type: 'string', required: true, desc: 'JID grup' },
+            { name: 'message', in: 'body', type: 'string', required: true, desc: 'Teks pesan' }
+        ],
+        body: { message: 'Halo rekan-rekan, rapat mingguan dimulai pukul 14.00 WIB.' },
+        responses: {
+            200: { success: true, message: 'Pesan berhasil dikirim ke grup', messageId: '3EB0...' }
+        }
+    },
+    {
+        cat: 'api-groups',
+        method: 'POST',
+        path: '/api/groups/:sessionId/:groupId/participants/add',
+        summary: 'Tambahkan peserta ke grup',
+        desc: 'Memasukkan satu atau lebih nomor kontak ke dalam grup WhatsApp.',
+        auth: 'Publik / Opsional Auth',
+        authType: 'optional',
+        params: [
+            { name: 'sessionId', in: 'path', type: 'string', required: true, desc: 'ID sesi' },
+            { name: 'groupId', in: 'path', type: 'string', required: true, desc: 'JID grup' },
+            { name: 'participants', in: 'body', type: 'array', required: true, desc: 'Array JID nomor (contoh: ["6281234567890@s.whatsapp.net"])' }
+        ],
+        body: { participants: ['6281234567890@s.whatsapp.net'] },
+        responses: {
+            200: { success: true, message: '1 peserta berhasil ditambahkan' }
+        }
+    },
+    {
+        cat: 'api-groups',
+        method: 'POST',
+        path: '/api/groups/:sessionId/:groupId/participants/remove',
+        summary: 'Keluarkan peserta dari grup',
+        desc: 'Mengeluarkan satu atau lebih anggota dari keanggotaan grup.',
+        auth: 'Publik / Opsional Auth',
+        authType: 'optional',
+        params: [
+            { name: 'sessionId', in: 'path', type: 'string', required: true, desc: 'ID sesi' },
+            { name: 'groupId', in: 'path', type: 'string', required: true, desc: 'JID grup' },
+            { name: 'participants', in: 'body', type: 'array', required: true, desc: 'Array JID nomor yang dikeluarkan' }
+        ],
+        body: { participants: ['6281234567890@s.whatsapp.net'] },
+        responses: {
+            200: { success: true, message: '1 peserta berhasil dikeluarkan' }
+        }
+    },
+    {
+        cat: 'api-groups',
+        method: 'POST',
+        path: '/api/groups/:sessionId/:groupId/participants/promote',
+        summary: 'Jadikan peserta sebagai admin grup',
+        desc: 'Memberikan hak admin grup kepada anggota tertentu.',
+        auth: 'Publik / Opsional Auth',
+        authType: 'optional',
+        params: [
+            { name: 'sessionId', in: 'path', type: 'string', required: true, desc: 'ID sesi' },
+            { name: 'groupId', in: 'path', type: 'string', required: true, desc: 'JID grup' },
+            { name: 'participants', in: 'body', type: 'array', required: true, desc: 'Array JID nomor yang dipromosikan' }
+        ],
+        body: { participants: ['6281234567890@s.whatsapp.net'] },
+        responses: {
+            200: { success: true, message: '1 peserta berhasil dijadikan admin' }
+        }
+    },
+    {
+        cat: 'api-groups',
+        method: 'POST',
+        path: '/api/groups/:sessionId/:groupId/participants/demote',
+        summary: 'Cabut status admin dari peserta grup',
+        desc: 'Menurunkan status admin grup kembali menjadi anggota biasa.',
+        auth: 'Publik / Opsional Auth',
+        authType: 'optional',
+        params: [
+            { name: 'sessionId', in: 'path', type: 'string', required: true, desc: 'ID sesi' },
+            { name: 'groupId', in: 'path', type: 'string', required: true, desc: 'JID grup' },
+            { name: 'participants', in: 'body', type: 'array', required: true, desc: 'Array JID nomor yang dicabut adminnya' }
+        ],
+        body: { participants: ['6281234567890@s.whatsapp.net'] },
+        responses: {
+            200: { success: true, message: '1 peserta berhasil diturunkan dari admin' }
+        }
+    },
+
+    // 10. EXPORTS API (14)
+    {
+        cat: 'api-exports',
+        method: 'GET',
+        path: '/api/exports',
+        summary: 'Daftar riwayat export data',
+        desc: 'Mengambil riwayat berkas unduhan ekspor data yang pernah digenerate.',
+        auth: 'Publik / Opsional Auth',
+        authType: 'optional',
+        params: [
+            { name: 'sessionId', in: 'query', type: 'string', required: false, desc: 'Filter sesi' }
+        ],
+        body: null,
+        responses: {
+            200: { success: true, exports: [{ id: 1, session_id: 'gudangtoko-main', file_name: 'export_kontak.xlsx', status: 'completed' }] }
+        }
+    },
+    {
+        cat: 'api-exports',
+        method: 'GET',
+        path: '/api/exports/:id',
+        summary: 'Detail export berdasarkan ID',
+        desc: 'Mengambil status dan lokasi berkas file export spesifik.',
+        auth: 'Publik / Opsional Auth',
+        authType: 'optional',
+        params: [
+            { name: 'id', in: 'path', type: 'number', required: true, desc: 'ID export' }
+        ],
+        body: null,
+        responses: {
+            200: { success: true, export: { id: 1, file_name: 'export.xlsx', status: 'completed' } }
+        }
+    },
+    {
+        cat: 'api-exports',
+        method: 'POST',
+        path: '/api/exports',
+        summary: 'Buat permintaan export baru',
+        desc: 'Membuat antrian proses pembuatan file export data Excel/JSON.',
+        auth: 'Publik / Opsional Auth',
+        authType: 'optional',
+        params: [
+            { name: 'sessionId', in: 'body', type: 'string', required: true, desc: 'ID sesi WhatsApp' },
+            { name: 'format', in: 'body', type: 'string', required: false, desc: 'xlsx atau json (default: xlsx)' }
+        ],
+        body: { sessionId: 'gudangtoko-main', format: 'xlsx' },
+        responses: {
+            200: { success: true, message: 'Export request created', exportId: 2 }
+        }
+    },
+    {
+        cat: 'api-exports',
+        method: 'GET',
+        path: '/api/exports/:id/download',
+        summary: 'Unduh file export (.xlsx)',
+        desc: 'Mengunduh langsung berkas spreadsheet Excel hasil export grup atau kontak.',
+        auth: 'Publik / Opsional Auth',
+        authType: 'optional',
+        params: [
+            { name: 'id', in: 'path', type: 'number', required: true, desc: 'ID export' }
+        ],
+        body: null,
+        responses: {
+            200: { description: 'Mengembalikan stream file Excel (application/vnd.openxmlformats...)' }
+        }
+    },
+    {
+        cat: 'api-exports',
+        method: 'DELETE',
+        path: '/api/exports/:id',
+        summary: 'Hapus file export',
+        desc: 'Menghapus catatan dan file fisik spreadsheet export dari server.',
+        auth: 'Publik / Opsional Auth',
+        authType: 'optional',
+        params: [
+            { name: 'id', in: 'path', type: 'number', required: true, desc: 'ID export' }
+        ],
+        body: null,
+        responses: {
+            200: { success: true, message: 'Export deleted successfully' }
+        }
+    },
+    {
+        cat: 'api-exports',
+        method: 'GET',
+        path: '/api/group-exports',
+        summary: 'Daftar riwayat export grup WhatsApp',
+        desc: 'Menampilkan seluruh daftar spreadsheet hasil scrape nomor anggota grup WhatsApp.',
+        auth: 'Publik / Opsional Auth',
+        authType: 'optional',
+        params: [
+            { name: 'sessionId', in: 'query', type: 'string', required: false, desc: 'Filter sesi' },
+            { name: 'limit', in: 'query', type: 'number', required: false, desc: 'Limit' }
+        ],
+        body: null,
+        responses: {
+            200: { success: true, exports: [{ id: 1, session_id: 'gudangtoko-main', file_name: 'group_contacts.xlsx', total_members: 250 }] }
+        }
+    },
+    {
+        cat: 'api-exports',
+        method: 'GET',
+        path: '/api/group-exports/statistics',
+        summary: 'Statistik ekspor grup',
+        desc: 'Menghitung total berkas yang diekspor, jumlah grup diekstrak, dan total nomor kontak terdata.',
+        auth: 'Publik / Opsional Auth',
+        authType: 'optional',
+        params: [],
+        body: null,
+        responses: {
+            200: { success: true, stats: { total_exports: 5, total_sessions: 2, total_groups: 18, total_members: 1450 } }
+        }
+    },
+    {
+        cat: 'api-exports',
+        method: 'GET',
+        path: '/api/group-exports/:id',
+        summary: 'Detail export grup by ID',
+        desc: 'Mengambil informasi status record export grup spesifik.',
+        auth: 'Publik / Opsional Auth',
+        authType: 'optional',
+        params: [
+            { name: 'id', in: 'path', type: 'number', required: true, desc: 'ID export grup' }
+        ],
+        body: null,
+        responses: {
+            200: { success: true, export: { id: 1, file_name: 'group_export.xlsx', total_groups: 5, total_members: 250 } }
+        }
+    },
+    {
+        cat: 'api-exports',
+        method: 'POST',
+        path: '/api/group-exports',
+        summary: 'Simpan record export grup baru',
+        desc: 'Mencatat entri export grup baru di database.',
+        auth: 'Publik / Opsional Auth',
+        authType: 'optional',
+        params: [
+            { name: 'sessionId', in: 'body', type: 'string', required: true, desc: 'ID sesi' },
+            { name: 'fileName', in: 'body', type: 'string', required: true, desc: 'Nama berkas export' },
+            { name: 'totalGroups', in: 'body', type: 'number', required: false, desc: 'Jumlah grup' },
+            { name: 'totalMembers', in: 'body', type: 'number', required: false, desc: 'Jumlah kontak anggota' }
+        ],
+        body: { sessionId: 'gudangtoko-main', fileName: 'Export_Members_VIP.xlsx', totalGroups: 2, totalMembers: 80 },
+        responses: {
+            200: { success: true, message: 'Export created successfully', exportId: 3 }
+        }
+    },
+    {
+        cat: 'api-exports',
+        method: 'POST',
+        path: '/api/group-exports/:id/upload',
+        summary: 'Upload berkas Excel ke record export',
+        desc: 'Menyimpan file spreadsheet fisik ke record database yang sudah dibuat.',
+        auth: 'Publik / Opsional Auth',
+        authType: 'optional',
+        params: [
+            { name: 'id', in: 'path', type: 'number', required: true, desc: 'ID export' },
+            { name: 'file', in: 'body', type: 'file', required: true, desc: 'File Excel (.xlsx) via multipart form-data' }
+        ],
+        body: null,
+        responses: {
+            200: { success: true, message: 'File uploaded successfully' }
+        }
+    },
+    {
+        cat: 'api-exports',
+        method: 'GET',
+        path: '/api/group-exports/:id/download',
+        summary: 'Unduh berkas Excel hasil export grup',
+        desc: 'Mengunduh file Excel (.xlsx) berisi daftar nomor HP dan nama member grup.',
+        auth: 'Publik / Opsional Auth',
+        authType: 'optional',
+        params: [
+            { name: 'id', in: 'path', type: 'number', required: true, desc: 'ID export' }
+        ],
+        body: null,
+        responses: {
+            200: { description: 'Mengembalikan stream file Excel' }
+        }
+    },
+    {
+        cat: 'api-exports',
+        method: 'DELETE',
+        path: '/api/group-exports/:id',
+        summary: 'Hapus record export grup',
+        desc: 'Menghapus data dan berkas Excel export grup.',
+        auth: 'Publik / Opsional Auth',
+        authType: 'optional',
+        params: [
+            { name: 'id', in: 'path', type: 'number', required: true, desc: 'ID export' }
+        ],
+        body: null,
+        responses: {
+            200: { success: true, message: 'Export deleted successfully' }
+        }
+    },
+    {
+        cat: 'api-exports',
+        method: 'POST',
+        path: '/api/group-exports/bulk-delete',
+        summary: 'Hapus banyak export grup sekaligus',
+        desc: 'Menghapus beberapa berkas export grup sekaligus dengan array ID.',
+        auth: 'Publik / Opsional Auth',
+        authType: 'optional',
+        params: [
+            { name: 'ids', in: 'body', type: 'array', required: true, desc: 'Array ID (contoh: [1, 2])' }
+        ],
+        body: { ids: [1, 2] },
+        responses: {
+            200: { success: true, message: '2 exports deleted successfully' }
+        }
+    },
+    {
+        cat: 'api-exports',
+        method: 'POST',
+        path: '/api/export-groups-excel',
+        summary: 'Generate langsung Excel grup dari data realtime',
+        desc: 'Membuat file Excel berformat rapi langsung dari data kontak grup WhatsApp.',
+        auth: 'Publik / Opsional Auth',
+        authType: 'optional',
+        params: [
+            { name: 'sessionId', in: 'body', type: 'string', required: true, desc: 'ID sesi WhatsApp' },
+            { name: 'phoneNumber', in: 'body', type: 'string', required: false, desc: 'Nomor akun pengirim' },
+            { name: 'groups', in: 'body', type: 'array', required: true, desc: 'Data grup dan partisipannya' }
+        ],
+        body: { sessionId: 'gudangtoko-main', groups: [{ id: '12036304@g.us', subject: 'Grup 1', participants: [{ id: '6281234567890@s.whatsapp.net', role: 'admin' }] }] },
+        responses: {
+            200: { success: true, message: 'Export berhasil dibuat', downloadUrl: '/api/group-exports/1/download' }
+        }
+    },
+
+    // 11. HEALTH API (1)
+    {
+        cat: 'api-health',
+        method: 'GET',
+        path: '/api/health',
+        summary: 'Cek kesehatan server & performa',
+        desc: 'Endpoint health check untuk memonitor uptime server, penggunaan RAM, dan jumlah sesi WhatsApp yang aktif/terhubung.',
+        auth: 'Publik (Tidak Butuh Auth)',
+        authType: 'none',
+        params: [],
+        body: null,
+        responses: {
+            200: { status: 'ok', uptime: 120, uptimeFormatted: '2m', sessions: { total: 2, connected: 2 }, memory: { used: 56, total: 76, unit: 'MB' }, timestamp: '2026-10-02T15:00:00.000Z' }
+        }
+    }
+];
+
+console.log('Total endpoint specs built:', endpoints.length);
+fs.writeFileSync(path.join(__dirname, 'swagger-spec.json'), JSON.stringify(endpoints, null, 2));

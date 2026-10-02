@@ -59,6 +59,7 @@
     "music-metadata": "^11.7.0",
     "p-queue": "^9.0.0",
     "pino": "^9.6",
+    "playwright": "^1.63.0",
     "protobufjs": "^7.2.4",
     "socket.io": "^4.8.1",
     "ws": "^8.13.0",

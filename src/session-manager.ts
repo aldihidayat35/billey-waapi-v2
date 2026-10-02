@@ -544,7 +544,11 @@ export class SessionManager {
 				keys: makeCacheableSignalKeyStore(state.keys, pinoLogger),
 			},
 			browser: [`WhatsApp Web ${sessionId}`, 'Chrome', '1.0.0'],
-			getMessage: async () => undefined
+			getMessage: async () => undefined,
+			keepAliveIntervalMs: 25_000,
+			connectTimeoutMs: 60_000,
+			defaultQueryTimeoutMs: 60_000,
+			syncFullHistory: false
 		})
 
 		session.sock = sock
@@ -642,31 +646,39 @@ export class SessionManager {
 					user: sock.user
 				})
 
-				// If this is a guest session, send them the integration link
+				// If this is a guest session, send them the integration link ONCE upon initial connection
 				if (sessionId.startsWith('guest_') && sock.user) {
 					try {
-						setTimeout(async () => {
-							const guestRow = db.prepare('SELECT api_token FROM guest_sessions WHERE session_id = ?').get(sessionId) as any;
-							if (guestRow && guestRow.api_token) {
-								const port = process.env.PORT || 3000;
-								const baseUrl = process.env.APP_URL || `http://localhost:${port}`;
-								const integrationUrl = `${baseUrl}/guest-integration.html?id=${sessionId}&key=${guestRow.api_token}`;
-								const messageText = `🎉 *Berhasil Terhubung!*\n\nSesi WhatsApp Anda telah aktif di Billey WA API.\n\nUntuk mengakses *API Key, Dokumentasi, dan Mengelola Session Anda*, silakan buka tautan berikut:\n\n${integrationUrl}\n\n⚠️ *Rahasia!* Jangan bagikan link ini kepada siapa pun karena berisi kredensial akses API Anda.`;
-								
-								// Clean up the JID (e.g. 62812...:12@s.whatsapp.net -> 62812...@s.whatsapp.net)
-								const ownJid = sock.user.id.replace(/:.+@/, '@');
-								await sock.sendMessage(ownJid, { text: messageText });
-								console.log(`✉️ Sent integration link to guest ${sessionId}`);
-							}
-						}, 3000);
+						const guestRow = db.prepare('SELECT api_token, link_sent FROM guest_sessions WHERE session_id = ?').get(sessionId) as any;
+						if (guestRow && guestRow.api_token && !guestRow.link_sent) {
+							// Mark as sent immediately to avoid duplicate messages on rapid reconnects
+							db.prepare('UPDATE guest_sessions SET link_sent = 1 WHERE session_id = ?').run(sessionId);
+
+							setTimeout(async () => {
+								try {
+									const port = process.env.PORT || 3000;
+									const baseUrl = process.env.APP_URL || `http://localhost:${port}`;
+									const integrationUrl = `${baseUrl}/guest-integration.html?id=${sessionId}&key=${guestRow.api_token}`;
+									const messageText = `🎉 *Berhasil Terhubung!*\n\nSesi WhatsApp Anda telah aktif di Billey WA API.\n\nUntuk mengakses *API Key, Dokumentasi, dan Mengelola Session Anda*, silakan buka tautan berikut:\n\n${integrationUrl}\n\n⚠️ *Rahasia!* Jangan bagikan link ini kepada siapa pun karena berisi kredensial akses API Anda.`;
+									
+									// Clean up the JID (e.g. 62812...:12@s.whatsapp.net -> 62812...@s.whatsapp.net)
+									const ownJid = sock.user.id.replace(/:.+@/, '@');
+									await sock.sendMessage(ownJid, { text: messageText });
+									console.log(`✉️ Sent initial integration link to guest ${sessionId}`);
+								} catch (sendErr) {
+									console.error('Error sending integration link to guest:', sendErr);
+								}
+							}, 3000);
+						} else if (guestRow && guestRow.link_sent) {
+							console.log(`ℹ️ Integration link already sent for guest ${sessionId}, skipping duplicate message.`);
+						}
 					} catch (e) {
-						console.error('Error sending integration link to guest:', e);
+						console.error('Error checking guest link_sent status:', e);
 					}
 				}
 			}
 		})
 
-		// Save credentials
 		sock.ev.on('creds.update', saveCreds)
 
 		// Handle incoming messages
