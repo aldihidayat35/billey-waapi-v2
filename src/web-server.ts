@@ -180,6 +180,18 @@ app.get('/manifest.json', (req, res) => {
 	}
 })
 
+// Fallback: If requesting a root-level script e.g. /manage-sessions.js and it exists in admin/js/, serve it directly
+app.use((req, res, next) => {
+	if (req.method === 'GET' && req.path.endsWith('.js') && !req.path.startsWith('/js/')) {
+		const scriptName = path.basename(req.path)
+		const candidate = path.join(adminPublicDir, 'js', scriptName)
+		if (fs.existsSync(candidate)) {
+			return res.sendFile(candidate)
+		}
+	}
+	next()
+})
+
 // Serve static files (now protected by middleware above)
 app.use(express.static(publicDir))
 app.use(express.static(adminPublicDir))
@@ -2866,7 +2878,6 @@ app.get('/api/storage/gallery', adminOrApiKeyMiddleware, (req, res) => {
 
 app.delete('/api/storage/media', adminOrApiKeyMiddleware, (req, res) => {
     try {
-        const olderThanDays = parseInt(req.body.olderThanDays as string || '0', 10);
         const mediaDir = path.join(process.cwd(), 'src', 'data', 'media');
         let deletedCount = 0;
         let deletedSize = 0;
@@ -2874,6 +2885,82 @@ app.delete('/api/storage/media', adminOrApiKeyMiddleware, (req, res) => {
         if (!fs.existsSync(mediaDir)) {
             return res.json({ success: true, deletedCount, deletedSize, message: 'Folder media kosong.' });
         }
+
+        // Mode 1: Delete specific selected files (Multi-select)
+        if (Array.isArray(req.body.files) && req.body.files.length > 0) {
+            for (const item of req.body.files) {
+                let session = '';
+                let fileName = '';
+                
+                if (typeof item === 'object' && item !== null) {
+                    session = String(item.session || '');
+                    fileName = String(item.name || '');
+                } else if (typeof item === 'string') {
+                    const clean = item.replace(/^\/?media\//, '').replace(/^\\?media\\/, '');
+                    const parts = clean.split(/[/\\]/);
+                    if (parts.length >= 2) {
+                        session = parts[0];
+                        fileName = parts.slice(1).join('/');
+                    } else {
+                        fileName = parts[0];
+                    }
+                }
+
+                session = path.basename(session);
+                fileName = path.basename(fileName);
+                if (!session || !fileName) continue;
+
+                const targetPath = path.join(mediaDir, session, fileName);
+                // Ensure resolved path is within mediaDir
+                const resolvedTarget = path.resolve(targetPath);
+                if (!resolvedTarget.startsWith(path.resolve(mediaDir))) continue;
+
+                if (fs.existsSync(resolvedTarget) && fs.statSync(resolvedTarget).isFile()) {
+                    const stats = fs.statSync(resolvedTarget);
+                    fs.unlinkSync(resolvedTarget);
+                    deletedCount++;
+                    deletedSize += stats.size;
+                }
+            }
+
+            return res.json({
+                success: true,
+                deletedCount,
+                deletedSize,
+                message: `Berhasil menghapus ${deletedCount} file media terpilih.`
+            });
+        }
+
+        // Mode 2: Delete all files in a single specific session
+        if (req.body.session && typeof req.body.session === 'string' && req.body.session !== 'all') {
+            const sessionName = path.basename(req.body.session.trim());
+            const sessionFolder = path.join(mediaDir, sessionName);
+            const resolvedSessionFolder = path.resolve(sessionFolder);
+
+            if (resolvedSessionFolder.startsWith(path.resolve(mediaDir)) && fs.existsSync(resolvedSessionFolder) && fs.statSync(resolvedSessionFolder).isDirectory()) {
+                const files = fs.readdirSync(resolvedSessionFolder);
+                for (const file of files) {
+                    if (file === '.gitignore') continue;
+                    const fullPath = path.join(resolvedSessionFolder, file);
+                    if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
+                        const stats = fs.statSync(fullPath);
+                        fs.unlinkSync(fullPath);
+                        deletedCount++;
+                        deletedSize += stats.size;
+                    }
+                }
+            }
+
+            return res.json({
+                success: true,
+                deletedCount,
+                deletedSize,
+                message: `Berhasil menghapus seluruh media untuk sesi "${sessionName}" (${deletedCount} file).`
+            });
+        }
+
+        // Mode 3: Legacy bulk cleanup by age (olderThanDays)
+        const olderThanDays = parseInt(req.body.olderThanDays as string || '0', 10);
         
         const getAllFiles = (dirPath: string, arrayOfFiles: string[] = []) => {
             if (!fs.existsSync(dirPath)) return arrayOfFiles;

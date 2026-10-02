@@ -8,6 +8,95 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,400,500,600,700" />
     <link href="assets/plugins/global/plugins.bundle.css" rel="stylesheet" type="text/css" />
     <link href="assets/css/style.bundle.css" rel="stylesheet" type="text/css" />
+    <style>
+        .media-card {
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            border-radius: 10px;
+            overflow: hidden;
+            background: #ffffff;
+        }
+        .media-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08) !important;
+        }
+        .media-card.is-selected {
+            border-color: #009EF7 !important;
+            background-color: rgba(0, 158, 247, 0.04) !important;
+            box-shadow: 0 0 0 1.5px #009EF7, 0 4px 14px rgba(0, 158, 247, 0.18) !important;
+        }
+        .media-thumb-box {
+            height: 130px;
+            background: #fbfbfb;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            border-radius: 8px 8px 0 0;
+        }
+        .media-checkbox-wrapper {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            z-index: 10;
+            background: rgba(255, 255, 255, 0.94);
+            backdrop-filter: blur(4px);
+            border-radius: 6px;
+            padding: 3px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .media-checkbox-wrapper .form-check-input {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+            margin: 0;
+        }
+        .media-btn-open {
+            height: 30px !important;
+            min-height: 30px !important;
+            padding: 0 10px !important;
+            font-size: 11px !important;
+            font-weight: 600 !important;
+            border-radius: 6px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 5px !important;
+            transition: all 0.15s ease !important;
+            line-height: 1 !important;
+        }
+        .media-btn-open:hover {
+            background-color: #009ef7 !important;
+            color: #ffffff !important;
+        }
+        .media-btn-open:hover i {
+            color: #ffffff !important;
+        }
+        .media-btn-delete {
+            height: 30px !important;
+            min-height: 30px !important;
+            width: 30px !important;
+            min-width: 30px !important;
+            padding: 0 !important;
+            border-radius: 6px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            transition: all 0.15s ease !important;
+            line-height: 1 !important;
+        }
+        .media-btn-delete:hover {
+            background-color: #f1416c !important;
+            color: #ffffff !important;
+        }
+        .media-btn-delete:hover i {
+            color: #ffffff !important;
+        }
+    </style>
     <script src="/js/app-init.js"></script>
 </head>
 <body id="kt_app_body" data-kt-app-layout="dark-sidebar" data-kt-app-header-fixed="true"
@@ -125,15 +214,67 @@
                                 <div class="row g-5 g-xl-10 mb-5 mb-xl-10">
                                     <div class="col-xl-12">
                                         <div class="card card-flush">
-                                            <div class="card-header pt-7">
-                                                <h3 class="card-title align-items-start flex-column">
+                                            <div class="card-header pt-7 d-flex align-items-center justify-content-between flex-wrap gap-3">
+                                                <h3 class="card-title align-items-start flex-column mb-0">
                                                     <span class="card-label fw-bold text-gray-800">Galeri Media</span>
-                                                    <span class="text-gray-400 mt-1 fw-semibold fs-6">Dikelompokkan berdasarkan folder session</span>
+                                                    <span class="text-gray-400 mt-1 fw-semibold fs-6">Dikelompokkan berdasarkan folder session WhatsApp</span>
                                                 </h3>
+                                                <div class="card-toolbar d-flex align-items-center gap-2">
+                                                    <div class="d-flex align-items-center gap-2">
+                                                        <span class="fs-8 fw-bold text-gray-600 d-none d-sm-inline">Filter Sesi:</span>
+                                                        <select id="gallery-session-filter" class="form-select form-select-sm form-select-solid w-175px" onchange="filterGalleryBySession()">
+                                                            <option value="ALL">Semua Sesi</option>
+                                                        </select>
+                                                    </div>
+                                                    <button type="button" class="btn btn-sm btn-icon btn-light-primary" onclick="loadGallery()" title="Muat Ulang Galeri">
+                                                        <i class="bi bi-arrow-clockwise fs-5"></i>
+                                                    </button>
+                                                </div>
                                             </div>
+                                            
+                                            <!-- Selection Summary Sub-toolbar inside card (visible when items selected) -->
+                                            <div id="card-selection-banner" class="d-none bg-light-primary border-bottom border-primary border-opacity-25 px-7 py-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <i class="bi bi-check2-circle text-primary fs-4"></i>
+                                                    <span class="fw-bold text-gray-800 fs-7">
+                                                        <span id="card-selected-count">0</span> file media terpilih 
+                                                        <span class="text-muted fw-normal fs-8" id="card-selected-size">(0 Bytes)</span>
+                                                    </span>
+                                                </div>
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <button type="button" class="btn btn-xs btn-light py-1 px-3 fs-8" onclick="unselectAllMedia()">
+                                                        <i class="bi bi-x me-1"></i>Batalkan Pilihan
+                                                    </button>
+                                                    <button type="button" class="btn btn-xs btn-danger py-1 px-3 fs-8 fw-bold" onclick="deleteSelectedMedia()">
+                                                        <i class="bi bi-trash-fill me-1"></i>Hapus Media Terpilih
+                                                    </button>
+                                                </div>
+                                            </div>
+
                                             <div class="card-body pt-5" id="gallery-container">
                                                 <div class="text-center text-muted py-10">Memuat galeri...</div>
                                             </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Floating Multi-Select Action Bar (Bottom Screen) -->
+                                <div id="media-selection-toolbar" class="d-none position-fixed bottom-0 start-50 translate-middle-x mb-8 z-index-3 shadow-lg rounded-4 p-4 bg-dark text-white border border-gray-700" style="min-width: 360px; max-width: 95vw; z-index: 1050; backdrop-filter: blur(10px); background: rgba(30, 30, 45, 0.95) !important;">
+                                    <div class="d-flex align-items-center justify-content-between gap-4">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span class="badge badge-primary fs-7 px-3 py-2 fw-bolder" id="selected-count-badge">0</span>
+                                            <div>
+                                                <div class="fs-7 fw-bold text-white">Media Terpilih</div>
+                                                <div class="text-gray-400 fs-9" id="selected-size-badge">0 Bytes</div>
+                                            </div>
+                                        </div>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <button type="button" class="btn btn-sm btn-light-secondary text-gray-300 py-2 px-3 fs-8" onclick="unselectAllMedia()">
+                                                <i class="bi bi-x-lg me-1"></i>Batal
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-danger py-2 px-4 fs-8 fw-bold" onclick="deleteSelectedMedia()">
+                                                <i class="bi bi-trash-fill me-1"></i>Hapus Terpilih
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
@@ -208,6 +349,6 @@
         loadComponents();
     });
     </script>
-    <script src="manage-storage.js"></script>
+    <script src="js/manage-storage.js"></script>
 </body>
 </html>

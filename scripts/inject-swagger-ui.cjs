@@ -149,7 +149,7 @@ function renderEndpointCard(ep, index) {
                         <i class="bi bi-file-earmark-code text-primary me-1"></i>Request Body 
                         <span class="badge badge-light-primary fs-9 ms-1 font-monospace">application/json</span>
                     </span>
-                    <button type="button" class="btn btn-xs btn-light py-1 px-2 fs-8 copy-btn" onclick="copySwaggerCode(this, ${escapeAttr(JSON.stringify(bodyJson))})">
+                    <button type="button" class="btn btn-xs btn-light py-1 px-2 fs-8 copy-btn" onclick="copySwaggerCode(this)">
                         <i class="bi bi-clipboard me-1"></i>Salin JSON
                     </button>
                 </div>
@@ -178,7 +178,7 @@ function renderEndpointCard(ep, index) {
                             <span class="badge ${badgeClass} fs-8 fw-bold">${code}</span>
                             <span class="text-gray-800 fw-semibold fs-7">${statusLabel}</span>
                         </div>
-                        <button type="button" class="btn btn-xs btn-light py-1 px-2 fs-8 copy-btn" onclick="copySwaggerCode(this, ${escapeAttr(JSON.stringify(respJson))})">
+                        <button type="button" class="btn btn-xs btn-light py-1 px-2 fs-8 copy-btn" onclick="copySwaggerCode(this)">
                             <i class="bi bi-clipboard me-1"></i>Salin Respon
                         </button>
                     </div>
@@ -307,7 +307,7 @@ function renderEndpointCard(ep, index) {
                             <span class="fw-bold text-gray-800 fs-7">
                                 <i class="bi bi-terminal text-warning me-1"></i>Contoh cURL
                             </span>
-                            <button type="button" class="btn btn-xs btn-light-warning py-1 px-2 fs-8 copy-btn" onclick="copySwaggerCode(this, ${escapeAttr(JSON.stringify(curlCommand))})">
+                            <button type="button" class="btn btn-xs btn-light-warning py-1 px-2 fs-8 copy-btn" onclick="copySwaggerCode(this)">
                                 <i class="bi bi-clipboard me-1"></i>Salin cURL
                             </button>
                         </div>
@@ -656,7 +656,18 @@ const swaggerJs = `
         }
 
         // Copy code helper with visual feedback
-        function copySwaggerCode(btn, codeText) {
+        function copySwaggerCode(btn, explicitText) {
+            let codeText = explicitText;
+            if (!codeText || typeof codeText !== 'string') {
+                const parent = btn.closest('.d-flex')?.parentElement;
+                const preCode = parent ? parent.querySelector('pre code') : null;
+                if (preCode) {
+                    codeText = preCode.textContent;
+                } else {
+                    const box = btn.closest('.border')?.querySelector('pre code') || btn.parentElement?.nextElementSibling?.querySelector('code');
+                    if (box) codeText = box.textContent;
+                }
+            }
             if (!codeText) return;
             navigator.clipboard.writeText(codeText).then(() => {
                 const originalHtml = btn.innerHTML;
@@ -840,30 +851,42 @@ if (!apiDocsContent.includes('SWAGGER INTERACTIVE ACCORDION')) {
 }
 
 // Find markers
-const authMarker = '<!-- AUTHENTICATION API -->';
-const socketMarker = '<!-- SOCKET.IO EVENTS -->';
+let startIndex = apiDocsContent.indexOf('<!-- INTERACTIVE SWAGGER-STYLE REST API REFERENCE -->');
+if (startIndex !== -1) {
+    startIndex = apiDocsContent.lastIndexOf('<!-- ============================================ -->', startIndex);
+} else {
+    const authMarker = '<!-- AUTHENTICATION API -->';
+    const authIndex = apiDocsContent.indexOf(authMarker);
+    if (authIndex !== -1) {
+        startIndex = apiDocsContent.lastIndexOf('<!-- ============================================ -->', authIndex);
+    }
+}
 
-const authIndex = apiDocsContent.indexOf(authMarker);
-const socketIndex = apiDocsContent.indexOf(socketMarker);
+const socketIndex = apiDocsContent.indexOf('<!-- SOCKET.IO EVENTS -->');
+let endIndex = -1;
+if (socketIndex !== -1) {
+    endIndex = apiDocsContent.lastIndexOf('<!-- ============================================ -->', socketIndex);
+}
 
-if (authIndex === -1 || socketIndex === -1) {
+if (startIndex === -1 || endIndex === -1) {
     console.error('Could not find markers in api-docs.html!');
-    console.log('authIndex:', authIndex, 'socketIndex:', socketIndex);
+    console.log('startIndex:', startIndex, 'endIndex:', endIndex);
     process.exit(1);
 }
 
-// Find the line preceding authMarker
-const beforeAuth = apiDocsContent.lastIndexOf('<!-- ============================================ -->', authIndex);
-// Find the line before socketMarker
-const beforeSocket = apiDocsContent.lastIndexOf('<!-- ============================================ -->', socketIndex);
-
-const beforePart = apiDocsContent.substring(0, beforeAuth);
-const afterPart = apiDocsContent.substring(beforeSocket);
+const beforePart = apiDocsContent.substring(0, startIndex);
+const afterPart = apiDocsContent.substring(endIndex);
 
 let updatedContent = beforePart + fullHtml + afterPart;
 
-// Inject JS before </body>
-if (!updatedContent.includes('toggleSwaggerCard')) {
+// Update or inject JS before </body>
+const scriptMarker = '// Toggle single endpoint accordion';
+const existingScriptIndex = updatedContent.indexOf(scriptMarker);
+if (existingScriptIndex !== -1) {
+    const scriptStart = updatedContent.lastIndexOf('<script>', existingScriptIndex);
+    const scriptEnd = updatedContent.indexOf('</script>', existingScriptIndex) + 9;
+    updatedContent = updatedContent.substring(0, scriptStart) + swaggerJs + updatedContent.substring(scriptEnd);
+} else if (!updatedContent.includes('toggleSwaggerCard')) {
     updatedContent = updatedContent.replace('</body>', `${swaggerJs}\n</body>`);
 }
 

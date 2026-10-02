@@ -50,6 +50,13 @@ temp/
 # SQLite WAL files
 data/*.db-wal
 data/*.db-shm
-NUL
-#data/media
-data/media/ src/data/media/  
+src/data/*.db
+src/data/*.db-journal
+src/data/*.db-wal
+src/data/*.db-shm
+
+# Media storage
+data/media/
+src/data/media/
+**/media/
+
