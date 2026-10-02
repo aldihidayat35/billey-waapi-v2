@@ -68,6 +68,8 @@ const protectStaticFiles = (req: any, res: any, next: any) => {
 		'/auth/login.html',
 		'/guest-session.html',
 		'/guest-session',
+		'/guest-integration.html',
+		'/guest-integration',
 		'/api-docs.html',
 		'/api-docs',
 		'/assets/',
@@ -328,9 +330,10 @@ function buildGuestIntegrationPayload(req: any, row: any): any {
 	const baseUrl = getBaseUrl(req)
 	const apiBaseUrl = `${baseUrl}/api`
 	const endpointPath = '/api/send-message'
+	const phoneNum = refreshed.phone_number || runtime?.user?.id?.split(':')[0] || null
 	const payload = {
 		session_id: refreshed.session_id,
-		to: refreshed.phone_number || '628xxxxxxxxxx',
+		to: phoneNum || '628xxxxxxxxxx',
 		message: 'Halo dari aplikasi lain'
 	}
 	const curl = `curl -X POST "${baseUrl}${endpointPath}" \\
@@ -338,10 +341,33 @@ function buildGuestIntegrationPayload(req: any, row: any): any {
   -H "Content-Type: application/json" \\
   -d '${JSON.stringify(payload, null, 2)}'`
 
+	let stats = { total: 0, incoming: 0, outgoing: 0, lastActivity: null as string | null }
+	try {
+		const sRow = db.prepare(`
+			SELECT 
+				COUNT(*) as total,
+				SUM(CASE WHEN direction = 'incoming' THEN 1 ELSE 0 END) as incoming,
+				SUM(CASE WHEN direction = 'outgoing' THEN 1 ELSE 0 END) as outgoing,
+				MAX(timestamp) as last_activity
+			FROM message_logs 
+			WHERE session_id = ?
+		`).get(refreshed.session_id) as any
+		if (sRow) {
+			stats = {
+				total: Number(sRow.total || 0),
+				incoming: Number(sRow.incoming || 0),
+				outgoing: Number(sRow.outgoing || 0),
+				lastActivity: sRow.last_activity || null
+			}
+		}
+	} catch (e) {
+		// ignore
+	}
+
 	return {
 		sessionId: refreshed.session_id,
 		sessionName: refreshed.session_name,
-		phoneNumber: refreshed.phone_number,
+		phoneNumber: phoneNum,
 		jid: refreshed.jid || runtime?.user?.id || null,
 		pushName: refreshed.push_name || runtime?.user?.name || null,
 		status: refreshed.status,
@@ -354,7 +380,8 @@ function buildGuestIntegrationPayload(req: any, row: any): any {
 		connectedAt: refreshed.connected_at,
 		lastSeen: refreshed.last_seen,
 		expiredAt: refreshed.expired_at,
-		deviceInfo: refreshed.device_info ? safeJsonParse(refreshed.device_info) : (runtime?.user || null)
+		deviceInfo: refreshed.device_info ? safeJsonParse(refreshed.device_info) : (runtime?.user || null),
+		stats
 	}
 }
 
@@ -2427,6 +2454,89 @@ app.get('/api/sessions', optionalAuthMiddleware, (req, res) => {
 	}
 })
 
+// Get comprehensive session detail (for session-detail.html)
+app.get('/api/sessions/:sessionId/detail', optionalAuthMiddleware, async (req, res) => {
+	try {
+		const rawId = req.params.sessionId
+		const session = sessionManager.getSession(rawId)
+		
+		const sessionBaseDir = process.env.SESSION_DIR || './sessions'
+		let existsOnDisk = false
+		let credsUser: any = null
+		let diskSessionId = rawId
+
+		if (!session && fs.existsSync(sessionBaseDir)) {
+			const entries = fs.readdirSync(sessionBaseDir)
+			const norm = (s: string) => s.toLowerCase().replace(/[\s_-]+/g, '_')
+			const matchedDir = entries.find(e => norm(e) === norm(rawId) || e === rawId)
+			if (matchedDir) {
+				existsOnDisk = true
+				diskSessionId = matchedDir
+				const credsPath = path.join(sessionBaseDir, matchedDir, 'creds.json')
+				if (fs.existsSync(credsPath)) {
+					try {
+						const credsData = JSON.parse(fs.readFileSync(credsPath, 'utf-8'))
+						credsUser = credsData.me || null
+					} catch {}
+				}
+			}
+		}
+
+		if (!session && !existsOnDisk) {
+			return res.status(404).json({ success: false, error: 'Session tidak ditemukan' })
+		}
+
+		const canonicalId = session?.id || diskSessionId
+		
+		// Message stats from database
+		let stats = { total: 0, incoming: 0, outgoing: 0, lastActivity: null }
+		try {
+			const rowStats = db.prepare(`
+				SELECT 
+					COUNT(*) as total,
+					SUM(CASE WHEN direction = 'incoming' THEN 1 ELSE 0 END) as incoming,
+					SUM(CASE WHEN direction = 'outgoing' THEN 1 ELSE 0 END) as outgoing,
+					MAX(timestamp) as lastActivity
+				FROM message_logs 
+				WHERE session_id = ? OR session_id = ?
+			`).get(canonicalId, rawId) as any
+			if (rowStats) {
+				stats = {
+					total: rowStats.total || 0,
+					incoming: rowStats.incoming || 0,
+					outgoing: rowStats.outgoing || 0,
+					lastActivity: rowStats.lastActivity || null
+				}
+			}
+		} catch (e) {}
+
+		// Check guest session token
+		let guestToken = null
+		try {
+			const guestRow = db.prepare('SELECT api_token FROM guest_sessions WHERE session_id = ? OR session_id = ?').get(canonicalId, rawId) as any
+			if (guestRow) guestToken = guestRow.api_token
+		} catch (e) {}
+
+		res.json({
+			success: true,
+			session: {
+				id: canonicalId,
+				isConnected: !!session?.isConnected,
+				user: session?.user || (credsUser ? { id: credsUser.id, name: credsUser.name } : null),
+				type: session?.type || 'qr',
+				phoneNumber: session?.phoneNumber || session?.user?.id?.replace(/:.+/, '') || (credsUser?.id ? credsUser.id.replace(/:.+/, '') : null),
+				createdAt: session?.createdAt || null,
+				lastConnected: session?.lastConnected || null,
+				guestToken
+			},
+			stats
+		})
+	} catch (error: any) {
+		console.error('Error fetching session detail:', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
 // Get session info (for inbox page)
 app.get('/api/session/:sessionId', (req, res) => {
 	try {
@@ -2889,6 +2999,64 @@ io.on('connection', (socket) => {
 		}
 	})
 
+	socket.on('guest-logout', async (data: { sessionId: string, token: string }) => {
+		try {
+			if (!data?.sessionId || !data?.token) return socket.emit('guest-session.error', { error: 'Invalid payload' })
+			const row = getGuestSessionByToken(data.token)
+			if (!row || row.session_id !== data.sessionId) return socket.emit('guest-session.error', { error: 'Token guest tidak valid.' })
+			await sessionManager.logout(data.sessionId)
+			socket.emit('guest-session.status', { sessionId: data.sessionId, status: 'disconnected', isConnected: false })
+		} catch (error: any) {
+			socket.emit('guest-session.error', { error: error.message })
+		}
+	})
+
+	socket.on('guest-delete', async (data: { sessionId: string, token: string }) => {
+		try {
+			if (!data?.sessionId || !data?.token) return socket.emit('guest-session.error', { error: 'Invalid payload' })
+			const row = getGuestSessionByToken(data.token)
+			if (!row || row.session_id !== data.sessionId) return socket.emit('guest-session.error', { error: 'Token guest tidak valid.' })
+			await sessionManager.deleteSession(data.sessionId)
+			try {
+				db.prepare('DELETE FROM guest_sessions WHERE session_id = ?').run(data.sessionId)
+			} catch (e) {}
+			const sessions = sessionManager.getAllSessions()
+			io.emit('all-sessions', sessions)
+			socket.emit('guest-session.deleted', { sessionId: data.sessionId })
+		} catch (error: any) {
+			socket.emit('guest-session.error', { error: error.message })
+		}
+	})
+
+	socket.on('guest-logout', async (data: { sessionId: string, token: string }) => {
+		try {
+			if (!data?.sessionId || !data?.token) return socket.emit('guest-session.error', { error: 'Invalid payload' })
+			const row = getGuestSessionByToken(data.token)
+			if (!row || row.session_id !== data.sessionId) return socket.emit('guest-session.error', { error: 'Token guest tidak valid.' })
+			await sessionManager.logout(data.sessionId)
+			socket.emit('guest-session.status', { sessionId: data.sessionId, status: 'disconnected', isConnected: false })
+		} catch (error: any) {
+			socket.emit('guest-session.error', { error: error.message })
+		}
+	})
+
+	socket.on('guest-delete', async (data: { sessionId: string, token: string }) => {
+		try {
+			if (!data?.sessionId || !data?.token) return socket.emit('guest-session.error', { error: 'Invalid payload' })
+			const row = getGuestSessionByToken(data.token)
+			if (!row || row.session_id !== data.sessionId) return socket.emit('guest-session.error', { error: 'Token guest tidak valid.' })
+			await sessionManager.deleteSession(data.sessionId)
+			try {
+				db.prepare('DELETE FROM guest_sessions WHERE session_id = ?').run(data.sessionId)
+			} catch (e) {}
+			const sessions = sessionManager.getAllSessions()
+			io.emit('all-sessions', sessions)
+			socket.emit('guest-session.deleted', { sessionId: data.sessionId })
+		} catch (error: any) {
+			socket.emit('guest-session.error', { error: error.message })
+		}
+	})
+
 	// Create new session
 	socket.on('create-session', (sessionId: string) => {
 		try {
@@ -2943,8 +3111,7 @@ io.on('connection', (socket) => {
 	// Delete session
 	socket.on('delete-session', async (sessionId: string) => {
 		try {
-			await sessionManager.deleteSession(sessionId)
-			const sessions = sessionManager.getAllSessions()
+			await sessionManager.deleteSession(sessionId); try { if (sessionId.startsWith('guest_')) { db.prepare('DELETE FROM guest_sessions WHERE session_id = ?').run(sessionId) } } catch(e){} const sessions = sessionManager.getAllSessions()
 			io.emit('all-sessions', sessions)
 			socket.emit('message', `Session ${sessionId} deleted`)
 		} catch (error: any) {
@@ -6342,3 +6509,4 @@ server.listen(PORT, async () => {
 		}
 	}, 3000)
 })
+

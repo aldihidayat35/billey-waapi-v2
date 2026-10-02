@@ -482,7 +482,7 @@ document.addEventListener('DOMContentLoaded', () => {
 let detailModal = null
 
 window.showSessionDetail = function (sessionId) {
-    window.location.href = `session-detail.html?id=${sessionId}`
+    window.location.href = `session-detail.html?id=${encodeURIComponent(sessionId)}`
 }
 
 function buildCurlExample(baseUrl, token, sessionId) {

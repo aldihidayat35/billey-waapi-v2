@@ -1,215 +1,262 @@
 // Initialize Socket.IO
-const socket = io()
+const socket = io();
 
-let currentSessionId = new URLSearchParams(window.location.search).get('id')
-let allSessions = []
+const urlParams = new URLSearchParams(window.location.search);
+let currentSessionId = urlParams.get('id') || urlParams.get('sessionId') || '';
+let currentSessionData = null;
+let allSessions = [];
+let adminToken = '';
 
-// Helper function to load HTML and execute scripts
+// Bootstrap Modal Instances
+let qrModalInst = null;
+let pairingModalInst = null;
+
+// Normalization helper for session matching (handles "wa 1 asli" vs "wa_1_asli")
+function normalizeId(id) {
+    return decodeURIComponent(id || '').trim().toLowerCase().replace(/[\s_-]+/g, '_');
+}
+
+function findSessionInList(targetId, list) {
+    if (!targetId || !Array.isArray(list) || list.length === 0) return null;
+    const direct = list.find(s => s.id === targetId);
+    if (direct) return direct;
+    
+    const targetNorm = normalizeId(targetId);
+    return list.find(s => normalizeId(s.id) === targetNorm) ||
+           list.find(s => (s.id || '').toLowerCase() === targetId.toLowerCase()) || null;
+}
+
+// Helper to load HTML components
 function loadHTMLWithScripts(containerId, html) {
-    const container = document.getElementById(containerId)
-    if (!container) return
+    const container = document.getElementById(containerId);
+    if (!container) return;
     
-    const temp = document.createElement('div')
-    temp.innerHTML = html
+    const temp = document.createElement('div');
+    temp.innerHTML = html;
     
-    const scripts = temp.querySelectorAll('script')
-    scripts.forEach(script => script.remove())
-    container.innerHTML = temp.innerHTML
+    const scripts = temp.querySelectorAll('script');
+    scripts.forEach(script => script.remove());
+    container.innerHTML = temp.innerHTML;
     
     scripts.forEach(oldScript => {
-        const newScript = document.createElement('script')
+        const newScript = document.createElement('script');
         if (oldScript.src) {
-            newScript.src = oldScript.src
+            newScript.src = oldScript.src;
         } else {
-            newScript.textContent = oldScript.textContent
+            newScript.textContent = oldScript.textContent;
         }
-        document.body.appendChild(newScript)
-    })
+        document.body.appendChild(newScript);
+    });
 }
 
-// Load components
+// Load navigation components (header, sidebar, footer)
 async function loadComponents() {
     try {
-        const headerResponse = await fetch('components/header.html')
-        const headerHTML = await headerResponse.text()
-        loadHTMLWithScripts('header-container', headerHTML)
+        const [headerRes, sidebarRes, footerRes] = await Promise.all([
+            fetch('components/header.html'),
+            fetch('components/sidebar.html'),
+            fetch('components/footer.html')
+        ]);
         
-        const sidebarResponse = await fetch('components/sidebar.html')
-        const sidebarHTML = await sidebarResponse.text()
-        loadHTMLWithScripts('sidebar-container', sidebarHTML)
+        loadHTMLWithScripts('header-container', await headerRes.text());
+        loadHTMLWithScripts('sidebar-container', await sidebarRes.text());
+        loadHTMLWithScripts('footer-container', await footerRes.text());
         
-        const footerResponse = await fetch('components/footer.html')
-        const footerHTML = await footerResponse.text()
-        loadHTMLWithScripts('footer-container', footerHTML)
-        
-        console.log('✅ Components loaded')
-        
-        initializeComponents()
-        
-        if (typeof initializeHeader === 'function') {
-            initializeHeader()
-        }
+        if (typeof KTMenu !== 'undefined') KTMenu.createInstances();
+        if (typeof KTDrawer !== 'undefined') KTDrawer.createInstances();
+        if (typeof KTScroll !== 'undefined') KTScroll.createInstances();
+        if (typeof initializeHeader === 'function') initializeHeader();
     } catch (error) {
-        console.error('❌ Error loading components:', error)
+        console.error('❌ Error loading components:', error);
     }
 }
 
-function initializeComponents() {
-    if (typeof KTMenu !== 'undefined') KTMenu.createInstances()
-    if (typeof KTDrawer !== 'undefined') KTDrawer.createInstances()
-    if (typeof KTScroll !== 'undefined') KTScroll.createInstances()
-}
+// Fetch comprehensive session details from HTTP REST API
+async function fetchSessionDetail(showLoader = false) {
+    if (!currentSessionId) return;
 
-document.addEventListener('DOMContentLoaded', () => {
-    if (!currentSessionId) {
-        Swal.fire({
-            icon: 'error',
-            title: 'Error',
-            text: 'Session ID tidak ditemukan di URL'
-        }).then(() => {
-            window.location.href = 'manage-sessions.html'
-        })
-        return
+    if (showLoader) {
+        document.getElementById('detailStatusDesc').textContent = 'Memperbarui data...';
     }
 
-    document.getElementById('pageSessionId').textContent = currentSessionId
-
-    loadComponents()
-
-    // Toggle API key show/hide
-    const btnToggleApiKey = document.getElementById('btnToggleApiKey')
-    if (btnToggleApiKey) {
-        btnToggleApiKey.addEventListener('click', function () {
-            const input = document.getElementById('det-api-key')
-            const icon  = document.getElementById('iconApiKey')
-            if (input.type === 'password') {
-                input.type = 'text'
-                icon.className = 'bi bi-eye-slash fs-6'
-            } else {
-                input.type = 'password'
-                icon.className = 'bi bi-eye fs-6'
+    try {
+        const res = await fetch(`/api/sessions/${encodeURIComponent(currentSessionId)}/detail`);
+        if (!res.ok) {
+            if (res.status === 404) {
+                showSessionNotFound(currentSessionId);
+                return;
             }
-        })
+            throw new Error(`Server returned ${res.status}`);
+        }
+
+        const data = await res.json();
+        if (data.success && data.session) {
+            hideSessionNotFound();
+            
+            // Set canonical ID
+            currentSessionId = data.session.id;
+            currentSessionData = data.session;
+            
+            renderSessionUI(data.session, data.stats);
+        } else {
+            showSessionNotFound(currentSessionId);
+        }
+    } catch (err) {
+        console.warn('⚠️ Fetch /api/sessions/:id/detail error:', err.message);
+        // Fallback to socket allSessions if already received
+        const matched = findSessionInList(currentSessionId, allSessions);
+        if (matched) {
+            hideSessionNotFound();
+            currentSessionId = matched.id;
+            renderSessionUI(matched, null);
+        }
     }
+}
 
-    // Initial fetch of API key and endpoints
-    const baseUrl = window.location.origin
-    document.getElementById('det-base-url').value  = baseUrl
-    document.getElementById('det-endpoint').value   = `${baseUrl}/api/wa/send`
-
-    const keyInput = document.getElementById('det-api-key')
-    keyInput.value = 'Memuat...'
-    keyInput.type  = 'password'
-    document.getElementById('iconApiKey').className = 'bi bi-eye fs-6'
-
-    fetch('/api/auth/me')
-        .then(r => r.json())
-        .then(data => {
-            const token = data.user?.token || '(token tidak tersedia)'
-            keyInput.value = token
-            document.getElementById('det-curl-example').textContent = buildCurlExample(baseUrl, token, currentSessionId)
-        })
-        .catch(() => {
-            keyInput.value = '(gagal mengambil token)'
-            document.getElementById('det-curl-example').textContent = buildCurlExample(baseUrl, '<YOUR_API_KEY>', currentSessionId)
-        })
-
-    // Actions
-    document.getElementById('detailBtnLogout').onclick    = () => { logoutSession(currentSessionId) }
-    document.getElementById('detailBtnReconnect').onclick = () => { 
-        const session = allSessions.find(s => s.id === currentSessionId)
-        if(session) reconnectSession(currentSessionId, session.type, session.phoneNumber || '') 
+// Render session information into UI
+function renderSessionUI(session, stats) {
+    const isConnected = !!session.isConnected;
+    const phoneNumber = session.phoneNumber || session.user?.id?.split(':')[0] || '-';
+    let userName = session.user?.name;
+    if (!userName) {
+        if (session.id.startsWith('guest_')) {
+            userName = `Guest Session (${phoneNumber})`;
+        } else if (phoneNumber !== '-') {
+            userName = `WhatsApp User (${phoneNumber})`;
+        } else {
+            userName = 'WhatsApp Session';
+        }
     }
-    document.getElementById('detailBtnDelete').onclick    = () => { deleteSession(currentSessionId) }
-
-    // Start fetching sessions
-    socket.emit('get-sessions')
-})
-
-socket.on('sessions', (sessions) => {
-    allSessions = sessions
-    renderSessionDetail()
-})
-
-socket.on('session-status', (data) => {
-    if (data.sessionId === currentSessionId) {
-        // Automatically fetch latest list
-        socket.emit('get-sessions')
-    }
-})
-
-function renderSessionDetail() {
-    const session = allSessions.find(s => s.id === currentSessionId)
-    if (!session) return
-
-    const isConnected  = session.isConnected
-    const userName     = session.user?.name || session.user?.id?.split(':')[0] || 'Unknown'
-    const phoneNumber  = session.user?.id?.split(':')[0] || '-'
-    const jid          = session.user?.id || '-'
-    const typeLabel    = session.type === 'qr' ? '📱 QR Code' : '🔢 Pairing Code'
-    const createdAt    = session.createdAt ? new Date(session.createdAt).toLocaleString('id-ID') : '-'
-    const lastOn       = session.lastConnected
+    const jid = session.user?.id || (phoneNumber !== '-' ? `${phoneNumber}@s.whatsapp.net` : '-');
+    const typeLabel = session.type === 'pairing' ? '🔢 Pairing Code' : '📱 QR Code';
+    const createdAt = session.createdAt ? new Date(session.createdAt).toLocaleString('id-ID') : '-';
+    const lastOn = session.lastConnected
         ? new Date(session.lastConnected).toLocaleString('id-ID')
-        : (isConnected ? 'Saat ini' : '-')
+        : (isConnected ? 'Saat ini' : '-');
 
-    // — Identity
-    document.getElementById('det-session-id').textContent  = session.id
-    document.getElementById('det-name').textContent         = userName
-    document.getElementById('det-phone').textContent        = phoneNumber
-    document.getElementById('det-jid').textContent          = jid
-
-    // — Connection info
-    document.getElementById('det-type').textContent           = typeLabel
-    document.getElementById('det-created').textContent        = createdAt
-    document.getElementById('det-last-connected').textContent = lastOn
-    document.getElementById('det-paired-phone').textContent   = session.phoneNumber || '-'
-
-    // — Status banner
-    const dot  = document.getElementById('detailStatusDot')
-    const desc = document.getElementById('detailStatusDesc')
-    if (isConnected) {
-        dot.className   = 'badge badge-light-success fs-7 px-4 py-2'
-        dot.innerHTML   = '<span class="status-dot-connected me-2"></span>Terhubung'
-        desc.textContent = `Session aktif dan siap menerima / mengirim pesan`
-    } else {
-        dot.className   = 'badge badge-light-danger fs-7 px-4 py-2'
-        dot.innerHTML   = '<span class="status-dot-disconnected me-2"></span>Terputus'
-        desc.textContent = 'Session tidak aktif. Lakukan Reconnect untuk menggunakannya kembali.'
-    }
-
-    // — Header
-    document.getElementById('detailModalTitle').textContent    = `Detail — ${session.id}`
+    // Title & Subtitle
+    document.getElementById('pageSessionId').textContent = session.id;
+    document.getElementById('detailModalTitle').textContent = `Detail — ${session.id}`;
     document.getElementById('detailModalSubtitle').textContent = isConnected
         ? `✅ Aktif · ${userName}`
-        : `❌ Offline · ${session.id}`
+        : `❌ Offline · ${session.id}`;
+        
+    // Header gradient
     document.getElementById('detailModalHeader').style.background = isConnected
         ? 'linear-gradient(135deg,#50cd89 0%,#1bc5bd 100%)'
-        : 'linear-gradient(135deg,#f1416c 0%,#d9214e 100%)'
+        : 'linear-gradient(135deg,#f1416c 0%,#d9214e 100%)';
 
-    // — Raw JSON
-    document.getElementById('det-raw-json').textContent = JSON.stringify(session, null, 2)
+    // Status Banner
+    const dot = document.getElementById('detailStatusDot');
+    const desc = document.getElementById('detailStatusDesc');
+    if (isConnected) {
+        dot.className = 'badge badge-light-success fs-7 px-4 py-2';
+        dot.innerHTML = '<span class="status-dot-connected me-2"></span>Terhubung';
+        desc.textContent = `Session aktif dan siap menerima / mengirim pesan WhatsApp`;
+    } else {
+        dot.className = 'badge badge-light-danger fs-7 px-4 py-2';
+        dot.innerHTML = '<span class="status-dot-disconnected me-2"></span>Terputus';
+        desc.textContent = 'Session tidak aktif. Klik Reconnect untuk menyambungkan kembali.';
+    }
 
-    // — Buttons
-    document.getElementById('detailBtnLogout').classList.toggle('d-none', !isConnected)
-    document.getElementById('detailBtnReconnect').classList.toggle('d-none', isConnected)
+    // Stats
+    if (stats) {
+        document.getElementById('det-stat-total').textContent = (stats.total || 0).toLocaleString();
+        document.getElementById('det-stat-incoming').textContent = (stats.incoming || 0).toLocaleString();
+        document.getElementById('det-stat-outgoing').textContent = (stats.outgoing || 0).toLocaleString();
+        document.getElementById('det-stat-last-activity').textContent = stats.lastActivity 
+            ? new Date(stats.lastActivity).toLocaleString('id-ID') 
+            : '-';
+    }
+
+    // Identitas
+    document.getElementById('det-session-id').textContent = session.id;
+    document.getElementById('det-name').textContent = userName;
+    document.getElementById('det-phone').textContent = phoneNumber;
+    document.getElementById('det-jid').textContent = jid;
+
+    // Info Koneksi
+    document.getElementById('det-connection-status').innerHTML = isConnected 
+        ? '<span class="badge badge-light-success fw-bold">ONLINE</span>' 
+        : '<span class="badge badge-light-danger fw-bold">OFFLINE</span>';
+    document.getElementById('det-type').textContent = typeLabel;
+    document.getElementById('det-created').textContent = createdAt;
+    document.getElementById('det-last-connected').textContent = lastOn;
+
+    // API Key & Endpoints
+    const baseUrl = window.location.origin;
+    const isGuest = !!session.guestToken || session.id.startsWith('guest_');
+    const endpointPath = isGuest ? '/api/send-message' : '/api/wa/send';
+    document.getElementById('det-base-url').value = baseUrl;
+    document.getElementById('det-endpoint').value = `${baseUrl}${endpointPath}`;
+
+    const tokenToUse = session.guestToken || adminToken;
+    if (tokenToUse) {
+        document.getElementById('det-api-key').value = tokenToUse;
+        document.getElementById('det-curl-example').textContent = buildCurlExample(baseUrl, tokenToUse, session.id, isGuest);
+    } else {
+        // Will be populated when admin token loads
+        document.getElementById('det-curl-example').textContent = buildCurlExample(baseUrl, '<YOUR_API_KEY>', session.id, isGuest);
+    }
+
+    // Raw JSON
+    const cleanSessionForDisplay = {
+        id: session.id,
+        isConnected: isConnected,
+        user: session.user || null,
+        type: session.type || 'qr',
+        phoneNumber: phoneNumber,
+        createdAt: session.createdAt || null,
+        lastConnected: session.lastConnected || null,
+        stats: stats || undefined
+    };
+    document.getElementById('det-raw-json').textContent = JSON.stringify(cleanSessionForDisplay, null, 2);
+
+    // Buttons
+    document.getElementById('detailBtnLogout').classList.toggle('d-none', !isConnected);
+    document.getElementById('detailBtnReconnectGroup').classList.toggle('d-none', isConnected);
 }
 
-function buildCurlExample(baseUrl, token, sessionId) {
-    return `curl -X POST ${baseUrl}/api/wa/send \\
+function showSessionNotFound(id) {
+    document.getElementById('sessionNotFoundAlert').classList.remove('d-none');
+    document.getElementById('sessionNotFoundText').textContent = `Session "${id}" tidak ditemukan di memori server ataupun folder penyimpanan sessions.`;
+    document.getElementById('sessionDetailContent').classList.add('d-none');
+    document.getElementById('pageSessionId').textContent = `${id} (Tidak Ditemukan)`;
+    document.getElementById('detailModalTitle').textContent = `Session Tidak Ditemukan`;
+    document.getElementById('detailModalSubtitle').textContent = `ID: ${id}`;
+    document.getElementById('detailModalHeader').style.background = 'linear-gradient(135deg,#6c757d 0%,#495057 100%)';
+}
+
+function hideSessionNotFound() {
+    document.getElementById('sessionNotFoundAlert').classList.add('d-none');
+    document.getElementById('sessionDetailContent').classList.remove('d-none');
+}
+
+function buildCurlExample(baseUrl, token, sessionId, isGuest = false) {
+    if (isGuest) {
+        return `curl -X POST "${baseUrl}/api/send-message" \\
+  -H "Authorization: Bearer ${token}" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "session_id": "${sessionId}",
+    "to": "628123456789",
+    "message": "Halo dari Billey WA API!"
+  }'`;
+    }
+    return `curl -X POST "${baseUrl}/api/wa/send" \\
   -H "Content-Type: application/json" \\
   -H "X-Api-Key: ${token}" \\
   -d '{
+    "session_id": "${sessionId}",
     "to": "628123456789",
-    "message": "Halo dari Billey WA API!",
-    "session_id": "${sessionId}"
-  }'`
+    "message": "Halo dari Billey WA API!"
+  }'`;
 }
 
-window.copyDetailField = function (id, label) {
-    const el   = document.getElementById(id)
-    const text = (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')
-        ? el.value
-        : el.textContent
+window.copyDetailField = function(id, label) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const text = (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') ? el.value : el.textContent;
 
     const doToast = () => Swal.fire({
         icon: 'success',
@@ -219,26 +266,238 @@ window.copyDetailField = function (id, label) {
         toast: true,
         position: 'top-end',
         customClass: { popup: 'p-3' }
-    })
+    });
 
     if (navigator.clipboard) {
-        navigator.clipboard.writeText(text).then(doToast)
+        navigator.clipboard.writeText(text).then(doToast).catch(() => fallbackCopy(text, doToast));
     } else {
-        const textarea = document.createElement('textarea')
-        textarea.value = text
-        document.body.appendChild(textarea)
-        textarea.select()
-        document.execCommand('copy')
-        document.body.removeChild(textarea)
-        doToast()
+        fallbackCopy(text, doToast);
+    }
+};
+
+function fallbackCopy(text, cb) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+        document.execCommand('copy');
+        if (cb) cb();
+    } catch (e) {
+        console.error('Fallback copy failed', e);
+    }
+    document.body.removeChild(textarea);
+}
+
+// Document Ready Initialization
+document.addEventListener('DOMContentLoaded', () => {
+    if (!currentSessionId) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Parameter Hilang',
+            text: 'Session ID tidak ditemukan di URL. Mengalihkan ke daftar session...'
+        }).then(() => {
+            window.location.href = 'manage-sessions.html';
+        });
+        return;
+    }
+
+    document.getElementById('pageSessionId').textContent = currentSessionId;
+    loadComponents();
+
+    // Initialize Bootstrap Modals
+    const qEl = document.getElementById('qrModal');
+    if (qEl && typeof bootstrap !== 'undefined') {
+        qrModalInst = new bootstrap.Modal(qEl, { backdrop: 'static', keyboard: false });
+    }
+    const pEl = document.getElementById('pairingModal');
+    if (pEl && typeof bootstrap !== 'undefined') {
+        pairingModalInst = new bootstrap.Modal(pEl, { backdrop: 'static', keyboard: false });
+    }
+
+    // Toggle API Key Show/Hide
+    const btnToggleApiKey = document.getElementById('btnToggleApiKey');
+    if (btnToggleApiKey) {
+        btnToggleApiKey.addEventListener('click', function() {
+            const input = document.getElementById('det-api-key');
+            const icon = document.getElementById('iconApiKey');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.className = 'bi bi-eye-slash fs-6';
+            } else {
+                input.type = 'password';
+                icon.className = 'bi bi-eye fs-6';
+            }
+        });
+    }
+
+    // Refresh button
+    const btnRefresh = document.getElementById('btnRefreshDetail');
+    if (btnRefresh) {
+        btnRefresh.addEventListener('click', () => {
+            fetchSessionDetail(true);
+            socket.emit('get-sessions');
+        });
+    }
+
+    // Actions
+    document.getElementById('detailBtnLogout').onclick = () => logoutSession();
+    document.getElementById('detailBtnDelete').onclick = () => deleteSession();
+    document.getElementById('detailBtnReconnect').onclick = () => reconnectViaQr();
+    document.getElementById('reconnectViaQrAction').onclick = () => reconnectViaQr();
+    document.getElementById('reconnectViaPairingAction').onclick = () => reconnectViaPairing();
+
+    // Fetch Admin API Token
+    fetch('/api/auth/me')
+        .then(r => r.json())
+        .then(data => {
+            adminToken = data.user?.token || '';
+            const keyInput = document.getElementById('det-api-key');
+            if (!keyInput.value || keyInput.value === 'Memuat...' || keyInput.value === '(token tidak tersedia)') {
+                keyInput.value = adminToken || '(token tidak tersedia)';
+                const baseUrl = window.location.origin;
+                document.getElementById('det-curl-example').textContent = buildCurlExample(baseUrl, adminToken || '<YOUR_API_KEY>', currentSessionId);
+            }
+        })
+        .catch(() => {});
+
+    // Initial Fetch via REST API
+    fetchSessionDetail();
+});
+
+// Socket.IO Events
+socket.on('connect', () => {
+    console.log('⚡ Socket connected to server');
+    socket.emit('get-sessions');
+});
+
+socket.on('all-sessions', (sessions) => {
+    allSessions = sessions || [];
+    const matched = findSessionInList(currentSessionId, allSessions);
+    if (matched) {
+        hideSessionNotFound();
+        currentSessionId = matched.id;
+        // Keep stats intact if already loaded
+        fetchSessionDetail();
+    }
+});
+
+socket.on('session-status', (data) => {
+    if (!data || !data.sessionId) return;
+    if (data.sessionId === currentSessionId || normalizeId(data.sessionId) === normalizeId(currentSessionId)) {
+        console.log('🔄 Session status update received:', data);
+        
+        if (data.status === 'connected') {
+            if (qrModalInst) qrModalInst.hide();
+            if (pairingModalInst) pairingModalInst.hide();
+            Swal.close();
+            
+            Swal.fire({
+                icon: 'success',
+                title: 'Terhubung!',
+                text: `Session ${data.sessionId} berhasil terhubung!`,
+                timer: 2000,
+                showConfirmButton: false
+            });
+        }
+        
+        fetchSessionDetail();
+    }
+});
+
+// Handle QR events (supporting both 'qr' and 'qr-code')
+function handleQrReceived(data) {
+    if (!data || !data.sessionId) return;
+    if (data.sessionId !== currentSessionId && normalizeId(data.sessionId) !== normalizeId(currentSessionId)) return;
+
+    Swal.close();
+    if (pairingModalInst) pairingModalInst.hide();
+
+    const container = document.getElementById('qr-code-container');
+    if (container) {
+        container.innerHTML = '';
+        if (typeof QRCode !== 'undefined') {
+            try {
+                new QRCode(container, {
+                    text: data.qr,
+                    width: 256,
+                    height: 256,
+                    colorDark: "#000000",
+                    colorLight: "#ffffff",
+                    correctLevel: QRCode.CorrectLevel.M
+                });
+            } catch (qrErr) {
+                renderQrFallback(data.qr, container);
+            }
+        } else {
+            renderQrFallback(data.qr, container);
+        }
+    }
+    
+    if (qrModalInst) {
+        qrModalInst.show();
+    } else {
+        const qEl = document.getElementById('qrModal');
+        if (qEl && typeof bootstrap !== 'undefined') {
+            qrModalInst = new bootstrap.Modal(qEl, { backdrop: 'static', keyboard: false });
+            qrModalInst.show();
+        }
     }
 }
 
-// Implement action functions (logoutSession, deleteSession, reconnectSession)
-function logoutSession(sessionId) {
+function renderQrFallback(qrData, container) {
+    container.innerHTML = '';
+    const img = document.createElement('img');
+    img.src = `https://api.qrserver.com/v1/create-qr-code/?size=256x256&data=${encodeURIComponent(qrData)}`;
+    img.alt = 'QR Code WhatsApp';
+    img.className = 'img-fluid rounded shadow-sm';
+    container.appendChild(img);
+}
+
+socket.on('qr', handleQrReceived);
+socket.on('qr-code', handleQrReceived);
+
+// Handle Pairing Code
+socket.on('pairing-code', (data) => {
+    if (!data || !data.sessionId) return;
+    if (data.sessionId !== currentSessionId && normalizeId(data.sessionId) !== normalizeId(currentSessionId)) return;
+
+    Swal.close();
+    if (qrModalInst) qrModalInst.hide();
+
+    const display = document.getElementById('pairing-code-display');
+    if (display) {
+        display.textContent = data.code || '------';
+    }
+
+    if (pairingModalInst) {
+        pairingModalInst.show();
+    } else {
+        const pEl = document.getElementById('pairingModal');
+        if (pEl && typeof bootstrap !== 'undefined') {
+            pairingModalInst = new bootstrap.Modal(pEl, { backdrop: 'static', keyboard: false });
+            pairingModalInst.show();
+        }
+    }
+});
+
+socket.on('message', (msg) => {
+    console.log('Server message:', msg);
+});
+
+socket.on('error', (err) => {
+    Swal.fire({
+        icon: 'error',
+        title: 'Terjadi Kesalahan',
+        text: err
+    });
+});
+
+// Action implementations
+function logoutSession() {
     Swal.fire({
         title: 'Logout Session?',
-        text: "Anda harus melakukan scan ulang untuk terhubung kembali",
+        text: `Koneksi WhatsApp pada session "${currentSessionId}" akan diputus.`,
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#f1416c',
@@ -250,58 +509,100 @@ function logoutSession(sessionId) {
             Swal.fire({
                 title: 'Melogout session...',
                 allowOutsideClick: false,
-                didOpen: () => { Swal.showLoading() }
-            })
-            socket.emit('logout-session', sessionId)
-            setTimeout(() => { socket.emit('get-sessions') }, 1500)
+                didOpen: () => Swal.showLoading()
+            });
+            socket.emit('logout', currentSessionId);
+            setTimeout(() => {
+                fetchSessionDetail();
+                Swal.close();
+            }, 1500);
         }
-    })
+    });
 }
 
-function deleteSession(sessionId) {
+function deleteSession() {
     Swal.fire({
         title: 'Hapus Session?',
-        text: "Semua data terkait session ini akan dihapus permanen",
+        text: `Semua data autentikasi dan histori session "${currentSessionId}" akan dihapus permanen!`,
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#f1416c',
         cancelButtonColor: '#b5b5c3',
-        confirmButtonText: 'Ya, Hapus',
+        confirmButtonText: 'Ya, Hapus Permanen',
         cancelButtonText: 'Batal'
     }).then((result) => {
         if (result.isConfirmed) {
             Swal.fire({
                 title: 'Menghapus session...',
                 allowOutsideClick: false,
-                didOpen: () => { Swal.showLoading() }
-            })
-            socket.emit('delete-session', sessionId)
-            setTimeout(() => { 
-                Swal.fire('Terhapus!', 'Session berhasil dihapus.', 'success').then(() => {
-                    window.location.href = 'manage-sessions.html'
-                })
-            }, 1500)
+                didOpen: () => Swal.showLoading()
+            });
+            socket.emit('delete-session', currentSessionId);
+            setTimeout(() => {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Terhapus!',
+                    text: 'Session berhasil dihapus.',
+                    timer: 1500,
+                    showConfirmButton: false
+                }).then(() => {
+                    window.location.href = 'manage-sessions.html';
+                });
+            }, 1800);
         }
-    })
+    });
 }
 
-function reconnectSession(sessionId, type, phoneNumber) {
-    if (type === 'pairing' && phoneNumber) {
-        socket.emit('start-session-pairing', {
-            sessionId: sessionId,
-            phoneNumber: phoneNumber
-        })
-    } else {
-        socket.emit('start-session-qr', sessionId)
+function reconnectViaQr() {
+    Swal.fire({
+        title: 'Menyiapkan QR Code...',
+        text: 'Meminta QR Code WhatsApp dari server',
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading()
+    });
+    
+    // Clear old container
+    const container = document.getElementById('qr-code-container');
+    if (container) {
+        container.innerHTML = '<div class="text-center text-muted"><span class="spinner-border spinner-border-sm me-2"></span>Meminta QR code dari server...</div>';
     }
     
-    Swal.fire({
-        title: 'Menghubungkan kembali...',
-        text: 'Menghubungkan kembali session',
-        allowOutsideClick: false,
-        timer: 2000,
-        didOpen: () => { Swal.showLoading() }
-    })
+    socket.emit('start-session-qr', currentSessionId);
+}
+
+function reconnectViaPairing() {
+    const existingPhone = currentSessionData?.phoneNumber || '';
     
-    setTimeout(() => { socket.emit('get-sessions') }, 2000)
+    Swal.fire({
+        title: 'Pairing Code',
+        text: 'Masukkan nomor WhatsApp untuk menerima Pairing Code (contoh: 628123456789):',
+        input: 'text',
+        inputValue: existingPhone.replace(/[^0-9]/g, ''),
+        inputPlaceholder: '628xxxxxxxxxx',
+        showCancelButton: true,
+        confirmButtonText: 'Minta Kode Pairing',
+        cancelButtonText: 'Batal',
+        confirmButtonColor: '#50cd89',
+        preConfirm: (phone) => {
+            if (!phone || phone.trim().length < 9) {
+                Swal.showValidationMessage('Nomor WhatsApp harus valid (minimal 9 digit)!');
+                return false;
+            }
+            return phone.trim();
+        }
+    }).then((res) => {
+        if (res.isConfirmed && res.value) {
+            Swal.fire({
+                title: 'Membuat Pairing Code...',
+                text: 'Harap tunggu...',
+                allowOutsideClick: false,
+                didOpen: () => Swal.showLoading()
+            });
+            
+            socket.emit('start-session-pairing', {
+                sessionId: currentSessionId,
+                phoneNumber: res.value
+            });
+        }
+    });
 }

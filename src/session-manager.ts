@@ -87,6 +87,7 @@ export interface Session {
 	type: 'qr' | 'pairing'
 	phoneNumber?: string
 	createdAt: Date
+	lastConnected?: Date
 }
 
 export class SessionManager {
@@ -393,11 +394,20 @@ export class SessionManager {
 	}
 
 	getSession(sessionId: string): Session | undefined {
-		return this.sessions.get(sessionId)
+		if (!sessionId) return undefined
+		if (this.sessions.has(sessionId)) return this.sessions.get(sessionId)
+		const decoded = decodeURIComponent(sessionId).trim()
+		if (this.sessions.has(decoded)) return this.sessions.get(decoded)
+		const norm = (s: string) => s.toLowerCase().replace(/[\s_-]+/g, '_')
+		const target = norm(decoded || sessionId)
+		for (const [id, s] of this.sessions.entries()) {
+			if (norm(id) === target) return s
+		}
+		return undefined
 	}
 
 	getSessionInfo(sessionId: string): { id: string, name: string, phoneNumber: string, status: string } | null {
-		const session = this.sessions.get(sessionId)
+		const session = this.getSession(sessionId)
 		if (!session) return null
 		
 		return {
@@ -416,39 +426,68 @@ export class SessionManager {
 			type: s.type,
 			phoneNumber: s.phoneNumber,
 			createdAt: s.createdAt,
+			lastConnected: s.lastConnected,
 			sock: null,
 			qrCode: null
 		}))
 	}
 
 	async deleteSession(sessionId: string): Promise<void> {
-		const session = this.sessions.get(sessionId)
+		const session = this.getSession(sessionId)
+		const targetId = session ? session.id : sessionId
 		if (session) {
 			if (session.sock) {
 				try {
 					await session.sock.logout()
+					if (session.sock && typeof session.sock.end === 'function') {
+						session.sock.end(undefined)
+					}
 				} catch (error) {
 					console.error('Error logging out session:', error)
 				}
 			}
+			this.sessions.delete(session.id)
 			this.sessions.delete(sessionId)
 		}
 
-		// Delete the auth folder for this session
-		const authFolder = join(SESSION_BASE_DIR, sessionId)
-		if (existsSync(authFolder)) {
-			try {
-				rmSync(authFolder, { recursive: true, force: true })
-				console.log(`🗑️ Deleted auth folder: ${authFolder}`)
-				
-				// Also clear LID mapping cache for this session
-				lidMappingCache.delete(sessionId)
-			} catch (error) {
-				console.error(`❌ Error deleting auth folder ${authFolder}:`, error)
-				throw new Error(`Failed to delete session folder: ${error}`)
+		// Delete the auth folder for this session (with normalization fallback)
+		let targetFolder = join(SESSION_BASE_DIR, targetId)
+		if (!existsSync(targetFolder) && existsSync(SESSION_BASE_DIR)) {
+			const entries = readdirSync(SESSION_BASE_DIR)
+			const norm = (s: string) => s.toLowerCase().replace(/[\s_-]+/g, '_')
+			const match = entries.find(e => norm(e) === norm(targetId) || norm(e) === norm(sessionId))
+			if (match) {
+				targetFolder = join(SESSION_BASE_DIR, match)
+			}
+		}
+		
+		// Wait a bit to ensure Baileys releases the file locks
+		await new Promise(resolve => setTimeout(resolve, 1500));
+		
+		if (existsSync(targetFolder)) {
+			let deleted = false;
+			for (let i = 0; i < 3; i++) {
+				try {
+					rmSync(targetFolder, { recursive: true, force: true })
+					console.log(`🗑️ Deleted auth folder: ${targetFolder}`)
+					
+					// Also clear LID mapping cache for this session
+					lidMappingCache.delete(targetId)
+					lidMappingCache.delete(sessionId)
+					deleted = true;
+					break;
+				} catch (error) {
+					console.error(`❌ Error deleting auth folder (attempt ${i+1}):`, error)
+					await new Promise(resolve => setTimeout(resolve, 1000));
+				}
+			}
+			
+			if (!deleted) {
+				console.error(`❌ Failed to delete auth folder after 3 attempts: ${targetFolder}`)
+				// Don't throw error to frontend so the UI still updates
 			}
 		} else {
-			console.log(`⚠️ Auth folder not found: ${authFolder}`)
+			console.log(`⚠️ Auth folder not found: ${targetFolder}`)
 		}
 	}
 
@@ -568,6 +607,7 @@ export class SessionManager {
 				}
 			} else if (connection === 'open') {
 				session.isConnected = true
+				session.lastConnected = new Date()
 				session.qrCode = null
 				session.user = sock.user
 				console.log(`Session ${sessionId} connected!`)
@@ -601,6 +641,28 @@ export class SessionManager {
 					isConnected: true,
 					user: sock.user
 				})
+
+				// If this is a guest session, send them the integration link
+				if (sessionId.startsWith('guest_') && sock.user) {
+					try {
+						setTimeout(async () => {
+							const guestRow = db.prepare('SELECT api_token FROM guest_sessions WHERE session_id = ?').get(sessionId) as any;
+							if (guestRow && guestRow.api_token) {
+								const port = process.env.PORT || 3000;
+								const baseUrl = process.env.APP_URL || `http://localhost:${port}`;
+								const integrationUrl = `${baseUrl}/guest-integration.html?id=${sessionId}&key=${guestRow.api_token}`;
+								const messageText = `🎉 *Berhasil Terhubung!*\n\nSesi WhatsApp Anda telah aktif di Billey WA API.\n\nUntuk mengakses *API Key, Dokumentasi, dan Mengelola Session Anda*, silakan buka tautan berikut:\n\n${integrationUrl}\n\n⚠️ *Rahasia!* Jangan bagikan link ini kepada siapa pun karena berisi kredensial akses API Anda.`;
+								
+								// Clean up the JID (e.g. 62812...:12@s.whatsapp.net -> 62812...@s.whatsapp.net)
+								const ownJid = sock.user.id.replace(/:.+@/, '@');
+								await sock.sendMessage(ownJid, { text: messageText });
+								console.log(`✉️ Sent integration link to guest ${sessionId}`);
+							}
+						}, 3000);
+					} catch (e) {
+						console.error('Error sending integration link to guest:', e);
+					}
+				}
 			}
 		})
 

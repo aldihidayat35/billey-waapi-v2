@@ -38,6 +38,17 @@
             0%, 100% { opacity: 1; transform: scale(1); } 
             50% { opacity: 0.7; transform: scale(1.1); } 
         }
+        .pairing-code-text {
+            font-size: 2.2rem;
+            letter-spacing: 6px;
+            font-family: monospace;
+            background: #f1fbf6;
+            border: 2px dashed #50cd89;
+            border-radius: 12px;
+            padding: 14px 20px;
+            color: #047857;
+            display: inline-block;
+        }
     </style>
 </head>
 <body id="kt_app_body" data-kt-app-layout="dark-sidebar" data-kt-app-header-fixed="true" data-kt-app-sidebar-enabled="true" data-kt-app-sidebar-fixed="true" data-kt-app-sidebar-hoverable="true" data-kt-app-sidebar-push-header="true" data-kt-app-sidebar-push-toolbar="true" data-kt-app-sidebar-push-footer="true" data-kt-app-toolbar-enabled="true" class="app-default">
@@ -62,7 +73,7 @@
                                 <div class="page-title d-flex flex-column justify-content-center flex-wrap me-3">
                                     <h1 class="page-heading d-flex text-dark fw-bold fs-3 flex-column justify-content-center my-0">
                                         Detail Session
-                                        <span id="pageSessionId" class="text-muted fs-7 mt-1"></span>
+                                        <span id="pageSessionId" class="text-muted fs-7 mt-1">Memuat session...</span>
                                     </h1>
                                     <ul class="breadcrumb breadcrumb-separatorless fw-semibold fs-7 my-0 pt-1">
                                         <li class="breadcrumb-item text-muted">
@@ -77,13 +88,15 @@
                                     </ul>
                                 </div>
                                 <div class="d-flex align-items-center gap-2 gap-lg-3">
+                                    <button type="button" id="btnRefreshDetail" class="btn btn-sm fw-bold btn-light-primary">
+                                        <i class="bi bi-arrow-clockwise"></i> Refresh
+                                    </button>
                                     <a href="manage-sessions.html" class="btn btn-sm fw-bold btn-secondary">
                                         <i class="bi bi-arrow-left"></i> Kembali
                                     </a>
                                 </div>
                             </div>
                         </div>
-
                         <!-- Content -->
                         <div id="kt_app_content" class="app-content flex-column-fluid">
                             <div id="kt_app_content_container" class="app-container container-xxl">
@@ -107,204 +120,285 @@
                                             </div>
                                         </div>
                                     </div>
-                    
-                                    <!-- Status Banner -->
-                                    <div class="px-7 py-3 d-flex align-items-center gap-3 border-bottom bg-gray-50">
-                                        <span id="detailStatusDot" class="badge fs-7 px-4 py-2"></span>
-                                        <span id="detailStatusDesc" class="text-muted fs-7"></span>
+
+                                    <!-- Alert Not Found -->
+                                    <div id="sessionNotFoundAlert" class="alert alert-danger d-flex align-items-center m-7 d-none">
+                                        <i class="bi bi-exclamation-triangle-fill fs-2x text-danger me-4"></i>
+                                        <div class="d-flex flex-column">
+                                            <h4 class="mb-1 text-danger">Session Tidak Ditemukan</h4>
+                                            <span id="sessionNotFoundText">Session ID ini tidak terdaftar di server. Pastikan Session ID sudah benar.</span>
+                                        </div>
+                                        <a href="manage-sessions.html" class="btn btn-sm btn-danger ms-auto">Kembali ke Daftar Session</a>
                                     </div>
                     
-                                    <!-- Body -->
-                                    <div class="card-body px-7 py-6">
-                    
-                                        <!-- Row 1: Identitas & Koneksi -->
-                                        <div class="row g-5 mb-5">
-                    
-                                            <!-- Identitas Session -->
-                                            <div class="col-md-6">
-                                                <div class="card card-flush border border-dashed border-primary h-100">
-                                                    <div class="card-header min-h-50px px-5 pt-4 pb-2">
-                                                        <h5 class="card-title fw-bold text-primary fs-8 mb-0 text-uppercase tracking-wider">
-                                                            <i class="bi bi-person-vcard me-2"></i>Identitas Session
-                                                        </h5>
-                                                    </div>
-                                                    <div class="card-body py-3 px-5">
-                                                        <table class="table table-borderless table-sm mb-0">
-                                                            <tbody>
-                                                                <tr>
-                                                                    <td class="text-muted fw-semibold py-1 pe-3"
-                                                                        style="width:100px;white-space:nowrap">Session ID</td>
-                                                                    <td class="py-1">
-                                                                        <span class="badge badge-light-primary fw-bold font-monospace fs-8"
-                                                                              id="det-session-id">-</span>
-                                                                    </td>
-                                                                </tr>
-                                                                <tr>
-                                                                    <td class="text-muted fw-semibold py-1">Nama</td>
-                                                                    <td class="fw-semibold py-1" id="det-name">-</td>
-                                                                </tr>
-                                                                <tr>
-                                                                    <td class="text-muted fw-semibold py-1">Nomor WA</td>
-                                                                    <td class="fw-bold text-dark py-1" id="det-phone">-</td>
-                                                                </tr>
-                                                                <tr>
-                                                                    <td class="text-muted fw-semibold py-1">JID</td>
-                                                                    <td class="text-muted font-monospace fs-8 py-1"
-                                                                        id="det-jid">-</td>
-                                                                </tr>
-                                                            </tbody>
-                                                        </table>
-                                                    </div>
-                                                </div>
-                                            </div>
-                    
-                                            <!-- Info Koneksi -->
-                                            <div class="col-md-6">
-                                                <div class="card card-flush border border-dashed border-success h-100">
-                                                    <div class="card-header min-h-50px px-5 pt-4 pb-2">
-                                                        <h5 class="card-title fw-bold text-success fs-8 mb-0 text-uppercase">
-                                                            <i class="bi bi-wifi me-2"></i>Info Koneksi
-                                                        </h5>
-                                                    </div>
-                                                    <div class="card-body py-3 px-5">
-                                                        <table class="table table-borderless table-sm mb-0">
-                                                            <tbody>
-                                                                <tr>
-                                                                    <td class="text-muted fw-semibold py-1 pe-3"
-                                                                        style="width:100px;white-space:nowrap">Metode</td>
-                                                                    <td class="fw-semibold py-1" id="det-type">-</td>
-                                                                </tr>
-                                                                <tr>
-                                                                    <td class="text-muted fw-semibold py-1">Dibuat</td>
-                                                                    <td class="fw-semibold py-1" id="det-created">-</td>
-                                                                </tr>
-                                                                <tr>
-                                                                    <td class="text-muted fw-semibold py-1">Terakhir On</td>
-                                                                    <td class="fw-semibold py-1" id="det-last-connected">-</td>
-                                                                </tr>
-                                                                <tr>
-                                                                    <td class="text-muted fw-semibold py-1">Nomor Paired</td>
-                                                                    <td class="text-muted fs-8 py-1" id="det-paired-phone">-</td>
-                                                                </tr>
-                                                            </tbody>
-                                                        </table>
-                                                    </div>
-                                                </div>
-                                            </div>
+                                    <div id="sessionDetailContent">
+                                        <!-- Status Banner -->
+                                        <div class="px-7 py-3 d-flex align-items-center gap-3 border-bottom bg-gray-50">
+                                            <span id="detailStatusDot" class="badge fs-7 px-4 py-2">
+                                                <span class="spinner-border spinner-border-sm me-2"></span>Memeriksa status...
+                                            </span>
+                                            <span id="detailStatusDesc" class="text-muted fs-7">Menghubungkan ke server...</span>
                                         </div>
-                    
-                                        <!-- Row 2: API Key & Endpoint -->
-                                        <div class="card card-flush border border-dashed border-warning mb-5">
-                                            <div class="card-header min-h-50px px-5 pt-4 pb-2">
-                                                <h5 class="card-title fw-bold text-warning fs-8 mb-0 text-uppercase">
-                                                    <i class="bi bi-key me-2"></i>API Key &amp; Endpoint
-                                                </h5>
+                        
+                                        <!-- Body -->
+                                        <div class="card-body px-7 py-6">
+                        
+                                            <!-- Row 0: Statistik Ringkas -->
+                                            <div class="row g-5 mb-5">
+                                                <div class="col-sm-6 col-xl-3">
+                                                    <div class="card card-flush border border-gray-200 bg-light-primary h-100">
+                                                        <div class="card-body py-4 px-5 d-flex align-items-center justify-content-between">
+                                                            <div>
+                                                                <span class="text-muted fw-bold fs-7 d-block">TOTAL PESAN</span>
+                                                                <span class="fs-2hx fw-bold text-primary" id="det-stat-total">0</span>
+                                                            </div>
+                                                            <div class="symbol symbol-45px">
+                                                                <span class="symbol-label bg-white text-primary"><i class="bi bi-chat-dots-fill fs-2"></i></span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="col-sm-6 col-xl-3">
+                                                    <div class="card card-flush border border-gray-200 bg-light-success h-100">
+                                                        <div class="card-body py-4 px-5 d-flex align-items-center justify-content-between">
+                                                            <div>
+                                                                <span class="text-muted fw-bold fs-7 d-block">PESAN MASUK</span>
+                                                                <span class="fs-2hx fw-bold text-success" id="det-stat-incoming">0</span>
+                                                            </div>
+                                                            <div class="symbol symbol-45px">
+                                                                <span class="symbol-label bg-white text-success"><i class="bi bi-arrow-down-left-circle-fill fs-2"></i></span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="col-sm-6 col-xl-3">
+                                                    <div class="card card-flush border border-gray-200 bg-light-info h-100">
+                                                        <div class="card-body py-4 px-5 d-flex align-items-center justify-content-between">
+                                                            <div>
+                                                                <span class="text-muted fw-bold fs-7 d-block">PESAN KELUAR</span>
+                                                                <span class="fs-2hx fw-bold text-info" id="det-stat-outgoing">0</span>
+                                                            </div>
+                                                            <div class="symbol symbol-45px">
+                                                                <span class="symbol-label bg-white text-info"><i class="bi bi-arrow-up-right-circle-fill fs-2"></i></span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="col-sm-6 col-xl-3">
+                                                    <div class="card card-flush border border-gray-200 bg-light-warning h-100">
+                                                        <div class="card-body py-4 px-5 d-flex align-items-center justify-content-between">
+                                                            <div>
+                                                                <span class="text-muted fw-bold fs-7 d-block">AKTIVITAS TERAKHIR</span>
+                                                                <span class="fs-7 fw-bold text-warning d-block mt-1" id="det-stat-last-activity">-</span>
+                                                            </div>
+                                                            <div class="symbol symbol-45px">
+                                                                <span class="symbol-label bg-white text-warning"><i class="bi bi-clock-history fs-2"></i></span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div class="card-body py-4 px-5">
-                    
-                                                <!-- API Key row -->
-                                                <div class="mb-4">
-                                                    <label class="form-label fw-semibold text-muted fs-8 mb-1">
-                                                        API KEY
-                                                        <span class="text-muted fw-normal ms-1">(gunakan sebagai header <code>X-Api-Key</code>)</span>
-                                                    </label>
-                                                    <div class="input-group input-group-sm">
-                                                        <input type="password" id="det-api-key"
-                                                               class="form-control form-control-sm font-monospace bg-light-warning border-0 fw-semibold"
-                                                               readonly autocomplete="off">
-                                                        <button class="btn btn-sm btn-light" type="button"
-                                                                id="btnToggleApiKey" title="Tampilkan / Sembunyikan">
-                                                            <i class="bi bi-eye fs-6" id="iconApiKey"></i>
-                                                        </button>
-                                                        <button class="btn btn-sm btn-light-warning fw-semibold" type="button"
-                                                                onclick="copyDetailField('det-api-key','API Key')">
-                                                            <i class="bi bi-clipboard me-1 fs-7"></i>Salin
-                                                        </button>
-                                                    </div>
-                                                </div>
-                    
-                                                <!-- URL & Endpoint row -->
-                                                <div class="row g-3 mb-4">
-                                                    <div class="col-md-5">
-                                                        <label class="form-label fw-semibold text-muted fs-8 mb-1">Base URL</label>
-                                                        <div class="input-group input-group-sm">
-                                                            <input type="text" id="det-base-url"
-                                                                   class="form-control form-control-sm font-monospace bg-light border-0"
-                                                                   readonly>
-                                                            <button class="btn btn-sm btn-light-primary" type="button"
-                                                                    onclick="copyDetailField('det-base-url','Base URL')">
-                                                                <i class="bi bi-clipboard fs-7"></i>
-                                                            </button>
+
+                                            <!-- Row 1: Identitas & Koneksi -->
+                                            <div class="row g-5 mb-5">
+                        
+                                                <!-- Identitas Session -->
+                                                <div class="col-md-6">
+                                                    <div class="card card-flush border border-dashed border-primary h-100">
+                                                        <div class="card-header min-h-50px px-5 pt-4 pb-2">
+                                                            <h5 class="card-title fw-bold text-primary fs-8 mb-0 text-uppercase tracking-wider">
+                                                                <i class="bi bi-person-vcard me-2"></i>Identitas Session
+                                                            </h5>
                                                         </div>
-                                                    </div>
-                                                    <div class="col-md-7">
-                                                        <label class="form-label fw-semibold text-muted fs-8 mb-1">Send Message Endpoint</label>
-                                                        <div class="input-group input-group-sm">
-                                                            <input type="text" id="det-endpoint"
-                                                                   class="form-control form-control-sm font-monospace bg-light border-0"
-                                                                   readonly>
-                                                            <button class="btn btn-sm btn-light-primary" type="button"
-                                                                    onclick="copyDetailField('det-endpoint','Endpoint')">
-                                                                <i class="bi bi-clipboard fs-7"></i>
-                                                            </button>
+                                                        <div class="card-body py-3 px-5">
+                                                            <table class="table table-borderless table-sm mb-0">
+                                                                <tbody>
+                                                                    <tr>
+                                                                        <td class="text-muted fw-semibold py-1 pe-3"
+                                                                            style="width:110px;white-space:nowrap">Session ID</td>
+                                                                        <td class="py-1">
+                                                                            <span class="badge badge-light-primary fw-bold font-monospace fs-8"
+                                                                                  id="det-session-id">-</span>
+                                                                        </td>
+                                                                    </tr>
+                                                                    <tr>
+                                                                        <td class="text-muted fw-semibold py-1">Nama Kontak</td>
+                                                                        <td class="fw-semibold py-1" id="det-name">-</td>
+                                                                    </tr>
+                                                                    <tr>
+                                                                        <td class="text-muted fw-semibold py-1">Nomor WA</td>
+                                                                        <td class="fw-bold text-dark py-1" id="det-phone">-</td>
+                                                                    </tr>
+                                                                    <tr>
+                                                                        <td class="text-muted fw-semibold py-1">JID</td>
+                                                                        <td class="text-muted font-monospace fs-8 py-1"
+                                                                            id="det-jid">-</td>
+                                                                    </tr>
+                                                                </tbody>
+                                                            </table>
                                                         </div>
                                                     </div>
                                                 </div>
-                    
-                                                <!-- cURL example -->
-                                                <div>
-                                                    <label class="form-label fw-semibold text-muted fs-8 mb-1">Contoh cURL</label>
-                                                    <div class="position-relative">
+                        
+                                                <!-- Info Koneksi -->
+                                                <div class="col-md-6">
+                                                    <div class="card card-flush border border-dashed border-success h-100">
+                                                        <div class="card-header min-h-50px px-5 pt-4 pb-2">
+                                                            <h5 class="card-title fw-bold text-success fs-8 mb-0 text-uppercase">
+                                                                <i class="bi bi-wifi me-2"></i>Info Koneksi
+                                                            </h5>
+                                                        </div>
+                                                        <div class="card-body py-3 px-5">
+                                                            <table class="table table-borderless table-sm mb-0">
+                                                                <tbody>
+                                                                    <tr>
+                                                                        <td class="text-muted fw-semibold py-1 pe-3"
+                                                                            style="width:110px;white-space:nowrap">Status</td>
+                                                                        <td class="fw-semibold py-1" id="det-connection-status">-</td>
+                                                                    </tr>
+                                                                    <tr>
+                                                                        <td class="text-muted fw-semibold py-1">Metode</td>
+                                                                        <td class="fw-semibold py-1" id="det-type">-</td>
+                                                                    </tr>
+                                                                    <tr>
+                                                                        <td class="text-muted fw-semibold py-1">Dibuat</td>
+                                                                        <td class="fw-semibold py-1" id="det-created">-</td>
+                                                                    </tr>
+                                                                    <tr>
+                                                                        <td class="text-muted fw-semibold py-1">Terakhir On</td>
+                                                                        <td class="fw-semibold py-1" id="det-last-connected">-</td>
+                                                                    </tr>
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                        
+                                            <!-- Row 2: API Key & Endpoint -->
+                                            <div class="card card-flush border border-dashed border-warning mb-5">
+                                                <div class="card-header min-h-50px px-5 pt-4 pb-2">
+                                                    <h5 class="card-title fw-bold text-warning fs-8 mb-0 text-uppercase">
+                                                        <i class="bi bi-key me-2"></i>API Key &amp; Endpoint
+                                                    </h5>
+                                                </div>
+                                                <div class="card-body py-4 px-5">
+                        
+                                                    <!-- API Key row -->
+                                                    <div class="mb-4">
+                                                        <label class="form-label fw-semibold text-muted fs-8 mb-1">
+                                                            API KEY
+                                                            <span class="text-muted fw-normal ms-1">(gunakan sebagai header <code>X-Api-Key</code>)</span>
+                                                        </label>
+                                                        <div class="input-group input-group-sm">
+                                                            <input type="password" id="det-api-key"
+                                                                   class="form-control form-control-sm font-monospace bg-light-warning border-0 fw-semibold"
+                                                                   readonly autocomplete="off" value="Memuat...">
+                                                            <button class="btn btn-sm btn-light" type="button"
+                                                                    id="btnToggleApiKey" title="Tampilkan / Sembunyikan">
+                                                                <i class="bi bi-eye fs-6" id="iconApiKey"></i>
+                                                            </button>
+                                                            <button class="btn btn-sm btn-light-warning fw-semibold" type="button"
+                                                                    onclick="copyDetailField('det-api-key','API Key')">
+                                                                <i class="bi bi-clipboard me-1 fs-7"></i>Salin
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                        
+                                                    <!-- URL & Endpoint row -->
+                                                    <div class="row g-3 mb-4">
+                                                        <div class="col-md-5">
+                                                            <label class="form-label fw-semibold text-muted fs-8 mb-1">Base URL</label>
+                                                            <div class="input-group input-group-sm">
+                                                                <input type="text" id="det-base-url"
+                                                                       class="form-control form-control-sm font-monospace bg-light border-0"
+                                                                       readonly>
+                                                                <button class="btn btn-sm btn-light-primary" type="button"
+                                                                        onclick="copyDetailField('det-base-url','Base URL')">
+                                                                    <i class="bi bi-clipboard fs-7"></i>
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-md-7">
+                                                            <label class="form-label fw-semibold text-muted fs-8 mb-1">Send Message Endpoint</label>
+                                                            <div class="input-group input-group-sm">
+                                                                <input type="text" id="det-endpoint"
+                                                                       class="form-control form-control-sm font-monospace bg-light border-0"
+                                                                       readonly>
+                                                                <button class="btn btn-sm btn-light-primary" type="button"
+                                                                        onclick="copyDetailField('det-endpoint','Endpoint')">
+                                                                    <i class="bi bi-clipboard fs-7"></i>
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                        
+                                                    <!-- cURL example -->
+                                                    <div>
+                                                        <div class="d-flex align-items-center justify-content-between mb-1">
+                                                            <label class="form-label fw-semibold text-muted fs-8 mb-0">Contoh Request cURL</label>
+                                                            <button class="btn btn-xs btn-light-primary py-1 px-3"
+                                                                    style="font-size:0.75rem"
+                                                                    onclick="copyDetailField('det-curl-example','cURL')">
+                                                                <i class="bi bi-clipboard fs-8 me-1"></i>Salin Kode
+                                                            </button>
+                                                        </div>
                                                         <pre id="det-curl-example"
-                                                             class="bg-dark text-warning rounded p-4 fs-8 mb-0"
-                                                             style="overflow-x:auto;white-space:pre;max-height:120px"></pre>
-                                                        <button class="btn btn-xs btn-light position-absolute top-0 end-0 m-2 py-1 px-3"
-                                                                style="font-size:0.75rem"
-                                                                onclick="copyDetailField('det-curl-example','cURL')">
-                                                            <i class="bi bi-clipboard fs-8 me-1"></i>Salin
-                                                        </button>
+                                                             class="bg-dark text-warning rounded p-4 fs-8 mb-0 font-monospace"
+                                                             style="overflow-x:auto;white-space:pre-wrap;line-height:1.6">Memuat contoh curl...</pre>
                                                     </div>
                                                 </div>
                                             </div>
-                                        </div>
-                    
-                                        <!-- Row 3: Raw JSON -->
-                                        <div class="card card-flush border border-dashed border-secondary">
-                                            <div class="card-header min-h-50px px-5 pt-4 pb-2">
-                                                <h5 class="card-title fw-bold text-secondary fs-8 mb-0 text-uppercase">
-                                                    <i class="bi bi-braces me-2"></i>Raw Session Data
-                                                </h5>
-                                                <div class="card-toolbar">
-                                                    <button class="btn btn-xs btn-light py-1 px-3"
-                                                            style="font-size:0.75rem"
-                                                            onclick="copyDetailField('det-raw-json','JSON')">
-                                                        <i class="bi bi-clipboard fs-8 me-1"></i>Salin JSON
-                                                    </button>
+                        
+                                            <!-- Row 3: Raw JSON -->
+                                            <div class="card card-flush border border-dashed border-secondary">
+                                                <div class="card-header min-h-50px px-5 pt-4 pb-2">
+                                                    <h5 class="card-title fw-bold text-secondary fs-8 mb-0 text-uppercase">
+                                                        <i class="bi bi-braces me-2"></i>Raw Session Data
+                                                    </h5>
+                                                    <div class="card-toolbar">
+                                                        <button class="btn btn-xs btn-light py-1 px-3"
+                                                                style="font-size:0.75rem"
+                                                                onclick="copyDetailField('det-raw-json','JSON')">
+                                                            <i class="bi bi-clipboard fs-8 me-1"></i>Salin JSON
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <div class="card-body py-3 px-5">
+                                                    <pre id="det-raw-json"
+                                                         class="bg-light rounded p-4 fs-8 mb-0 text-gray-700 font-monospace"
+                                                         style="max-height:220px;overflow-y:auto;white-space:pre-wrap">Memuat data raw...</pre>
                                                 </div>
                                             </div>
-                                            <div class="card-body py-3 px-5">
-                                                <pre id="det-raw-json"
-                                                     class="bg-light rounded p-4 fs-8 mb-0 text-gray-700"
-                                                     style="max-height:180px;overflow-y:auto;white-space:pre-wrap"></pre>
-                                            </div>
+                        
                                         </div>
-                    
-                                    </div>
-                    
-                                    <!-- Footer -->
-                                    <div class="card-footer border-top px-7 py-4 d-flex justify-content-start gap-2">
-                                        <button type="button" id="detailBtnLogout"
-                                                class="btn btn-sm btn-danger d-none">
-                                            <i class="bi bi-power me-1"></i>Logout Session
-                                        </button>
-                                        <button type="button" id="detailBtnReconnect"
-                                                class="btn btn-sm btn-primary d-none">
-                                            <i class="bi bi-arrow-repeat me-1"></i>Reconnect
-                                        </button>
-                                        <button type="button" id="detailBtnDelete"
-                                                class="btn btn-sm btn-light-danger ms-auto">
-                                            <i class="bi bi-trash me-1"></i>Hapus Session
-                                        </button>
+                        
+                                        <!-- Footer Action Buttons -->
+                                        <div class="card-footer border-top px-7 py-4 d-flex justify-content-start gap-2 flex-wrap">
+                                            <button type="button" id="detailBtnLogout"
+                                                    class="btn btn-sm btn-danger d-none">
+                                                <i class="bi bi-power me-1"></i>Logout Session
+                                            </button>
+                                            
+                                            <!-- Reconnect Button with Dropdown (QR or Pairing) -->
+                                            <div class="btn-group d-none" id="detailBtnReconnectGroup">
+                                                <button type="button" id="detailBtnReconnect" class="btn btn-sm btn-primary">
+                                                    <i class="bi bi-arrow-repeat me-1"></i>Reconnect (QR)
+                                                </button>
+                                                <button type="button" class="btn btn-sm btn-primary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+                                                    <span class="visually-hidden">Pilihan Reconnect</span>
+                                                </button>
+                                                <ul class="dropdown-menu">
+                                                    <li><a class="dropdown-item" href="javascript:void(0)" id="reconnectViaQrAction"><i class="bi bi-qr-code me-2"></i>Scan QR Code</a></li>
+                                                    <li><a class="dropdown-item" href="javascript:void(0)" id="reconnectViaPairingAction"><i class="bi bi-key me-2"></i>Gunakan Pairing Code</a></li>
+                                                </ul>
+                                            </div>
+
+                                            <button type="button" id="detailBtnDelete"
+                                                    class="btn btn-sm btn-light-danger ms-auto">
+                                                <i class="bi bi-trash me-1"></i>Hapus Session
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -319,14 +413,93 @@
         </div>
     </div>
 
+    <!-- QR Code Modal -->
+    <div class="modal fade" id="qrModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow-lg border-0">
+                <div class="modal-header bg-primary py-4">
+                    <h3 class="modal-title text-white fs-5">
+                        <i class="bi bi-qr-code fs-3 me-2 text-white"></i>
+                        Scan QR Code WhatsApp
+                    </h3>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center py-8 px-6">
+                    <div id="qr-code-container" class="mb-6 d-flex justify-content-center align-items-center" style="min-height:260px;">
+                        <div class="text-center text-muted">
+                            <span class="spinner-border spinner-border-sm me-2"></span>Meminta QR code dari server...
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-light-primary border border-primary border-dashed d-flex align-items-start text-start p-4 mb-4">
+                        <i class="bi bi-info-circle fs-2 text-primary me-3 mt-1"></i>
+                        <div>
+                            <p class="mb-1 fw-bold text-gray-800 fs-7">Petunjuk Menghubungkan:</p>
+                            <ol class="mb-0 ps-3 text-gray-700 fs-8">
+                                <li>Buka aplikasi WhatsApp di HP Anda</li>
+                                <li>Buka Menu (⋮) atau Settings &gt; <strong>Perangkat Tertaut</strong></li>
+                                <li>Tap <strong>Tautkan Perangkat</strong></li>
+                                <li>Arahkan kamera ke QR Code di atas</li>
+                            </ol>
+                        </div>
+                    </div>
+                    
+                    <div class="text-muted fs-8">
+                        <i class="bi bi-shield-lock-fill text-success me-1"></i> Koneksi aman dan terenkripsi end-to-end
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Pairing Code Modal -->
+    <div class="modal fade" id="pairingModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow-lg border-0">
+                <div class="modal-header bg-success py-4">
+                    <h3 class="modal-title text-white fs-5">
+                        <i class="bi bi-key fs-3 me-2 text-white"></i>
+                        Pairing Code WhatsApp
+                    </h3>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center py-8 px-6">
+                    <div class="mb-6">
+                        <div class="pairing-code-text" id="pairing-code-display">------</div>
+                        <div class="mt-3">
+                            <button type="button" class="btn btn-sm btn-light-success fw-bold" onclick="copyDetailField('pairing-code-display', 'Pairing Code')">
+                                <i class="bi bi-clipboard me-1"></i> Salin Kode
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-light-success border border-success border-dashed d-flex align-items-start text-start p-4 mb-4">
+                        <i class="bi bi-info-circle fs-2 text-success me-3 mt-1"></i>
+                        <div>
+                            <p class="mb-1 fw-bold text-gray-800 fs-7">Cara Masukkan Pairing Code:</p>
+                            <ol class="mb-0 ps-3 text-gray-700 fs-8">
+                                <li>Buka WhatsApp di HP Anda</li>
+                                <li>Buka Menu (⋮) atau Settings &gt; <strong>Perangkat Tertaut</strong></li>
+                                <li>Tap <strong>Tautkan dengan Nomor Telepon</strong></li>
+                                <li>Ketikkan 8 digit kode di atas pada layar HP Anda</li>
+                            </ol>
+                        </div>
+                    </div>
+                    
+                    <div class="text-muted fs-8">
+                        <i class="bi bi-clock-history me-1"></i> Kode akan expired dalam beberapa menit
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
     <script src="assets/plugins/global/plugins.bundle.js"></script>
     <script src="assets/js/scripts.bundle.js"></script>
     <script src="/socket.io/socket.io.js"></script>
-    <!-- SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    
-    <!-- Custom JS -->
     <script src="session-detail.js"></script>
 
 </body>

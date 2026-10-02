@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#059669">
+    <title>Data Integrasi WhatsApp | Billey WA API</title>
+    <link rel="shortcut icon" href="/assets/media/logos/favicon.ico">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+    <style>
+        * { box-sizing: border-box; }
+        :root {
+            --green: #10b981;
+            --green-dark: #047857;
+            --ink: #0f172a;
+            --muted: #64748b;
+            --line: #dbe5e2;
+            --soft: #f4fbf8;
+            --card: rgba(255,255,255,.94);
+            --shadow: 0 24px 80px rgba(15, 23, 42, .12);
+        }
+        body {
+            margin: 0;
+            min-height: 100dvh;
+            font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at 18% 18%, rgba(16,185,129,.16), transparent 28%),
+                radial-gradient(circle at 82% 6%, rgba(20,184,166,.13), transparent 24%),
+                linear-gradient(135deg, #f7fffb 0%, #eef7f4 48%, #f8fafc 100%);
+        }
+        .shell {
+            width: min(1180px, calc(100% - 32px));
+            margin: 0 auto;
+            padding: 24px 0 36px;
+        }
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 22px;
+        }
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
+        }
+        .brand-mark {
+            width: 46px;
+            height: 46px;
+            display: grid;
+            place-items: center;
+            border-radius: 16px;
+            color: #fff;
+            background: linear-gradient(135deg, var(--green), var(--green-dark));
+            box-shadow: 0 12px 28px rgba(16,185,129,.28);
+            font-size: 23px;
+        }
+        .brand h1 {
+            margin: 0;
+            font-size: clamp(19px, 2.4vw, 26px);
+            letter-spacing: -.03em;
+            color: var(--ink);
+        }
+        .brand p {
+            margin: 2px 0 0;
+            color: var(--muted);
+            font-size: 13px;
+            font-weight: 700;
+        }
+        .topbar-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            min-height: 42px;
+            padding: 0 14px;
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            background: #fff;
+            color: #334155;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 800;
+            box-shadow: 0 8px 24px rgba(15,23,42,.06);
+            transition: all .2s ease;
+        }
+        .back-link:hover {
+            border-color: #cbd5e1;
+            background: #f8fafc;
+        }
+        .hero {
+            display: grid;
+            grid-template-columns: minmax(0, 0.95fr) minmax(440px, 1.05fr);
+            gap: 20px;
+            align-items: start;
+        }
+        .panel {
+            background: var(--card);
+            border: 1px solid rgba(219,229,226,.92);
+            border-radius: 24px;
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(18px);
+            overflow: hidden;
+        }
+        .panel-head {
+            padding: 22px 24px 18px;
+            border-bottom: 1px solid var(--line);
+        }
+        .panel-head h2 {
+            margin: 0;
+            font-size: 18px;
+            letter-spacing: -.02em;
+            color: var(--ink);
+        }
+        .panel-head p {
+            margin: 6px 0 0;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.55;
+            font-weight: 650;
+        }
+        .status-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            min-height: 32px;
+            padding: 0 12px;
+            border-radius: 999px;
+            background: #f1f5f9;
+            color: #475569;
+            font-size: 12px;
+            font-weight: 850;
+        }
+        .badge::before {
+            content: '';
+            width: 9px;
+            height: 9px;
+            border-radius: 999px;
+            background: currentColor;
+            box-shadow: 0 0 0 5px rgba(100,116,139,.12);
+        }
+        .badge.connected {
+            background: #dcfce7;
+            color: #15803d;
+        }
+        .badge.connected::before {
+            animation: pulse-dot 2s infinite;
+        }
+        .badge.disconnected {
+            background: #fff1f2;
+            color: #e11d48;
+        }
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(1.15); }
+        }
+        .small-id {
+            min-width: 0;
+            color: #64748b;
+            font-size: 12px;
+            font-weight: 800;
+            font-family: monospace;
+            background: #f8fafc;
+            padding: 4px 10px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* Account Card */
+        .account-card {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 16px;
+            background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+            border: 1px solid #bbf7d0;
+            border-radius: 18px;
+            margin-bottom: 16px;
+        }
+        .account-avatar {
+            width: 52px;
+            height: 52px;
+            border-radius: 16px;
+            background: linear-gradient(135deg, var(--green), var(--green-dark));
+            display: grid;
+            place-items: center;
+            color: #fff;
+            font-size: 26px;
+            box-shadow: 0 8px 20px rgba(16,185,129,.24);
+            flex-shrink: 0;
+        }
+        .account-details {
+            min-width: 0;
+            flex: 1;
+        }
+        .account-phone {
+            font-size: 17px;
+            font-weight: 850;
+            color: var(--ink);
+            letter-spacing: -.02em;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .account-sub {
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 700;
+            margin-top: 3px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* Stats Row */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 18px;
+        }
+        .stat-card {
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            padding: 12px 14px;
+            text-align: center;
+        }
+        .stat-label {
+            font-size: 10px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            color: var(--muted);
+            margin-bottom: 4px;
+        }
+        .stat-val {
+            font-size: 18px;
+            font-weight: 850;
+            color: var(--ink);
+        }
+        .stat-val.primary { color: #0284c7; }
+        .stat-val.success { color: #16a34a; }
+        .stat-val.info { color: #6366f1; }
+
+        /* Interactive Test Message Box */
+        .test-box {
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 18px;
+            padding: 16px;
+            margin-bottom: 18px;
+        }
+        .test-box-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            font-weight: 850;
+            color: var(--ink);
+            margin-bottom: 12px;
+        }
+        .test-box-title i {
+            color: var(--green);
+            font-size: 16px;
+        }
+        .test-form {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .form-row {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .form-label {
+            font-size: 11px;
+            font-weight: 800;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: .04em;
+        }
+        .form-input {
+            width: 100%;
+            height: 38px;
+            padding: 0 12px;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            background: #f8fafc;
+            color: var(--ink);
+            font-size: 13px;
+            font-weight: 700;
+            font-family: inherit;
+            outline: none;
+            transition: border-color .2s;
+        }
+        .form-input:focus {
+            border-color: var(--green);
+            background: #fff;
+        }
+        .btn-test-send {
+            height: 40px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, var(--green), var(--green-dark));
+            color: #fff;
+            font-weight: 800;
+            font-size: 13px;
+            border: none;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 8px 20px rgba(16,185,129,.24);
+            transition: all .2s ease;
+        }
+        .btn-test-send:hover {
+            opacity: .94;
+            transform: translateY(-1px);
+        }
+        .btn-test-send:disabled {
+            opacity: .6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* 2-Column Data Grid */
+        .info-panel {
+            padding: 22px 24px 24px;
+        }
+        .data-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 14px;
+        }
+        .data-item {
+            min-width: 0;
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            background: #fff;
+            padding: 13px 14px;
+        }
+        .data-item.full {
+            grid-column: 1 / -1;
+        }
+        .data-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            color: #64748b;
+            font-size: 11px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            margin-bottom: 6px;
+        }
+        .data-label-actions {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .copy-btn {
+            border: none;
+            cursor: pointer;
+            min-height: 26px;
+            padding: 0 8px;
+            border-radius: 8px;
+            background: #ecfdf5;
+            color: #047857;
+            font-size: 11px;
+            font-weight: 800;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            transition: background .15s;
+        }
+        .copy-btn:hover {
+            background: #d1fae5;
+        }
+        .data-value {
+            color: #0f172a;
+            font-size: 13px;
+            font-weight: 750;
+            line-height: 1.5;
+            word-break: break-all;
+            overflow-x: auto;
+        }
+        .data-value.mono {
+            font-family: monospace;
+        }
+        pre.data-value {
+            margin: 0;
+            max-height: 220px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            padding: 14px;
+            border-radius: 14px;
+            background: #0f172a;
+            color: #e2f5ef;
+            font-size: 12px;
+            font-weight: 600;
+            overflow-x: auto;
+            font-family: 'Fira Code', Consolas, monospace;
+            line-height: 1.55;
+            border: 1px solid #1e293b;
+        }
+
+        /* Notice Banner */
+        .notice-banner {
+            display: flex;
+            gap: 10px;
+            margin-top: 14px;
+            padding: 12px 14px;
+            border: 1px solid #c7f9df;
+            border-radius: 16px;
+            background: #f0fdf4;
+            color: #047857;
+            font-size: 12px;
+            line-height: 1.5;
+            font-weight: 700;
+        }
+        .notice-banner i {
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+
+        /* Buttons & Actions */
+        button, .button {
+            border: 0;
+            cursor: pointer;
+            min-height: 42px;
+            padding: 0 14px;
+            border-radius: 14px;
+            font-family: inherit;
+            font-weight: 850;
+            font-size: 13px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            text-decoration: none;
+            transition: all .2s ease;
+        }
+        .btn-primary {
+            background: var(--green);
+            color: #fff;
+            box-shadow: 0 10px 24px rgba(16,185,129,.22);
+        }
+        .btn-primary:hover {
+            background: var(--green-dark);
+        }
+        .btn-soft {
+            background: #f1f5f9;
+            color: #334155;
+            border: 1px solid #e2e8f0;
+        }
+        .btn-soft:hover {
+            background: #e2e8f0;
+        }
+        .btn-danger {
+            background: #fff1f2;
+            color: #be123c;
+            border: 1px solid #ffe4e6;
+        }
+        .btn-danger:hover {
+            background: #ffe4e6;
+        }
+        .actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 18px;
+            padding-top: 16px;
+            border-top: 1px dashed var(--line);
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            z-index: 9999;
+            min-width: 220px;
+            padding: 12px 16px;
+            border-radius: 14px;
+            background: #0f172a;
+            color: #fff;
+            font-size: 13px;
+            font-weight: 800;
+            box-shadow: 0 18px 50px rgba(15,23,42,.24);
+            opacity: 0;
+            transform: translateY(12px);
+            transition: all .2s ease;
+            pointer-events: none;
+        }
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Error Banner */
+        .alert-error {
+            background: #fff1f2;
+            border: 1px solid #ffe4e6;
+            border-radius: 20px;
+            padding: 24px;
+            color: #be123c;
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+            font-size: 14px;
+            line-height: 1.5;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow);
+        }
+        .alert-error i {
+            font-size: 32px;
+            color: #e11d48;
+            flex-shrink: 0;
+        }
+        .alert-error h3 {
+            margin: 0 0 6px;
+            font-size: 17px;
+            font-weight: 850;
+        }
+        .d-none { display: none !important; }
+
+        @media (max-width: 960px) {
+            .hero {
+                grid-template-columns: 1fr;
+            }
+        }
+        @media (max-width: 540px) {
+            .shell {
+                padding-top: 14px;
+            }
+            .data-grid {
+                grid-template-columns: 1fr;
+            }
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            .actions {
+                grid-template-columns: 1fr;
+            }
+            .topbar {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .topbar-actions {
+                width: 100%;
+                justify-content: flex-end;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <main class="shell">
+        <header class="topbar">
+            <div class="brand">
+                <div class="brand-mark"><i class="bi bi-whatsapp"></i></div>
+                <div>
+                    <h1>Data Integrasi WhatsApp</h1>
+                    <p>Kredensial REST API & Informasi Koneksi Sesi</p>
+                </div>
+            </div>
+            <div class="topbar-actions">
+                <a class="back-link" href="/guest-session.html">
+                    <i class="bi bi-qr-code-scan"></i>
+                    <span>Scan QR Baru</span>
+                </a>
+                <a class="back-link" href="/auth/login">
+                    <i class="bi bi-box-arrow-in-right"></i>
+                    <span>Halaman Login</span>
+                </a>
+            </div>
+        </header>
+
+        <!-- Alert Error (Jika token / session tidak valid) -->
+        <div id="alertError" class="alert-error d-none">
+            <i class="bi bi-exclamation-octagon-fill"></i>
+            <div>
+                <h3>Akses Sesi Tidak Valid</h3>
+                <p id="errorText" style="margin: 0 0 12px;">Sesi ini telah dihapus permanen atau token autentikasi salah.</p>
+                <a href="/guest-session.html" class="button btn-primary" style="display:inline-flex; width:auto;">
+                    <i class="bi bi-plus-circle me-1"></i> Hubungkan Sesi Baru
+                </a>
+            </div>
+        </div>
+
+        <div id="mainContent" class="hero">
+            <!-- Kolom Kiri: Status Akun, Statistik & Tester Pesan -->
+            <div class="panel">
+                <div class="panel-head">
+                    <div class="status-row">
+                        <span class="badge disconnected" id="status-badge">Memeriksa status...</span>
+                        <span class="small-id" id="session-id-label">Session: -</span>
+                    </div>
+                    <h2>Status WhatsApp</h2>
+                    <p>Informasi nomor WhatsApp yang sedang aktif pada session ini.</p>
+                </div>
+
+                <div class="info-panel">
+                    <!-- WhatsApp Account Profile Box -->
+                    <div class="account-card">
+                        <div class="account-avatar">
+                            <i class="bi bi-whatsapp"></i>
+                        </div>
+                        <div class="account-details">
+                            <div class="account-phone" id="account-phone-display">
+                                <span>-</span>
+                            </div>
+                            <div class="account-sub" id="account-name-display">WhatsApp Guest User</div>
+                            <div class="account-sub" id="account-jid-display" style="font-family: monospace; font-size: 11px;">-</div>
+                        </div>
+                    </div>
+
+                    <!-- Statistik Ringkas -->
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-label">TOTAL PESAN</div>
+                            <div class="stat-val primary" id="stat-total-msg">0</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">PESAN MASUK</div>
+                            <div class="stat-val success" id="stat-incoming-msg">0</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">PESAN KELUAR</div>
+                            <div class="stat-val info" id="stat-outgoing-msg">0</div>
+                        </div>
+                    </div>
+
+                    <!-- Interactive Quick Tester -->
+                    <div class="test-box">
+                        <div class="test-box-title">
+                            <i class="bi bi-send-check-fill"></i>
+                            <span>Uji Coba Kirim Pesan Langsung (Live API Test)</span>
+                        </div>
+                        <div class="test-form">
+                            <div class="form-row">
+                                <label class="form-label">Nomor Tujuan WhatsApp (dengan kode negara)</label>
+                                <input type="text" id="test-to" class="form-input" placeholder="Contoh: 6281234567890">
+                            </div>
+                            <div class="form-row">
+                                <label class="form-label">Pesan Teks</label>
+                                <input type="text" id="test-message" class="form-input" value="Halo! Uji coba kirim pesan via Billey WA API">
+                            </div>
+                            <button type="button" id="btn-send-test" class="btn-test-send" onclick="sendTestMessage()">
+                                <i class="bi bi-send-fill"></i>
+                                <span>Kirim Pesan Sekarang</span>
+                            </button>
+                        </div>
+                        <div id="test-result-box" class="d-none" style="margin-top: 10px; font-size: 12px; padding: 10px 12px; border-radius: 12px;"></div>
+                    </div>
+
+                    <!-- Session Action Buttons -->
+                    <div class="actions">
+                        <button id="btnLogout" class="btn-soft" onclick="logoutSession()">
+                            <i class="bi bi-power"></i> Logout Sesi
+                        </button>
+                        <button id="btnDelete" class="btn-danger" onclick="deleteSession()">
+                            <i class="bi bi-trash3-fill"></i> Hapus Permanen
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Kolom Kanan: Detail Kredensial & Dokumentasi REST API -->
+            <div class="panel">
+                <div class="panel-head">
+                    <h2>Detail Kredensial &amp; REST API</h2>
+                    <p>Gunakan informasi di bawah ini untuk menghubungkan aplikasi Anda. Sertakan header <code>Authorization: Bearer [TOKEN]</code>.</p>
+                </div>
+
+                <div class="info-panel">
+                    <div class="notice-banner">
+                        <i class="bi bi-shield-lock-fill"></i>
+                        <div>
+                            <strong>Autentikasi Aman:</strong> Sertakan header <code>Authorization: Bearer &lt;TOKEN&gt;</code> dan <code>Content-Type: application/json</code> pada setiap request POST.
+                        </div>
+                    </div>
+
+                    <!-- 2-Column Data Grid -->
+                    <div class="data-grid" id="dataGrid">
+                        <div style="grid-column: 1 / -1; padding: 30px; text-align: center; color: var(--muted);">
+                            <i class="bi bi-arrow-repeat fs-1 d-block mb-2"></i>
+                            Memuat data integrasi sesi...
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 18px; display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button type="button" class="btn-primary" style="flex: 1; min-width: 200px;" id="btn-download-json" onclick="downloadConfigJson()">
+                            <i class="bi bi-download"></i> Download Konfigurasi JSON
+                        </button>
+                        <button type="button" class="btn-soft" style="flex: 1; min-width: 180px;" id="btn-copy-all" onclick="copyAllConfig()">
+                            <i class="bi bi-clipboard-check"></i> Salin Semua Data
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Floating Toast Notification -->
+    <div class="toast" id="toast">Disalin ke clipboard</div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/guest-integration.js"></script>
+</body>
+</html>

@@ -328,8 +328,8 @@
 
             <div id="kt_app_sidebar_menu" data-kt-menu="true">
 
-                <!-- ── MAIN ─────────────────────────────────── -->
-                <div class="sb-section-label">Main</div>
+                <!-- ── 1. UTAMA ──────────────────────────────── -->
+                <div class="sb-section-label">Utama</div>
                 <div class="sb-menu">
                     <a class="sb-item" href="/" data-page="dashboard">
                         <span class="sb-icon"><i class="bi bi-speedometer2"></i></span>
@@ -337,12 +337,90 @@
                     </a>
                 </div>
 
-                <!-- ── ADMIN SECTION ─────────────────────────── -->
+                <!-- ── 2. WHATSAPP & KONEKSI ─────────────────── -->
+                <div class="sb-section-label">WhatsApp &amp; Koneksi</div>
+                <div class="sb-menu">
+                    <a class="sb-item" href="/manage-sessions.html" data-page="manage-sessions">
+                        <span class="sb-icon"><i class="bi bi-phone-fill"></i></span>
+                        <span class="sb-label">Kelola Session</span>
+                    </a>
+                    <a class="sb-item" href="/guest-session.html" data-page="guest-session" target="_blank">
+                        <span class="sb-icon"><i class="bi bi-qr-code-scan"></i></span>
+                        <span class="sb-label">Session Tamu (Guest)</span>
+                        <span class="sb-badge sb-badge-green">Scan</span>
+                    </a>
+                </div>
+
+                <!-- ── 3. PESAN & CHAT ───────────────────────── -->
+                <div class="sb-section-label">Pesan &amp; Chat</div>
+                <div class="sb-menu">
+                    <a class="sb-item" href="/send-message.html" data-page="send-message">
+                        <span class="sb-icon"><i class="bi bi-send-fill"></i></span>
+                        <span class="sb-label">Kirim Pesan</span>
+                    </a>
+                    <a class="sb-item" href="/broadcast.html" data-page="broadcast">
+                        <span class="sb-icon"><i class="bi bi-megaphone-fill"></i></span>
+                        <span class="sb-label">Broadcast Pesan</span>
+                    </a>
+                    <a class="sb-item" href="/templates.html" data-page="templates">
+                        <span class="sb-icon"><i class="bi bi-lightning-charge-fill"></i></span>
+                        <span class="sb-label">Template Chat</span>
+                    </a>
+                </div>
+
+                <!-- ── 4. OTOMASI ────────────────────────────── -->
+                <div class="sb-section-label">Otomasi</div>
+                <div class="sb-menu">
+                    <a class="sb-item" href="/auto-reply.html" data-page="auto-reply">
+                        <span class="sb-icon"><i class="bi bi-reply-fill"></i></span>
+                        <span class="sb-label">Auto Reply</span>
+                    </a>
+                    <a class="sb-item" href="/auto-forward.html" data-page="auto-forward">
+                        <span class="sb-icon"><i class="bi bi-forward-fill"></i></span>
+                        <span class="sb-label">Auto Forward</span>
+                    </a>
+                </div>
+
+                <!-- ── 5. GRUP ───────────────────────────────── -->
+                <div class="sb-section-label">Grup</div>
+                <div class="sb-menu">
+                    <a class="sb-item" href="/groups.html" data-page="groups">
+                        <span class="sb-icon"><i class="bi bi-people-fill"></i></span>
+                        <span class="sb-label">Manajemen Grup</span>
+                    </a>
+                    <a class="sb-item" href="/kelola-export.html" data-page="kelola-export">
+                        <span class="sb-icon"><i class="bi bi-file-earmark-spreadsheet-fill"></i></span>
+                        <span class="sb-label">Kelola Export Grup</span>
+                    </a>
+                </div>
+
+                <!-- ── 6. DATA & MONITORING ──────────────────── -->
+                <div class="sb-section-label">Data &amp; Logs</div>
+                <div class="sb-menu">
+                    <a class="sb-item" href="/log-activity.html" data-page="log-activity">
+                        <span class="sb-icon"><i class="bi bi-activity"></i></span>
+                        <span class="sb-label">Log Aktivitas</span>
+                    </a>
+                    <a class="sb-item" href="/auto-reply-logs.html" data-page="auto-reply-logs">
+                        <span class="sb-icon"><i class="bi bi-journal-check"></i></span>
+                        <span class="sb-label">Log Auto Reply</span>
+                    </a>
+                    <a class="sb-item" href="/database.html" data-page="database">
+                        <span class="sb-icon"><i class="bi bi-database-fill"></i></span>
+                        <span class="sb-label">Database Pesan</span>
+                    </a>
+                    <a class="sb-item" href="/manage-storage.html" data-page="manage-storage">
+                        <span class="sb-icon"><i class="bi bi-hdd-network"></i></span>
+                        <span class="sb-label">Storage Media</span>
+                    </a>
+                </div>
+
+                <!-- ── 7. ADMINISTRASI (Admin Only) ──────────── -->
                 <div class="admin-only-menu" style="display:none;">
-                    <div class="sb-section-label">Admin</div>
+                    <div class="sb-section-label">Administrasi</div>
                     <div class="sb-menu">
                         <a class="sb-item" href="/users.html" data-page="users">
-                            <span class="sb-icon"><i class="bi bi-people-fill"></i></span>
+                            <span class="sb-icon"><i class="bi bi-person-gear"></i></span>
                             <span class="sb-label">Manajemen User</span>
                         </a>
                         <a class="sb-item" href="/penugasan.html" data-page="penugasan">
@@ -357,10 +435,6 @@
                             <span class="sb-icon"><i class="bi bi-gear-fill"></i></span>
                             <span class="sb-label">Pengaturan Aplikasi</span>
                         </a>
-                        <a class="sb-item" href="/manage-storage.html" data-page="manage-storage">
-                            <span class="sb-icon"><i class="bi bi-hdd-network"></i></span>
-                            <span class="sb-label">Storage Media</span>
-                        </a>
                         <a class="sb-item" href="/notification-tester.html" data-page="notification-tester">
                             <span class="sb-icon"><i class="bi bi-bell-fill"></i></span>
                             <span class="sb-label">Notification Tester</span>
@@ -368,84 +442,30 @@
                     </div>
                 </div>
 
-                <!-- ── WHATSAPP ───────────────────────────────── -->
-                <div class="sb-section-label">WhatsApp</div>
-                <div class="sb-menu">
-                    <a class="sb-item" href="manage-sessions.html" data-page="manage-sessions">
-                        <span class="sb-icon"><i class="bi bi-phone-fill"></i></span>
-                        <span class="sb-label">Kelola Session</span>
-                    </a>
-                    <a class="sb-item" href="send-message.html" data-page="send-message">
-                        <span class="sb-icon"><i class="bi bi-send-fill"></i></span>
-                        <span class="sb-label">Send Message</span>
-                    </a>
-                    <a class="sb-item" href="inbox.html" data-page="inbox">
-                        <span class="sb-icon"><i class="bi bi-chat-dots-fill"></i></span>
-                        <span class="sb-label">Chat Box</span>
-                    </a>
-                    <a class="sb-item" href="broadcast.html" data-page="broadcast">
-                        <span class="sb-icon"><i class="bi bi-megaphone-fill"></i></span>
-                        <span class="sb-label">Broadcast</span>
-                    </a>
-                    <a class="sb-item" href="templates.html" data-page="templates">
-                        <span class="sb-icon"><i class="bi bi-lightning-charge-fill"></i></span>
-                        <span class="sb-label">Chat Templates</span>
-                    </a>
-                    <a class="sb-item" href="groups.html" data-page="groups">
-                        <span class="sb-icon"><i class="bi bi-people-fill"></i></span>
-                        <span class="sb-label">Group Management</span>
-                    </a>
-                    <a class="sb-item" href="log-activity.html" data-page="log-activity">
-                        <span class="sb-icon"><i class="bi bi-activity"></i></span>
-                        <span class="sb-label">Activity Logs</span>
-                    </a>
-                    <a class="sb-item" href="database.html" data-page="database">
-                        <span class="sb-icon"><i class="bi bi-database-fill"></i></span>
-                        <span class="sb-label">Database</span>
-                    </a>
-                    <a class="sb-item" href="kelola-export.html" data-page="kelola-export">
-                        <span class="sb-icon"><i class="bi bi-folder-check"></i></span>
-                        <span class="sb-label">Kelola Export Grup</span>
-                    </a>
-                    <a class="sb-item" href="auto-reply.html" data-page="auto-reply">
-                        <span class="sb-icon"><i class="bi bi-reply-fill"></i></span>
-                        <span class="sb-label">Auto Reply</span>
-                    </a>
-                    <a class="sb-item" href="auto-forward.html" data-page="auto-forward">
-                        <span class="sb-icon"><i class="bi bi-forward-fill"></i></span>
-                        <span class="sb-label">Auto Forward</span>
-                    </a>
-                    <a class="sb-item" href="integration-simulator.html" data-page="integration-simulator">
-                        <span class="sb-icon"><i class="bi bi-diagram-3-fill"></i></span>
-                        <span class="sb-label">Simulator CRM</span>
-                    </a>
-                </div>
-
-                <!-- ── MEMBER PORTAL ─────────────────────────── -->
-                <div class="admin-only-menu" style="display:none;">
-                    <div class="sb-section-label">Member</div>
-                    <div class="sb-menu">
-                        <a class="sb-item" href="/member/dashboard.html" data-page="member-portal" target="_blank">
-                            <span class="sb-icon"><i class="bi bi-whatsapp"></i></span>
-                            <span class="sb-label">Portal Member</span>
-                            <span class="sb-badge sb-badge-green">Chat</span>
-                        </a>
-                    </div>
-                </div>
-
-                <!-- ── RESOURCES ─────────────────────────────── -->
-                <div class="sb-section-label">Resources</div>
+                <!-- ── 8. DEVELOPER & INTEGRASI ──────────────── -->
+                <div class="sb-section-label">Developer &amp; Integrasi</div>
                 <div class="sb-menu" style="margin-bottom:16px;">
-                    <a class="sb-item" href="api-docs.html" data-page="api-docs">
+                    <a class="sb-item" href="/api-docs.html" data-page="api-docs">
                         <span class="sb-icon"><i class="bi bi-book-fill"></i></span>
                         <span class="sb-label">Dokumentasi API</span>
                     </a>
+                    <a class="sb-item" href="/integration-simulator.html" data-page="integration-simulator">
+                        <span class="sb-icon"><i class="bi bi-diagram-3-fill"></i></span>
+                        <span class="sb-label">Simulator CRM</span>
+                    </a>
+                    <div class="admin-only-menu" style="display:none;">
+                        <a class="sb-item" href="/member/dashboard.html" data-page="member-portal" target="_blank">
+                            <span class="sb-icon"><i class="bi bi-whatsapp"></i></span>
+                            <span class="sb-label">Portal Member</span>
+                            <span class="sb-badge sb-badge-green">Portal</span>
+                        </a>
+                    </div>
                 </div>
 
             </div>
         </div>
     </div>
-    <!--end::Sidebar Menu-->
+    
 
 </div>
 <!--end::Sidebar-->
@@ -579,15 +599,21 @@
 
     function highlightActiveMenu() {
         const currentPath = window.location.pathname;
+        const cleanPath = currentPath.replace('.html', '').replace(/^\//, '').replace(/^admin\//, '');
+        
         document.querySelectorAll('.sb-item').forEach(link => {
             link.classList.remove('active');
             const href = link.getAttribute('href');
             if (!href) return;
-            const normHref = href.replace('.html','').replace(/^\//,'');
-            const normPath = currentPath.replace('.html','').replace(/^\//,'');
-            if (normPath === normHref ||
-                (normPath === '' && (normHref === '' || normHref === 'index')) ||
-                (normPath === 'index' && normHref === '')) {
+            const cleanHref = href.replace('.html', '').replace(/^\//, '').replace(/^admin\//, '');
+            
+            if (cleanPath === cleanHref ||
+                (cleanPath === '' && (cleanHref === '' || cleanHref === 'index')) ||
+                (cleanPath === 'index' && (cleanHref === '' || cleanHref === 'index'))) {
+                link.classList.add('active');
+            } else if (cleanPath === 'session-detail' && cleanHref === 'manage-sessions') {
+                link.classList.add('active');
+            } else if (cleanPath === 'auto-reply-logs' && cleanHref === 'auto-reply-logs') {
                 link.classList.add('active');
             }
         });
