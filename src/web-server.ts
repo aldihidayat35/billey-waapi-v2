@@ -3432,7 +3432,9 @@ io.on('connection', (socket) => {
 			let match
 			
 			while ((match = templatePattern.exec(data.message)) !== null) {
-				foundCodes.push(match![1].toUpperCase())
+				if (match && match[1]) {
+					foundCodes.push(match[1].toUpperCase())
+				}
 			}
 			
 			// Remove duplicates
@@ -3441,7 +3443,144 @@ io.on('connection', (socket) => {
 			if (uniqueCodes.length > 0) {
 				console.log(`📝 Template codes detected in message: ${uniqueCodes.join(', ')}`)
 				
-				// First, send the original message as-is
+				const isPureTemplate = data.message.replace(/#([A-Za-z0-9_]+)/g, '').trim().length === 0
+				const foundTemplates: { code: string, template: any }[] = []
+				const pureNotFoundCodes: string[] = []
+
+				for (const code of uniqueCodes) {
+					const template = chatTemplateDb.getByCode(code)
+					if (template) {
+						foundTemplates.push({ code, template })
+					} else {
+						pureNotFoundCodes.push(code)
+					}
+				}
+
+				// If message is purely template code(s) and all codes exist, directly send template(s) without sending trigger text to WhatsApp
+				if (isPureTemplate && pureNotFoundCodes.length === 0 && foundTemplates.length > 0) {
+					console.log(`🚀 Pure template trigger from UI: sending ${foundTemplates.length} template(s) directly without sending trigger text`)
+					if (data.tempId) {
+						socket.emit('message-sent', {
+							success: true,
+							sessionId: data.sessionId,
+							to: data.phone,
+							tempId: data.tempId,
+							isTemplate: true
+						})
+					}
+
+					for (const { code, template } of foundTemplates) {
+						console.log(`✅ Sending template: ${code} - "${template.title || 'No title'}"`)
+						await new Promise(resolve => setTimeout(resolve, 500))
+
+						if (template.media_data) {
+							try {
+								const mediaBuffer = Buffer.from(template.media_data, 'base64')
+								const mimetype = template.media_mimetype || 'image/jpeg'
+								const mediaResult = await sessionManager.sendImage(
+									data.sessionId,
+									data.phone,
+									mediaBuffer,
+									template.content,
+									mimetype,
+									template.media_filename
+								)
+								const mediaMessageId = mediaResult?.key?.id || `media_${Date.now()}`
+								let mediaUrl: string | null = null
+								try {
+									mediaUrl = saveMedia(data.sessionId, mediaMessageId, mediaBuffer, mimetype, template.media_filename || 'template.jpg')
+								} catch (e) {}
+
+								try {
+									messageLogDb.insert({
+										message_id: mediaMessageId,
+										session_id: data.sessionId,
+										direction: 'outgoing',
+										from_number: data.sessionId,
+										to_number: jid,
+										remote_jid: jid,
+										message_type: 'image',
+										content: '',
+										caption: template.content,
+										media_url: mediaUrl || undefined,
+										timestamp: new Date().toISOString(),
+										status: 'sent',
+										source: 'template'
+									})
+								} catch (dbError) {
+									console.error('⚠️ Failed to save template media:', dbError)
+								}
+
+								socket.emit('message-sent', {
+									success: true,
+									sessionId: data.sessionId,
+									to: data.phone,
+									caption: template.content,
+									filename: template.media_filename || 'template.jpg',
+									messageId: mediaMessageId,
+									mediaType: 'image',
+									mediaUrl: mediaUrl || null
+								})
+								socket.emit('template-sent', {
+									success: true,
+									sessionId: data.sessionId,
+									to: data.phone,
+									templateCode: code,
+									templateContent: template.content,
+									hasMedia: true,
+									messageId: mediaMessageId
+								})
+							} catch (mediaError: any) {
+								console.error(`❌ Failed to send template ${code} media:`, mediaError)
+							}
+						} else {
+							try {
+								const templateResult = await sessionManager.sendMessage(data.sessionId, data.phone, template.content)
+								const templateMessageId = templateResult?.key?.id || `tmpl_${Date.now()}`
+								try {
+									messageLogDb.insert({
+										message_id: templateMessageId,
+										session_id: data.sessionId,
+										direction: 'outgoing',
+										from_number: data.sessionId,
+										to_number: jid,
+										remote_jid: jid,
+										message_type: 'text',
+										content: template.content,
+										timestamp: new Date().toISOString(),
+										status: 'sent',
+										source: 'template'
+									})
+								} catch (dbError) {
+									console.error('⚠️ Failed to save template text:', dbError)
+								}
+
+								socket.emit('message-sent', {
+									success: true,
+									sessionId: data.sessionId,
+									to: data.phone,
+									messageContent: template.content,
+									messageId: templateMessageId,
+									mediaType: 'text'
+								})
+								socket.emit('template-sent', {
+									success: true,
+									sessionId: data.sessionId,
+									to: data.phone,
+									templateCode: code,
+									templateContent: template.content,
+									hasMedia: false,
+									messageId: templateMessageId
+								})
+							} catch (textError: any) {
+								console.error(`❌ Failed to send template ${code} text:`, textError)
+							}
+						}
+					}
+					return
+				}
+
+				// Otherwise (mixed text or invalid codes), send the original message as-is
 				const originalResult = await sessionManager.sendMessage(data.sessionId, data.phone, data.message)
 				const originalMessageId = originalResult?.key?.id || `msg_${Date.now()}`
 				

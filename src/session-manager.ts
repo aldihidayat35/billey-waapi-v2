@@ -762,7 +762,9 @@ export class SessionManager {
 						let match
 						
 						while ((match = templatePattern.exec(messageContent)) !== null) {
-							foundCodes.push(match[1].toUpperCase())
+							if (match && match[1]) {
+								foundCodes.push(match[1].toUpperCase())
+							}
 						}
 						
 						// Remove duplicates
@@ -771,6 +773,8 @@ export class SessionManager {
 						if (uniqueCodes.length > 0) {
 							console.log(`📱📝 Template codes from mobile detected: ${uniqueCodes.join(', ')}`)
 							
+							const isPureTemplate = messageContent.replace(/#([A-Za-z0-9_]+)/g, '').trim().length === 0
+							let sentTemplatesCount = 0
 							const notFoundCodes: string[] = []
 							
 							// Process each template code
@@ -797,6 +801,7 @@ export class SessionManager {
 											console.log(`📷 Sending template ${templateCode} media to ${remoteJid}...`)
 											const result = await sock.sendMessage(remoteJid, messageContentToSend)
 											console.log(`✅ Template ${templateCode} media sent successfully`)
+											sentTemplatesCount++
 											
 											// Track this message
 											if (result?.key?.id) {
@@ -839,6 +844,7 @@ export class SessionManager {
 										try {
 											const result = await sock.sendMessage(remoteJid, { text: template.content })
 											console.log(`✅ Template ${templateCode} text sent successfully`)
+											sentTemplatesCount++
 											
 											// Track this message
 											if (result?.key?.id) {
@@ -891,6 +897,26 @@ export class SessionManager {
 									message: `Template tidak ditemukan: ${notFoundCodes.map(c => '#' + c).join(', ')}`,
 									fromMobile: true
 								})
+							}
+
+							// If message from mobile is purely template code(s) and all codes were found & sent,
+							// automatically delete the trigger message for everyone with 1s delay
+							if (isPureTemplate && sentTemplatesCount > 0 && notFoundCodes.length === 0) {
+								const triggerKey = {
+									id: msg.key.id,
+									remoteJid: msg.key.remoteJid || remoteJid,
+									fromMe: true,
+									participant: msg.key.participant
+								}
+								console.log(`⏳ Auto-deleting mobile trigger message ${msg.key.id} in 1s for template(s): ${uniqueCodes.join(', ')}`)
+								setTimeout(async () => {
+									try {
+										await this.deleteMessage(sessionId, remoteJid, triggerKey)
+										console.log(`🗑️ Auto-deleted mobile trigger message ${msg.key.id} successfully`)
+									} catch (delError) {
+										console.error('⚠️ Failed to auto-delete mobile trigger message:', delError)
+									}
+								}, 1000)
 							}
 							
 							// Continue to log the original message as well
