@@ -364,8 +364,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initial Fetch via REST API
     fetchSessionDetail();
     fetchSessionTemplatePackages();
+    fetchSessionAutoReplyPackages();
 
     document.getElementById('btnSaveSessionPackages')?.addEventListener('click', saveSessionTemplatePackages);
+    document.getElementById('btnSaveSessionAutoReplyPackages')?.addEventListener('click', saveSessionAutoReplyPackages);
 });
 
 // Socket.IO Events
@@ -729,6 +731,141 @@ async function saveSessionTemplatePackages() {
         }
     } catch (err) {
         console.error('Error saving session template packages:', err);
+        Swal.fire({
+            icon: 'error',
+            title: 'Kesalahan Server',
+            text: err.message
+        });
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalBtnHtml;
+        }
+    }
+}
+
+
+// ============================================
+// Session Auto Reply Packages
+// ============================================
+async function fetchSessionAutoReplyPackages() {
+    if (!currentSessionId) return;
+    const container = document.getElementById('sessionAutoReplyPackagesContainer');
+    if (!container) return;
+
+    try {
+        const res = await fetch(`/api/sessions/${encodeURIComponent(currentSessionId)}/auto-reply-packages`);
+        const data = await res.json();
+
+        if (!data.success) {
+            container.innerHTML = `<div class="col-12 text-danger fs-7">Gagal memuat paket auto reply: ${data.error || 'Unknown error'}</div>`;
+            return;
+        }
+
+        const allPackages = data.all || [];
+        const assigned = data.assigned || [];
+        const assignedIds = new Set(assigned.map(p => Number(p.id)));
+
+        if (allPackages.length === 0) {
+            container.innerHTML = `
+                <div class="col-12 text-muted fs-7">
+                    Belum ada kelompok paket auto reply. Buat paket terlebih dahulu di <a href="auto-reply.html" class="fw-bold text-warning">Halaman Auto Reply</a>.
+                </div>
+            `;
+            return;
+        }
+
+        let html = '';
+        allPackages.forEach(pkg => {
+            const isChecked = assignedIds.has(Number(pkg.id));
+
+            html += `
+                <div class="col-md-6 col-lg-4">
+                    <div class="border rounded p-3 d-flex align-items-start gap-3 h-100 bg-light ${isChecked ? 'border-warning shadow-xs' : 'border-gray-300'}">
+                        <div class="form-check form-check-custom form-check-solid mt-1">
+                            <input class="form-check-input session-autoreply-pkg-check" type="checkbox" value="${pkg.id}" id="arpkg_${pkg.id}" ${isChecked ? 'checked' : ''}>
+                        </div>
+                        <div class="flex-grow-1">
+                            <label class="form-check-label fw-bold text-gray-800 d-flex align-items-center gap-2 cursor-pointer mb-1" for="arpkg_${pkg.id}">
+                                <span class="badge" style="background-color: ${pkg.color || '#25D366'}; color: #fff; font-size: 0.8rem;">
+                                    ${escapeHtml(pkg.name)}
+                                </span>
+                                ${pkg.is_default ? '<span class="badge badge-light-primary fs-8">Default</span>' : ''}
+                            </label>
+                            <div class="text-muted fs-8 mb-1">${escapeHtml(pkg.description || 'Tidak ada deskripsi')}</div>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge badge-light fs-8 text-gray-700">
+                                    <i class="bi bi-robot me-1 text-warning"></i>${pkg.rule_count || 0} rule
+                                </span>
+                                <span class="badge badge-light fs-8 text-muted">
+                                    Prioritas: ${pkg.priority || 0}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        container.innerHTML = html;
+
+        // Status hint
+        const hint = document.getElementById('sessionAutoReplyPackageStatusHint');
+        if (hint) {
+            if (assigned.length > 0) {
+                const names = assigned.map(p => p.name).join(', ');
+                hint.innerHTML = `<span class="badge badge-light-success fw-bold me-2"><i class="bi bi-check-circle-fill text-success me-1"></i>Auto Reply AKTIF</span> <span class="text-gray-700">Paket aktif: <strong>${escapeHtml(names)}</strong> (${assigned.length} paket)</span>`;
+            } else {
+                hint.innerHTML = `<span class="badge badge-light-danger fw-bold me-2"><i class="bi bi-x-circle-fill text-danger me-1"></i>Auto Reply NONAKTIF</span> <span class="text-danger fs-8">Tidak ada paket yang dipilih. Session ini tidak akan membalas pesan otomatis.</span>`;
+            }
+        }
+    } catch (err) {
+        console.error('Error fetching session auto reply packages:', err);
+        container.innerHTML = `<div class="col-12 text-danger fs-7">Terjadi kesalahan saat memuat paket auto reply.</div>`;
+    }
+}
+
+async function saveSessionAutoReplyPackages() {
+    if (!currentSessionId) return;
+
+    const btn = document.getElementById('btnSaveSessionAutoReplyPackages');
+    const checkedInputs = Array.from(document.querySelectorAll('.session-autoreply-pkg-check:checked'));
+    const selectedIds = checkedInputs.map(el => Number(el.value));
+
+    const originalBtnHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Menyimpan...';
+    }
+
+    try {
+        const res = await fetch(`/api/sessions/${encodeURIComponent(currentSessionId)}/auto-reply-packages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ package_ids: selectedIds })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            Swal.fire({
+                icon: 'success',
+                title: 'Berhasil!',
+                text: selectedIds.length > 0 
+                    ? 'Paket auto reply untuk session ini berhasil disimpan.'
+                    : 'Auto reply dinonaktifkan untuk session ini (tidak ada paket dipilih).',
+                timer: 1800,
+                showConfirmButton: false
+            });
+            await fetchSessionAutoReplyPackages();
+        } else {
+            Swal.fire({
+                icon: 'error',
+                title: 'Gagal Menyimpan',
+                text: data.error || 'Terjadi kesalahan saat menyimpan paket auto reply.'
+            });
+        }
+    } catch (err) {
+        console.error('Error saving session auto reply packages:', err);
         Swal.fire({
             icon: 'error',
             title: 'Kesalahan Server',

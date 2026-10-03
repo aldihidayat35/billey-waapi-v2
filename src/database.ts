@@ -425,6 +425,64 @@ try {
     console.error('⚠️ Template packages migration error:', pkgMigrationError)
 }
 
+// Migration: Ensure auto_reply_packages and session_auto_reply_packages exist
+try {
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS auto_reply_packages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            description TEXT,
+            color TEXT DEFAULT '#25D366',
+            priority INTEGER DEFAULT 0,
+            is_default INTEGER DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS session_auto_reply_packages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT NOT NULL,
+            package_id INTEGER NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(session_id, package_id),
+            FOREIGN KEY (package_id) REFERENCES auto_reply_packages(id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_session_ar_packages_session ON session_auto_reply_packages(session_id);
+        CREATE INDEX IF NOT EXISTS idx_session_ar_packages_package ON session_auto_reply_packages(package_id);
+    `);
+
+    // Ensure default auto reply package exists
+    const defaultArPkg = db.prepare('SELECT id FROM auto_reply_packages WHERE is_default = 1').get();
+    if (!defaultArPkg) {
+        db.prepare(`
+            INSERT INTO auto_reply_packages (id, name, description, color, priority, is_default)
+            VALUES (1, 'Umum / Default', 'Paket auto reply bawaan', '#25D366', 0, 1)
+        `).run();
+    }
+
+    // Check if package_id column exists in auto_reply_rules
+    const arCols = (db.prepare("PRAGMA table_info(auto_reply_rules)").all() as any[]).map(c => c.name);
+    if (!arCols.includes('package_id')) {
+        console.log('🔄 Migrating auto_reply_rules: Adding package_id column...');
+        db.exec('ALTER TABLE auto_reply_rules ADD COLUMN package_id INTEGER');
+        db.exec('UPDATE auto_reply_rules SET package_id = 1 WHERE package_id IS NULL');
+        db.exec('CREATE INDEX IF NOT EXISTS idx_auto_reply_rules_pkg ON auto_reply_rules(package_id)');
+
+        // Link existing active sessions to package 1 so existing auto-replies don\'t stop
+        try {
+            const existingSessions = db.prepare('SELECT DISTINCT id FROM sessions').all() as any[];
+            for (const sess of existingSessions) {
+                if (sess.id) {
+                    db.prepare('INSERT OR IGNORE INTO session_auto_reply_packages (session_id, package_id) VALUES (?, 1)').run(sess.id);
+                }
+            }
+        } catch { /* ignore if sessions table missing */ }
+    }
+} catch (arPkgMigrationError) {
+    console.error('⚠️ Auto reply packages migration error:', arPkgMigrationError);
+}
+
 // Migration: Add user_id column for session isolation
 try {
     // Add user_id to chat_templates
@@ -594,6 +652,28 @@ export interface ChatTemplatePackageEntry {
 
 // Session Template Package Interface
 export interface SessionTemplatePackageEntry {
+    id?: number
+    session_id: string
+    package_id: number
+    created_at?: string
+}
+
+// Auto Reply Package Interface
+export interface AutoReplyPackageEntry {
+    id?: number
+    name: string
+    description?: string
+    color?: string
+    priority?: number
+    is_default?: number
+    created_at?: string
+    updated_at?: string
+    rule_count?: number
+    session_count?: number
+}
+
+// Session Auto Reply Package Interface
+export interface SessionAutoReplyPackageEntry {
     id?: number
     session_id: string
     package_id: number
@@ -1549,6 +1629,9 @@ export interface GroupExportEntry {
 // Auto Reply Rule Interface
 export interface AutoReplyRuleEntry {
     id?: number
+    package_id?: number | null
+    package_name?: string
+    package_color?: string
     session_id?: string | null
     name: string
     trigger_type: 'exact' | 'contains' | 'starts_with' | 'ends_with' | 'regex'
@@ -1775,21 +1858,181 @@ export const groupExportDb = {
     }
 }
 
+// Auto Reply Package Functions
+export const autoReplyPackageDb = {
+    getAll: (): AutoReplyPackageEntry[] => {
+        const stmt = db.prepare(`
+            SELECT p.*,
+                (SELECT COUNT(*) FROM auto_reply_rules r WHERE r.package_id = p.id) as rule_count,
+                (SELECT COUNT(*) FROM session_auto_reply_packages sp WHERE sp.package_id = p.id) as session_count
+            FROM auto_reply_packages p
+            ORDER BY p.priority DESC, p.created_at ASC
+        `)
+        return stmt.all() as AutoReplyPackageEntry[]
+    },
+
+    getById: (id: number): AutoReplyPackageEntry | undefined => {
+        const stmt = db.prepare(`
+            SELECT p.*,
+                (SELECT COUNT(*) FROM auto_reply_rules r WHERE r.package_id = p.id) as rule_count,
+                (SELECT COUNT(*) FROM session_auto_reply_packages sp WHERE sp.package_id = p.id) as session_count
+            FROM auto_reply_packages p
+            WHERE p.id = ?
+        `)
+        return stmt.get(id) as AutoReplyPackageEntry | undefined
+    },
+
+    create: (pkg: Partial<AutoReplyPackageEntry>): { success: boolean; id?: number | bigint; error?: string } => {
+        try {
+            if (!pkg.name || !pkg.name.trim()) {
+                return { success: false, error: 'Nama paket auto reply wajib diisi' }
+            }
+            const stmt = db.prepare(`
+                INSERT INTO auto_reply_packages (name, description, color, priority, is_default, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+            `)
+            const result = stmt.run(
+                pkg.name.trim(),
+                pkg.description?.trim() || null,
+                pkg.color?.trim() || '#25D366',
+                Number(pkg.priority || 0),
+                pkg.is_default ? 1 : 0
+            )
+            return { success: true, id: result.lastInsertRowid }
+        } catch (error: any) {
+            return { success: false, error: error.message }
+        }
+    },
+
+    update: (id: number, pkg: Partial<AutoReplyPackageEntry>): { success: boolean; changes?: number; error?: string } => {
+        try {
+            const updates: string[] = []
+            const params: any[] = []
+            if (pkg.name !== undefined) {
+                if (!pkg.name.trim()) return { success: false, error: 'Nama paket tidak boleh kosong' }
+                updates.push('name = ?')
+                params.push(pkg.name.trim())
+            }
+            if (pkg.description !== undefined) {
+                updates.push('description = ?')
+                params.push(pkg.description?.trim() || null)
+            }
+            if (pkg.color !== undefined) {
+                updates.push('color = ?')
+                params.push(pkg.color?.trim() || '#25D366')
+            }
+            if (pkg.priority !== undefined) {
+                updates.push('priority = ?')
+                params.push(Number(pkg.priority || 0))
+            }
+            if (pkg.is_default !== undefined) {
+                updates.push('is_default = ?')
+                params.push(pkg.is_default ? 1 : 0)
+            }
+            if (updates.length === 0) return { success: false, error: 'Tidak ada data untuk diupdate' }
+
+            updates.push("updated_at = datetime('now')")
+            params.push(id)
+
+            const stmt = db.prepare(`UPDATE auto_reply_packages SET ${updates.join(', ')} WHERE id = ?`)
+            const result = stmt.run(...params)
+            return { success: true, changes: result.changes }
+        } catch (error: any) {
+            return { success: false, error: error.message }
+        }
+    },
+
+    delete: (id: number): { success: boolean; error?: string } => {
+        try {
+            if (id === 1) {
+                return { success: false, error: 'Paket bawaan (id = 1) tidak dapat dihapus' }
+            }
+            const pkg = db.prepare('SELECT is_default FROM auto_reply_packages WHERE id = ?').get(id) as any
+            if (!pkg) return { success: false, error: 'Paket tidak ditemukan' }
+            if (pkg.is_default === 1) {
+                return { success: false, error: 'Paket berstatus default tidak dapat dihapus' }
+            }
+            db.transaction(() => {
+                // Reassign rules in this package to package id 1
+                db.prepare('UPDATE auto_reply_rules SET package_id = 1 WHERE package_id = ?').run(id)
+                // Delete session assignments
+                db.prepare('DELETE FROM session_auto_reply_packages WHERE package_id = ?').run(id)
+                // Delete package
+                db.prepare('DELETE FROM auto_reply_packages WHERE id = ?').run(id)
+            })()
+            return { success: true }
+        } catch (error: any) {
+            return { success: false, error: error.message }
+        }
+    },
+
+    getPackagesForSession: (sessionId: string): AutoReplyPackageEntry[] => {
+        const stmt = db.prepare(`
+            SELECT p.*,
+                (SELECT COUNT(*) FROM auto_reply_rules r WHERE r.package_id = p.id) as rule_count
+            FROM session_auto_reply_packages sp
+            JOIN auto_reply_packages p ON sp.package_id = p.id
+            WHERE sp.session_id = ?
+            ORDER BY p.priority DESC, p.created_at ASC
+        `)
+        return stmt.all(sessionId) as AutoReplyPackageEntry[]
+    },
+
+    setPackagesForSession: (sessionId: string, packageIds: number[]): { success: boolean; error?: string } => {
+        try {
+            db.transaction(() => {
+                db.prepare('DELETE FROM session_auto_reply_packages WHERE session_id = ?').run(sessionId)
+                const insertStmt = db.prepare('INSERT INTO session_auto_reply_packages (session_id, package_id) VALUES (?, ?)')
+                for (const pid of packageIds) {
+                    insertStmt.run(sessionId, pid)
+                }
+            })()
+            return { success: true }
+        } catch (error: any) {
+            return { success: false, error: error.message }
+        }
+    },
+
+    getSessionsForPackage: (packageId: number): { session_id: string }[] => {
+        const stmt = db.prepare('SELECT session_id FROM session_auto_reply_packages WHERE package_id = ?')
+        return stmt.all(packageId) as { session_id: string }[]
+    },
+
+    setSessionsForPackage: (packageId: number, sessionIds: string[]): { success: boolean; error?: string } => {
+        try {
+            db.transaction(() => {
+                db.prepare('DELETE FROM session_auto_reply_packages WHERE package_id = ?').run(packageId)
+                const insertStmt = db.prepare('INSERT INTO session_auto_reply_packages (session_id, package_id) VALUES (?, ?)')
+                for (const sid of sessionIds) {
+                    if (sid && typeof sid === 'string' && sid.trim()) {
+                        insertStmt.run(sid.trim(), packageId)
+                    }
+                }
+            })()
+            return { success: true }
+        } catch (error: any) {
+            return { success: false, error: error.message }
+        }
+    }
+}
+
 // Auto Reply Rules Functions
 export const autoReplyDb = {
     // Create new rule
     create: (rule: AutoReplyRuleEntry): { success: boolean; id?: number | bigint; error?: string } => {
         try {
+            const targetPkgId = rule.package_id ? Number(rule.package_id) : 1
             const stmt = db.prepare(`
                 INSERT INTO auto_reply_rules (
-                    session_id, name, trigger_type, trigger_value, match_case,
+                    package_id, session_id, name, trigger_type, trigger_value, match_case,
                     response_type, response_content, response_media_url, response_media_data,
                     response_media_filename, response_media_mimetype,
                     scope, enabled, priority, cooldown_seconds, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
             `)
             
             const result = stmt.run(
+                targetPkgId,
                 rule.session_id || null,
                 rule.name,
                 rule.trigger_type,
@@ -1814,20 +2057,32 @@ export const autoReplyDb = {
     },
 
     // Get all rules
-    getAll: (options: { sessionId?: string; enabledOnly?: boolean; limit?: number; offset?: number } = {}): AutoReplyRuleEntry[] => {
-        let query = 'SELECT * FROM auto_reply_rules WHERE 1=1'
+    getAll: (options: { sessionId?: string; packageId?: number; enabledOnly?: boolean; limit?: number; offset?: number } = {}): AutoReplyRuleEntry[] => {
+        let query = `
+            SELECT r.*, p.name as package_name, p.color as package_color
+            FROM auto_reply_rules r
+            LEFT JOIN auto_reply_packages p ON r.package_id = p.id
+            WHERE 1=1
+        `
         const params: any[] = []
 
+        if (options.packageId) {
+            query += ' AND r.package_id = ?'
+            params.push(options.packageId)
+        }
+
         if (options.sessionId) {
-            query += ' AND (session_id = ? OR session_id IS NULL)'
+            query += ` AND r.package_id IN (
+                SELECT package_id FROM session_auto_reply_packages WHERE session_id = ?
+            )`
             params.push(options.sessionId)
         }
 
         if (options.enabledOnly) {
-            query += ' AND enabled = 1'
+            query += ' AND r.enabled = 1'
         }
 
-        query += ' ORDER BY priority DESC, created_at DESC'
+        query += ' ORDER BY r.priority DESC, r.created_at DESC'
 
         if (options.limit) {
             query += ' LIMIT ?'
@@ -1845,18 +2100,38 @@ export const autoReplyDb = {
 
     // Get rules for matching (active rules for a session)
     getRulesForMatching: (sessionId: string): AutoReplyRuleEntry[] => {
+        // 1. Get assigned packages for this session
+        const assignedPackages = db.prepare(`
+            SELECT package_id FROM session_auto_reply_packages WHERE session_id = ?
+        `).all(sessionId) as { package_id: number }[]
+
+        // If session has no assigned packages, auto-reply is INACTIVE for this session!
+        if (!assignedPackages || assignedPackages.length === 0) {
+            return []
+        }
+
+        const packageIds = assignedPackages.map(p => p.package_id)
+        const placeholders = packageIds.map(() => '?').join(',')
+
         const stmt = db.prepare(`
-            SELECT * FROM auto_reply_rules 
-            WHERE (session_id = ? OR session_id IS NULL) 
-            AND enabled = 1
-            ORDER BY priority DESC, id ASC
+            SELECT r.*, p.name as package_name, p.color as package_color, p.priority as package_priority
+            FROM auto_reply_rules r
+            JOIN auto_reply_packages p ON r.package_id = p.id
+            WHERE r.package_id IN (${placeholders})
+            AND r.enabled = 1
+            ORDER BY p.priority DESC, r.priority DESC, r.id ASC
         `)
-        return stmt.all(sessionId) as AutoReplyRuleEntry[]
+        return stmt.all(...packageIds) as AutoReplyRuleEntry[]
     },
 
     // Get rule by ID
     getById: (id: number): AutoReplyRuleEntry | undefined => {
-        const stmt = db.prepare('SELECT * FROM auto_reply_rules WHERE id = ?')
+        const stmt = db.prepare(`
+            SELECT r.*, p.name as package_name, p.color as package_color
+            FROM auto_reply_rules r
+            LEFT JOIN auto_reply_packages p ON r.package_id = p.id
+            WHERE r.id = ?
+        `)
         return stmt.get(id) as AutoReplyRuleEntry | undefined
     },
 
@@ -1866,6 +2141,10 @@ export const autoReplyDb = {
             const updates: string[] = []
             const params: any[] = []
 
+            if (rule.package_id !== undefined) {
+                updates.push('package_id = ?')
+                params.push(rule.package_id)
+            }
             if (rule.session_id !== undefined) {
                 updates.push('session_id = ?')
                 params.push(rule.session_id)

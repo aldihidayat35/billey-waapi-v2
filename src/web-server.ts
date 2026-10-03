@@ -3,7 +3,7 @@ import { createServer } from 'http'
 import { Server as SocketIO } from 'socket.io'
 import { SessionManager } from './session-manager'
 import { logger as activityLogger } from './logger'
-import { messageLogDb, messageMutationDb, sessionLogDb, chatTemplateDb, chatTemplatePackageDb, groupExportDb, autoReplyDb, autoReplyLogDb, autoReplyCooldownDb, autoForwardConfigDb, autoForwardTokenDb, autoForwardLogDb, db, dbMaintenance, memberSessionDb, startMediaAutoCleanup, fcmTokenDb, notificationDb, appSettingDb } from './database.js'
+import { messageLogDb, messageMutationDb, sessionLogDb, chatTemplateDb, chatTemplatePackageDb, autoReplyPackageDb, groupExportDb, autoReplyDb, autoReplyLogDb, autoReplyCooldownDb, autoForwardConfigDb, autoForwardTokenDb, autoForwardLogDb, db, dbMaintenance, memberSessionDb, startMediaAutoCleanup, fcmTokenDb, notificationDb, appSettingDb } from './database.js'
 import * as fs from 'fs'
 import * as path from 'path'
 import { fileURLToPath } from 'url'
@@ -4983,10 +4983,11 @@ function isTriggerValueEmpty(triggerValue: any): boolean {
 // Get all auto reply rules
 app.get('/api/auto-reply', (req, res) => {
 	try {
-		const { sessionId, enabledOnly, limit, offset } = req.query
+		const { sessionId, packageId, enabledOnly, limit, offset } = req.query
 		
 		const rules = autoReplyDb.getAll({
 			sessionId: sessionId as string,
+			packageId: packageId ? parseInt(packageId as string) : undefined,
 			enabledOnly: enabledOnly === 'true',
 			limit: limit ? parseInt(limit as string) : undefined,
 			offset: offset ? parseInt(offset as string) : undefined
@@ -5011,9 +5012,10 @@ app.get('/api/auto-reply', (req, res) => {
 // Export auto reply rules as JSON backup
 app.get('/api/auto-reply/export', (req, res) => {
 	try {
-		const { sessionId } = req.query
+		const { sessionId, packageId } = req.query
 		const rules = autoReplyDb.getAll({
-			sessionId: sessionId ? String(sessionId) : undefined
+			sessionId: sessionId ? String(sessionId) : undefined,
+			packageId: packageId ? parseInt(packageId as string) : undefined
 		})
 		const dateStr = new Date().toISOString().split('T')[0]
 		const exportData = {
@@ -5025,6 +5027,8 @@ app.get('/api/auto-reply/export', (req, res) => {
 			total_rules: rules.length,
 			rules: rules.map(r => ({
 				name: r.name,
+				package_id: r.package_id,
+				package_name: r.package_name,
 				session_id: r.session_id,
 				trigger_type: r.trigger_type,
 				trigger_value: r.trigger_value,
@@ -5102,7 +5106,7 @@ app.get('/api/auto-reply/:id', (req, res) => {
 app.post('/api/auto-reply', (req, res) => {
 	try {
 		const { 
-			session_id, name, trigger_type, trigger_value, match_case,
+			package_id, session_id, name, trigger_type, trigger_value, match_case,
 			response_type, response_content, response_media_url, response_media_data,
 			response_media_filename, response_media_mimetype,
 			scope, chat_type, enabled, priority, cooldown_seconds 
@@ -5149,6 +5153,7 @@ app.post('/api/auto-reply', (req, res) => {
 		}
 		
 		const result = autoReplyDb.create({
+			package_id: package_id ? Number(package_id) : 1,
 			session_id: session_id || null,
 			name: name.trim(),
 			trigger_type,
@@ -5187,7 +5192,7 @@ app.put('/api/auto-reply/:id', (req, res) => {
 	try {
 		const id = parseInt(req.params.id)
 		const { 
-			session_id, name, trigger_type, trigger_value, match_case,
+			package_id, session_id, name, trigger_type, trigger_value, match_case,
 			response_type, response_content, response_media_url, response_media_data,
 			response_media_filename, response_media_mimetype,
 			scope, chat_type, enabled, priority, cooldown_seconds 
@@ -5241,6 +5246,7 @@ app.put('/api/auto-reply/:id', (req, res) => {
 		}
 		
 		const updateData: any = {}
+		if (package_id !== undefined) updateData.package_id = Number(package_id) || 1
 		if (session_id !== undefined) updateData.session_id = session_id || null
 		if (name !== undefined) updateData.name = name.trim()
 		if (trigger_type !== undefined) updateData.trigger_type = trigger_type
@@ -5460,6 +5466,168 @@ app.get('/api/auto-reply-logs', (req, res) => {
 		})
 	} catch (error: any) {
 		console.error('Error fetching auto reply logs:', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// ============================================
+// Auto Reply Packages API Endpoints
+// ============================================
+
+// Get all auto reply packages
+app.get('/api/auto-reply-packages', (req, res) => {
+	try {
+		const packages = autoReplyPackageDb.getAll()
+		res.json({ success: true, packages })
+	} catch (error: any) {
+		console.error('Error getting auto reply packages:', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Get single auto reply package by ID
+app.get('/api/auto-reply-packages/:id', (req, res) => {
+	try {
+		const id = parseInt(req.params.id)
+		const pkg = autoReplyPackageDb.getById(id)
+		if (!pkg) {
+			return res.status(404).json({ success: false, error: 'Paket auto reply tidak ditemukan' })
+		}
+		res.json({ success: true, package: pkg })
+	} catch (error: any) {
+		console.error('Error getting auto reply package:', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Create auto reply package
+app.post('/api/auto-reply-packages', (req, res) => {
+	try {
+		const { name, description, color, priority, is_default } = req.body
+		if (!name || !name.trim()) {
+			return res.status(400).json({ success: false, error: 'Nama paket auto reply wajib diisi' })
+		}
+		const result = autoReplyPackageDb.create({
+			name: name.trim(),
+			description: description?.trim() || null,
+			color: color?.trim() || '#25D366',
+			priority: Number(priority || 0),
+			is_default: is_default ? 1 : 0
+		})
+		if (result.success) {
+			const pkg = autoReplyPackageDb.getById(Number(result.id))
+			res.json({ success: true, message: 'Paket auto reply berhasil dibuat', package: pkg })
+		} else {
+			res.status(400).json({ success: false, error: result.error })
+		}
+	} catch (error: any) {
+		console.error('Error creating auto reply package:', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Update auto reply package
+app.put('/api/auto-reply-packages/:id', (req, res) => {
+	try {
+		const id = parseInt(req.params.id)
+		const existing = autoReplyPackageDb.getById(id)
+		if (!existing) {
+			return res.status(404).json({ success: false, error: 'Paket auto reply tidak ditemukan' })
+		}
+		const { name, description, color, priority, is_default } = req.body
+		const updateData: any = {}
+		if (name !== undefined) updateData.name = name.trim()
+		if (description !== undefined) updateData.description = description?.trim() || null
+		if (color !== undefined) updateData.color = color?.trim() || '#25D366'
+		if (priority !== undefined) updateData.priority = Number(priority || 0)
+		if (is_default !== undefined) updateData.is_default = is_default ? 1 : 0
+
+		const result = autoReplyPackageDb.update(id, updateData)
+		if (result.success) {
+			const updated = autoReplyPackageDb.getById(id)
+			res.json({ success: true, message: 'Paket auto reply berhasil diperbarui', package: updated })
+		} else {
+			res.status(400).json({ success: false, error: result.error })
+		}
+	} catch (error: any) {
+		console.error('Error updating auto reply package:', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Delete auto reply package
+app.delete('/api/auto-reply-packages/:id', (req, res) => {
+	try {
+		const id = parseInt(req.params.id)
+		const result = autoReplyPackageDb.delete(id)
+		if (result.success) {
+			res.json({ success: true, message: 'Paket auto reply berhasil dihapus' })
+		} else {
+			res.status(400).json({ success: false, error: result.error })
+		}
+	} catch (error: any) {
+		console.error('Error deleting auto reply package:', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Get assigned auto reply packages for a session
+app.get('/api/sessions/:sessionId/auto-reply-packages', (req, res) => {
+	try {
+		const sessionId = req.params.sessionId
+		const assignedPackages = autoReplyPackageDb.getPackagesForSession(sessionId)
+		const allPackages = autoReplyPackageDb.getAll()
+		res.json({
+			success: true,
+			assigned: assignedPackages,
+			all: allPackages
+		})
+	} catch (error: any) {
+		console.error('Error getting session auto reply packages:', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Save assigned auto reply packages for a session
+app.post('/api/sessions/:sessionId/auto-reply-packages', (req, res) => {
+	try {
+		const sessionId = req.params.sessionId
+		const { package_ids } = req.body
+		if (!Array.isArray(package_ids)) {
+			return res.status(400).json({ success: false, error: 'package_ids harus berupa array' })
+		}
+		autoReplyPackageDb.setPackagesForSession(sessionId, package_ids.map(Number))
+		res.json({ success: true, message: 'Paket auto reply sesi berhasil disimpan' })
+	} catch (error: any) {
+		console.error('Error setting session auto reply packages:', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Get sessions assigned to an auto reply package
+app.get('/api/auto-reply-packages/:id/sessions', (req, res) => {
+	try {
+		const id = parseInt(req.params.id)
+		const sessions = autoReplyPackageDb.getSessionsForPackage(id)
+		res.json({ success: true, sessions })
+	} catch (error: any) {
+		console.error('Error getting sessions for auto reply package:', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Set sessions assigned to an auto reply package
+app.post('/api/auto-reply-packages/:id/sessions', (req, res) => {
+	try {
+		const id = parseInt(req.params.id)
+		const { session_ids } = req.body
+		if (!Array.isArray(session_ids)) {
+			return res.status(400).json({ success: false, error: 'session_ids harus berupa array' })
+		}
+		autoReplyPackageDb.setSessionsForPackage(id, session_ids)
+		res.json({ success: true, message: 'Sesi untuk paket auto reply berhasil disimpan' })
+	} catch (error: any) {
+		console.error('Error setting sessions for auto reply package:', error)
 		res.status(500).json({ success: false, error: error.message })
 	}
 })

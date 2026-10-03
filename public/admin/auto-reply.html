@@ -609,11 +609,28 @@
                                     </div>
                                 </div>
                                 
+                                <!-- Package Filter Bar -->
+                                <div class="card card-flush shadow-sm mb-4">
+                                    <div class="card-body py-3 px-5 d-flex align-items-center justify-content-between flex-wrap gap-3">
+                                        <div class="d-flex align-items-center flex-wrap gap-2" id="package-pills-container">
+                                            <span class="text-muted fs-7"><span class="spinner-border spinner-border-sm me-1"></span>Memuat kelompok paket...</span>
+                                        </div>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <button class="btn btn-sm btn-light-warning fw-semibold" onclick="openCreatePackageModal()">
+                                                <i class="bi bi-folder-plus me-1"></i>Paket Baru
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <!-- Rules Container -->
                                 <div class="rules-container">
                                     <div class="rules-header">
                                         <h5><i class="bi bi-gear me-2"></i>Daftar Auto Reply Rules</h5>
                                         <div class="rules-toolbar">
+                                            <button class="btn btn-sm btn-light-warning fw-bold" onclick="openPackageManagementModal()" title="Kelola Kelompok / Paket Auto Reply">
+                                                <i class="bi bi-collection-fill me-1"></i>Kelola Paket
+                                            </button>
                                             <button class="btn btn-sm btn-light-success fw-bold" onclick="exportAutoReplyRules()" title="Export backup semua rules ke file JSON">
                                                 <i class="bi bi-download me-1"></i>Export Backup
                                             </button>
@@ -710,6 +727,14 @@
                                 <label class="form-label">Nama Rule <span class="text-danger">*</span></label>
                                 <input type="text" class="form-control" id="rule-name" 
                                        placeholder="Contoh: Greeting Hallo" required>
+                            </div>
+
+                            <!-- Paket Kelompok -->
+                            <div class="col-md-6">
+                                <label class="form-label">Kelompok / Paket <span class="text-danger">*</span></label>
+                                <select class="form-select" id="rule-package-id" required>
+                                    <!-- Populated via JS -->
+                                </select>
                             </div>
                             
                             <!-- Session -->
@@ -895,6 +920,149 @@
         </div>
     </div>
     
+    <!-- Modal: Kelola Paket Auto Reply -->
+    <div class="modal fade" id="packageManageModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="bi bi-collection-fill text-warning me-2"></i>Kelola Kelompok / Paket Auto Reply
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+                        <p class="text-muted fs-7 mb-0">
+                            Kelompokkan aturan auto-reply menjadi paket-paket tematik (misal CS Standar, Promo, Info Pembayaran). Session WhatsApp hanya akan menjalankan auto-reply dari paket yang diaktifkan.
+                        </p>
+                        <button class="btn btn-sm btn-primary fw-bold" onclick="openCreatePackageModal()">
+                            <i class="bi bi-plus-lg me-1"></i>Tambah Paket
+                        </button>
+                    </div>
+                    
+                    <div class="table-responsive">
+                        <table class="table table-row-dashed table-row-gray-300 align-middle gs-0 gy-3">
+                            <thead>
+                                <tr class="fw-bold text-muted fs-7 text-uppercase">
+                                    <th>Paket</th>
+                                    <th>Warna</th>
+                                    <th>Prioritas</th>
+                                    <th>Rules</th>
+                                    <th>Status</th>
+                                    <th class="text-end">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="package-list-tbody">
+                                <tr>
+                                    <td colspan="6" class="text-center py-4 text-muted">Memuat paket...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Tutup</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Create / Edit Package -->
+    <div class="modal fade" id="packageEditModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="package-modal-title">
+                        <i class="bi bi-folder-plus text-warning me-2"></i>Tambah Paket Auto Reply
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="package-form">
+                        <input type="hidden" id="pkg-id">
+                        
+                        <div class="mb-4">
+                            <label class="form-label required fw-semibold">Nama Paket</label>
+                            <input type="text" class="form-control" id="pkg-name" placeholder="Contoh: CS Umum, Promo Weekend" required>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="form-label fw-semibold">Deskripsi</label>
+                            <textarea class="form-control" id="pkg-description" rows="2" placeholder="Catatan kegunaan paket ini..."></textarea>
+                        </div>
+                        
+                        <div class="row g-3 mb-4">
+                            <div class="col-6">
+                                <label class="form-label fw-semibold">Warna Badge</label>
+                                <div class="d-flex align-items-center gap-2">
+                                    <input type="color" class="form-control form-control-color" id="pkg-color" value="#25D366" title="Pilih warna">
+                                    <div class="d-flex gap-1" id="pkg-color-presets">
+                                        <button type="button" class="btn btn-xs p-2 rounded-circle" style="background:#25D366; width:22px; height:22px;" onclick="setColorPreset('#25D366')"></button>
+                                        <button type="button" class="btn btn-xs p-2 rounded-circle" style="background:#009EF7; width:22px; height:22px;" onclick="setColorPreset('#009EF7')"></button>
+                                        <button type="button" class="btn btn-xs p-2 rounded-circle" style="background:#F1416C; width:22px; height:22px;" onclick="setColorPreset('#F1416C')"></button>
+                                        <button type="button" class="btn btn-xs p-2 rounded-circle" style="background:#7239EA; width:22px; height:22px;" onclick="setColorPreset('#7239EA')"></button>
+                                        <button type="button" class="btn btn-xs p-2 rounded-circle" style="background:#FFA800; width:22px; height:22px;" onclick="setColorPreset('#FFA800')"></button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-6">
+                                <label class="form-label fw-semibold">Prioritas</label>
+                                <input type="number" class="form-control" id="pkg-priority" value="0" placeholder="0">
+                                <div class="form-text fs-8">Paket prioritas lebih tinggi dievaluasi lebih dulu.</div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-check form-check-custom form-check-solid mb-2">
+                            <input class="form-check-input" type="checkbox" id="pkg-is-default" value="1">
+                            <label class="form-check-label fw-semibold fs-7 text-gray-800" for="pkg-is-default">
+                                Jadikan Paket Bawaan (Default untuk session baru)
+                            </label>
+                        </div>
+                        <div class="form-text fs-8 ps-7">
+                            Digunakan sebagai template paket standar sistem.
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
+                    <button type="button" class="btn btn-warning fw-bold" id="btn-save-package" onclick="savePackage()">
+                        <i class="bi bi-check-lg me-1"></i>Simpan Paket
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Atur Sesi untuk Paket -->
+    <div class="modal fade" id="packageSessionsModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="bi bi-whatsapp text-success me-2"></i>Atur Sesi WhatsApp untuk Paket: <span id="pkg-session-target-name" class="badge bg-warning text-dark"></span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted fs-7 mb-3">
+                        Centang session WhatsApp yang mengaktifkan paket auto-reply ini:
+                    </p>
+                    <input type="hidden" id="pkg-session-target-id">
+                    <div id="pkg-sessions-list-container" class="d-flex flex-column gap-2 mb-3">
+                        <div class="text-muted fs-7"><span class="spinner-border spinner-border-sm me-2"></span>Memuat daftar sesi...</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
+                    <button type="button" class="btn btn-success fw-bold" id="btn-save-pkg-sessions" onclick="savePackageSessions()">
+                        <i class="bi bi-check-lg me-1"></i>Simpan Sesi
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Scripts -->
     <script src="assets/plugins/global/plugins.bundle.js"></script>
     <script src="assets/js/scripts.bundle.js"></script>
@@ -949,11 +1117,24 @@
     <script>
         let rules = [];
         let sessions = [];
+        let packages = [];
+        let selectedPackageId = 'all';
+        let packageManageModalInstance = null;
+        let packageEditModalInstance = null;
+        let packageSessionsModalInstance = null;
         let triggerTags = [];
         const socket = io();
         
         document.addEventListener('DOMContentLoaded', () => {
+            const pmEl = document.getElementById('packageManageModal');
+            if (pmEl && typeof bootstrap !== 'undefined') packageManageModalInstance = new bootstrap.Modal(pmEl);
+            const peEl = document.getElementById('packageEditModal');
+            if (peEl && typeof bootstrap !== 'undefined') packageEditModalInstance = new bootstrap.Modal(peEl);
+            const psEl = document.getElementById('packageSessionsModal');
+            if (psEl && typeof bootstrap !== 'undefined') packageSessionsModalInstance = new bootstrap.Modal(psEl);
+
             loadSessions();
+            loadPackages();
             loadRules();
             loadStats();
             
@@ -1082,6 +1263,7 @@
                     rules = data.rules || [];
                     renderRules(rules);
                     updateStats();
+                    renderPackagePills();
                 }
             } catch (error) {
                 console.error('Error loading rules:', error);
@@ -1118,6 +1300,7 @@
             const statusFilter = document.getElementById('filter-status').value;
             
             const filtered = rules.filter(rule => {
+                if (selectedPackageId !== 'all' && Number(rule.package_id) !== Number(selectedPackageId)) return false;
                 if (search && !rule.name.toLowerCase().includes(search) && 
                     !parseTriggerValues(rule.trigger_value).some(v => v.toLowerCase().includes(search))) return false;
                 if (sessionFilter && rule.session_id !== sessionFilter) return false;
@@ -1151,7 +1334,12 @@
                                 <i class="bi bi-robot"></i>
                             </div>
                             <div class="rule-info">
-                                <h6>${escapeHtml(rule.name)}</h6>
+                                <div class="d-flex align-items-center gap-2 mb-1">
+                                    <h6 class="mb-0">${escapeHtml(rule.name)}</h6>
+                                    <span class="badge" style="background-color: ${rule.package_color || '#25D366'}; color: #fff; font-size: 0.72rem; padding: 2px 7px;">
+                                        ${escapeHtml(rule.package_name || 'Umum')}
+                                    </span>
+                                </div>
                                 <small>${rule.session_id || 'Global'} · Priority: ${rule.priority}</small>
                             </div>
                         </div>
@@ -1216,6 +1404,7 @@
             document.getElementById('test-result').classList.add('d-none');
             setTriggerTags([]);
             document.getElementById('tag-text-input').value = '';
+            populatePackageSelect(selectedPackageId !== 'all' ? selectedPackageId : null);
             new bootstrap.Modal(document.getElementById('ruleModal')).show();
         }
         
@@ -1226,6 +1415,7 @@
             document.getElementById('ruleModalTitle').innerHTML = '<i class="bi bi-pencil me-2"></i>Edit Auto Reply Rule';
             document.getElementById('rule-id').value = rule.id;
             document.getElementById('rule-name').value = rule.name;
+            populatePackageSelect(rule.package_id || 1);
             document.getElementById('rule-session').value = rule.session_id || '';
             document.getElementById('rule-trigger-type').value = rule.trigger_type;
             // Populate multi-trigger tags
@@ -1252,6 +1442,7 @@
             
             const data = {
                 name: document.getElementById('rule-name').value,
+                package_id: parseInt(document.getElementById('rule-package-id').value) || 1,
                 session_id: document.getElementById('rule-session').value || null,
                 trigger_type: document.getElementById('rule-trigger-type').value,
                 trigger_value: triggerValueArr,
@@ -1291,6 +1482,401 @@
             } catch (error) {
                 console.error('Error saving rule:', error);
                 Swal.fire('Error', 'Gagal menyimpan rule', 'error');
+            }
+        }
+        
+        // ============================================================
+        // Package Management Functions
+        // ============================================================
+        async function loadPackages() {
+            try {
+                const res = await fetch('/api/auto-reply-packages');
+                const data = await res.json();
+                if (data.success) {
+                    packages = data.packages || [];
+                    renderPackagePills();
+                    populatePackageSelect();
+                }
+            } catch (err) {
+                console.error('Error loading auto-reply packages:', err);
+            }
+        }
+
+        function renderPackagePills() {
+            const container = document.getElementById('package-pills-container');
+            if (!container) return;
+
+            const totalRules = rules.length;
+            const isAllActive = selectedPackageId === 'all';
+
+            let html = `
+                <button type="button" class="btn btn-sm ${isAllActive ? 'btn-warning text-dark' : 'btn-light'} fw-bold px-4 py-2" onclick="selectPackageFilter('all')">
+                    Semua <span class="badge badge-circle ${isAllActive ? 'bg-dark text-white' : 'badge-light-dark'} ms-1 fs-8">${totalRules}</span>
+                </button>
+            `;
+
+            packages.forEach(pkg => {
+                const isActive = String(selectedPackageId) === String(pkg.id);
+                const count = pkg.rule_count || 0;
+                const color = pkg.color || '#25D366';
+
+                if (isActive) {
+                    html += `
+                        <button type="button" class="btn btn-sm text-white fw-bold px-3 py-2 d-flex align-items-center gap-1 shadow-sm" 
+                                style="background-color: ${color};" onclick="selectPackageFilter(${pkg.id})">
+                            <span>${escapeHtml(pkg.name)}</span>
+                            <span class="badge badge-circle bg-white text-dark ms-1 fs-8">${count}</span>
+                        </button>
+                    `;
+                } else {
+                    html += `
+                        <button type="button" class="btn btn-sm btn-light fw-semibold px-3 py-2 d-flex align-items-center gap-1" 
+                                onclick="selectPackageFilter(${pkg.id})">
+                            <span class="bullet bullet-dot me-1" style="background-color: ${color}; width:8px; height:8px;"></span>
+                            <span>${escapeHtml(pkg.name)}</span>
+                            <span class="badge badge-light-secondary ms-1 fs-8">${count}</span>
+                        </button>
+                    `;
+                }
+            });
+
+            container.innerHTML = html;
+        }
+
+        function selectPackageFilter(pkgId) {
+            selectedPackageId = pkgId;
+            renderPackagePills();
+            filterRules();
+        }
+
+        function populatePackageSelect(selectedId = null) {
+            const select = document.getElementById('rule-package-id');
+            if (!select) return;
+
+            let html = '';
+            packages.forEach(pkg => {
+                const isSelected = selectedId !== null 
+                    ? Number(pkg.id) === Number(selectedId) 
+                    : (pkg.is_default === 1);
+                html += `<option value="${pkg.id}" ${isSelected ? 'selected' : ''}>${escapeHtml(pkg.name)} ${pkg.is_default ? '(Default)' : ''}</option>`;
+            });
+
+            if (packages.length === 0) {
+                html = '<option value="1">Umum / Default</option>';
+            }
+
+            select.innerHTML = html;
+        }
+
+        function setColorPreset(color) {
+            const input = document.getElementById('pkg-color');
+            if (input) input.value = color;
+        }
+
+        function openPackageManagementModal() {
+            renderPackageListTable();
+            if (packageManageModalInstance) {
+                packageManageModalInstance.show();
+            }
+        }
+
+        function renderPackageListTable() {
+            const tbody = document.getElementById('package-list-tbody');
+            if (!tbody) return;
+
+            if (packages.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">Belum ada paket auto reply.</td></tr>';
+                return;
+            }
+
+            let html = '';
+            packages.forEach(pkg => {
+                const color = pkg.color || '#25D366';
+                const isDefault = pkg.is_default === 1;
+
+                html += `
+                    <tr>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <div class="symbol symbol-30px me-3">
+                                    <span class="symbol-label rounded-circle" style="background-color: ${color};"></span>
+                                </div>
+                                <div>
+                                    <span class="text-dark fw-bold text-hover-primary d-block fs-6">${escapeHtml(pkg.name)}</span>
+                                    <span class="text-muted fs-8">${escapeHtml(pkg.description || 'Tidak ada deskripsi')}</span>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge" style="background-color: ${color}; color: #fff;">${color}</span>
+                        </td>
+                        <td>
+                            <span class="badge badge-light-info fw-semibold">${pkg.priority || 0}</span>
+                        </td>
+                        <td>
+                            <span class="badge badge-light-warning fw-bold">${pkg.rule_count || 0} rules</span>
+                        </td>
+                        <td>
+                            ${isDefault ? '<span class="badge badge-light-success fw-bold">Default</span>' : '<span class="badge badge-light-secondary">Opsional</span>'}
+                        </td>
+                        <td class="text-end">
+                            <button class="btn btn-icon btn-light-success btn-sm me-1" title="Atur Sesi" onclick="openPackageSessionsModal(${pkg.id}, '${escapeHtml(pkg.name)}')">
+                                <i class="bi bi-whatsapp"></i>
+                            </button>
+                            <button class="btn btn-icon btn-light-primary btn-sm me-1" title="Edit Paket" onclick="editPackage(${pkg.id})">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            ${!isDefault && pkg.id !== 1 ? `
+                            <button class="btn btn-icon btn-light-danger btn-sm" title="Hapus Paket" onclick="deletePackage(${pkg.id}, '${escapeHtml(pkg.name)}')">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                            ` : ''}
+                        </td>
+                    </tr>
+                `;
+            });
+
+            tbody.innerHTML = html;
+        }
+
+        function openCreatePackageModal() {
+            document.getElementById('pkg-id').value = '';
+            document.getElementById('pkg-name').value = '';
+            document.getElementById('pkg-description').value = '';
+            document.getElementById('pkg-color').value = '#25D366';
+            document.getElementById('pkg-priority').value = '0';
+            document.getElementById('pkg-is-default').checked = false;
+
+            document.getElementById('package-modal-title').innerHTML = '<i class="bi bi-folder-plus text-warning me-2"></i>Tambah Paket Auto Reply';
+            document.getElementById('btn-save-package').innerHTML = '<i class="bi bi-check-lg me-1"></i>Simpan Paket';
+
+            if (packageEditModalInstance) {
+                packageEditModalInstance.show();
+            }
+        }
+
+        function editPackage(id) {
+            const pkg = packages.find(p => Number(p.id) === Number(id));
+            if (!pkg) return;
+
+            document.getElementById('pkg-id').value = pkg.id;
+            document.getElementById('pkg-name').value = pkg.name || '';
+            document.getElementById('pkg-description').value = pkg.description || '';
+            document.getElementById('pkg-color').value = pkg.color || '#25D366';
+            document.getElementById('pkg-priority').value = pkg.priority || 0;
+            document.getElementById('pkg-is-default').checked = pkg.is_default === 1;
+
+            document.getElementById('package-modal-title').innerHTML = '<i class="bi bi-pencil text-warning me-2"></i>Edit Paket Auto Reply';
+            document.getElementById('btn-save-package').innerHTML = '<i class="bi bi-check-lg me-1"></i>Update Paket';
+
+            if (packageEditModalInstance) {
+                packageEditModalInstance.show();
+            }
+        }
+
+        async function savePackage() {
+            const id = document.getElementById('pkg-id').value;
+            const name = document.getElementById('pkg-name').value.trim();
+            const description = document.getElementById('pkg-description').value.trim();
+            const color = document.getElementById('pkg-color').value.trim();
+            const priority = Number(document.getElementById('pkg-priority').value || 0);
+            const isDefault = document.getElementById('pkg-is-default').checked;
+
+            if (!name) {
+                Swal.fire('Peringatan', 'Nama paket wajib diisi', 'warning');
+                document.getElementById('pkg-name').focus();
+                return;
+            }
+
+            const payload = {
+                name,
+                description: description || null,
+                color: color || '#25D366',
+                priority,
+                is_default: isDefault
+            };
+
+            const btn = document.getElementById('btn-save-package');
+            const origHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Menyimpan...';
+
+            try {
+                let res;
+                if (id) {
+                    res = await fetch(`/api/auto-reply-packages/${id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                } else {
+                    res = await fetch('/api/auto-reply-packages', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                }
+
+                const data = await res.json();
+                if (data.success) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Berhasil',
+                        text: data.message || 'Paket auto reply berhasil disimpan',
+                        timer: 1500,
+                        showConfirmButton: false
+                    });
+                    if (packageEditModalInstance) packageEditModalInstance.hide();
+                    await loadPackages();
+                    await loadRules();
+                    renderPackageListTable();
+                } else {
+                    Swal.fire('Gagal', data.error || 'Gagal menyimpan paket auto reply', 'error');
+                }
+            } catch (err) {
+                console.error('Error saving package:', err);
+                Swal.fire('Error', 'Terjadi kesalahan saat menyimpan paket auto reply', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = origHtml;
+            }
+        }
+
+        async function deletePackage(id, name) {
+            Swal.fire({
+                title: 'Hapus Paket Auto Reply?',
+                html: `Paket <strong>"${name}"</strong> akan dihapus.<br><small class="text-danger">Rule di dalam paket ini akan otomatis dialihkan ke paket Umum / Default.</small>`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#f1416c',
+                cancelButtonColor: '#b5b5c3',
+                confirmButtonText: 'Ya, Hapus',
+                cancelButtonText: 'Batal'
+            }).then(async (result) => {
+                if (result.isConfirmed) {
+                    try {
+                        const res = await fetch(`/api/auto-reply-packages/${id}`, {
+                            method: 'DELETE'
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Terhapus',
+                                text: 'Paket berhasil dihapus',
+                                timer: 1500,
+                                showConfirmButton: false
+                            });
+                            if (selectedPackageId == id) {
+                                selectedPackageId = 'all';
+                            }
+                            await loadPackages();
+                            await loadRules();
+                            renderPackageListTable();
+                        } else {
+                            Swal.fire('Gagal', data.error || 'Gagal menghapus paket', 'error');
+                        }
+                    } catch (err) {
+                        console.error('Error deleting package:', err);
+                        Swal.fire('Error', 'Terjadi kesalahan saat menghapus paket', 'error');
+                    }
+                }
+            });
+        }
+
+        async function openPackageSessionsModal(id, name) {
+            document.getElementById('pkg-session-target-id').value = id;
+            document.getElementById('pkg-session-target-name').textContent = name;
+            const container = document.getElementById('pkg-sessions-list-container');
+            container.innerHTML = '<div class="text-muted fs-7"><span class="spinner-border spinner-border-sm me-2"></span>Memuat sesi...</div>';
+
+            if (packageSessionsModalInstance) {
+                packageSessionsModalInstance.show();
+            }
+
+            try {
+                const [pkgSessionsRes, allSessionsRes] = await Promise.all([
+                    fetch(`/api/auto-reply-packages/${id}/sessions`),
+                    fetch('/api/sessions')
+                ]);
+                const pkgData = await pkgSessionsRes.json();
+                const allData = await allSessionsRes.json();
+
+                const activeSessions = new Set((pkgData.sessions || []).map(s => s.session_id));
+                const allSessionsList = Array.isArray(allData) ? allData : (allData.sessions || []);
+
+                if (allSessionsList.length === 0) {
+                    container.innerHTML = '<div class="alert alert-warning py-3 fs-7 mb-0">Belum ada WhatsApp Session yang terdaftar di sistem.</div>';
+                    return;
+                }
+
+                let html = '';
+                allSessionsList.forEach(sess => {
+                    const isChecked = activeSessions.has(sess.id);
+                    const isConnected = !!sess.isConnected;
+                    const phone = sess.phoneNumber || sess.user?.id?.split(':')[0] || '';
+
+                    html += `
+                        <div class="border rounded p-3 d-flex align-items-center justify-content-between bg-light">
+                            <div class="form-check form-check-custom form-check-solid">
+                                <input class="form-check-input pkg-session-check" type="checkbox" value="${escapeHtml(sess.id)}" id="sess_${escapeHtml(sess.id)}" ${isChecked ? 'checked' : ''}>
+                                <label class="form-check-label fw-bold text-gray-800 cursor-pointer ms-2" for="sess_${escapeHtml(sess.id)}">
+                                    ${escapeHtml(sess.id)}
+                                    ${phone ? `<span class="text-muted fs-8 fw-normal ms-1">(${phone})</span>` : ''}
+                                </label>
+                            </div>
+                            <div>
+                                <span class="badge ${isConnected ? 'badge-light-success' : 'badge-light-danger'} fs-8">
+                                    ${isConnected ? 'Online' : 'Offline'}
+                                </span>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                container.innerHTML = html;
+            } catch (err) {
+                console.error('Error opening package sessions modal:', err);
+                container.innerHTML = '<div class="text-danger fs-7">Gagal memuat daftar sesi</div>';
+            }
+        }
+
+        async function savePackageSessions() {
+            const id = document.getElementById('pkg-session-target-id').value;
+            const checkedBoxes = Array.from(document.querySelectorAll('.pkg-session-check:checked'));
+            const sessionIds = checkedBoxes.map(cb => cb.value);
+
+            const btn = document.getElementById('btn-save-pkg-sessions');
+            const origHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Menyimpan...';
+
+            try {
+                const res = await fetch(`/api/auto-reply-packages/${id}/sessions`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_ids: sessionIds })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Berhasil',
+                        text: 'Sesi untuk paket auto reply berhasil diperbarui',
+                        timer: 1500,
+                        showConfirmButton: false
+                    });
+                    if (packageSessionsModalInstance) packageSessionsModalInstance.hide();
+                    await loadPackages();
+                } else {
+                    Swal.fire('Gagal', data.error || 'Gagal menyimpan sesi paket', 'error');
+                }
+            } catch (err) {
+                console.error('Error saving package sessions:', err);
+                Swal.fire('Error', 'Terjadi kesalahan saat menyimpan sesi paket', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = origHtml;
             }
         }
         
