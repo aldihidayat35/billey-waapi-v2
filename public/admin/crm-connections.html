@@ -1,0 +1,1205 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="assets/media/logos/favicon.ico" />
+    <title>Kelola Koneksi CRM - Billey WA</title>
+
+    <!-- Metronic CSS -->
+    <link rel="stylesheet" href="assets/plugins/global/plugins.bundle.css">
+    <link rel="stylesheet" href="assets/css/style.bundle.css">
+    <!-- FontAwesome & Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <style>
+        :root {
+            --wa-green: #25D366;
+            --wa-teal: #128C7E;
+            --wa-dark-green: #075E54;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: #f8fafc;
+        }
+
+        /* Stat Cards */
+        .stat-card-sleek {
+            background: #ffffff;
+            border-radius: 14px;
+            border: 1px solid #e9edf2;
+            padding: 18px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: all 0.25s ease;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+        }
+        .stat-card-sleek:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
+            border-color: #d1d9e2;
+        }
+        .stat-card-sleek .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+        }
+
+        /* App Connection Card */
+        .conn-card {
+            background: #ffffff;
+            border-radius: 16px;
+            border: 1px solid #e9edf2;
+            overflow: hidden;
+            transition: all 0.25s ease;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+            position: relative;
+        }
+        .conn-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.08);
+            border-color: #cbd5e1;
+        }
+        .conn-card.inactive {
+            opacity: 0.72;
+            border-style: dashed;
+        }
+        .conn-top-stripe {
+            height: 4px;
+            width: 100%;
+        }
+
+        .conn-app-icon {
+            width: 52px;
+            height: 52px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            flex-shrink: 0;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+        }
+
+        .url-box {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 7px 10px;
+            font-family: 'JetBrains Mono', Consolas, monospace;
+            font-size: 11.5px;
+            color: #334155;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            word-break: break-all;
+        }
+
+        .copy-url-btn {
+            border: none;
+            background: transparent;
+            color: #64748b;
+            cursor: pointer;
+            padding: 2px 4px;
+            border-radius: 4px;
+            transition: color 0.15s;
+        }
+        .copy-url-btn:hover {
+            color: #0f172a;
+        }
+
+        /* Ping Status Indicators */
+        .ping-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11.5px;
+            font-weight: 700;
+            padding: 3px 10px;
+            border-radius: 999px;
+        }
+        .ping-pill.online {
+            background: #e8fff3;
+            color: #10b981;
+            border: 1px solid #bbf7d0;
+        }
+        .ping-pill.offline {
+            background: #fef2f2;
+            color: #ef4444;
+            border: 1px solid #fecaca;
+        }
+        .ping-pill.checking {
+            background: #eff6ff;
+            color: #3b82f6;
+            border: 1px solid #bfdbfe;
+        }
+        .ping-pill.idle {
+            background: #f1f5f9;
+            color: #64748b;
+            border: 1px solid #e2e8f0;
+        }
+
+        /* Pulse Dot */
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .status-dot.online { background-color: #10b981; box-shadow: 0 0 0 2px rgba(16,185,129,0.25); }
+        .status-dot.offline { background-color: #ef4444; box-shadow: 0 0 0 2px rgba(239,68,68,0.25); }
+        .status-dot.checking { background-color: #3b82f6; }
+        .status-dot.idle { background-color: #94a3b8; }
+
+        /* Feature Chips */
+        .feature-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+
+        /* Session Badges Container */
+        .session-badges-wrap {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            max-height: 60px;
+            overflow-y: auto;
+        }
+
+        /* Empty State */
+        .empty-state-box {
+            background: #ffffff;
+            border: 2px dashed #cbd5e1;
+            border-radius: 18px;
+            padding: 48px 24px;
+            text-align: center;
+        }
+    </style>
+
+    <!-- Auth Verification -->
+    <script>
+        (async function() {
+            try {
+                const res = await fetch('/api/auth/me');
+                if (!res.ok) { window.location.href = '/auth/login?error=' + encodeURIComponent('Silakan login terlebih dahulu'); return; }
+                const data = await res.json();
+                if (!data.success || !data.user) { window.location.href = '/auth/login?error=' + encodeURIComponent('Silakan login terlebih dahulu'); return; }
+                window._currentUser = data.user;
+            } catch (e) {
+                window.location.href = '/auth/login?error=' + encodeURIComponent('Terjadi kesalahan. Silakan login kembali');
+            }
+        })();
+    </script>
+</head>
+
+<body id="kt_app_body" data-kt-app-layout="dark-sidebar" data-kt-app-header-fixed="true" 
+      data-kt-app-sidebar-enabled="true" data-kt-app-sidebar-fixed="true" 
+      data-kt-app-sidebar-hoverable="true" data-kt-app-sidebar-push-header="true" 
+      data-kt-app-sidebar-push-toolbar="true" data-kt-app-sidebar-push-footer="true" 
+      class="app-default">
+
+    <div class="d-flex flex-column flex-root app-root" id="kt_app_root">
+        <div class="app-page flex-column flex-column-fluid" id="kt_app_page">
+            
+            <!-- Header Component -->
+            <div id="kt_app_header" class="app-header">
+                <div id="header-container"></div>
+            </div>
+            
+            <!-- Wrapper -->
+            <div class="app-wrapper flex-column flex-row-fluid" id="kt_app_wrapper">
+                
+                <!-- Sidebar Component -->
+                <div id="sidebar-container"></div>
+                
+                <!-- Main Content -->
+                <div class="app-main flex-column flex-row-fluid" id="kt_app_main">
+                    <div class="d-flex flex-column flex-column-fluid">
+                        
+                        <div id="kt_app_content" class="app-content flex-column-fluid">
+                            <div id="kt_app_content_container" class="app-container container-fluid py-6">
+                                
+                                <!-- ============================================================
+                                     1. Page Header & Toolbar
+                                     ============================================================ -->
+                                <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-6">
+                                    <div class="d-flex align-items-center gap-3">
+                                        <div class="symbol symbol-45px">
+                                            <span class="symbol-label bg-light-primary text-primary border border-primary border-opacity-20 shadow-xs">
+                                                <i class="bi bi-diagram-3-fill fs-2"></i>
+                                            </span>
+                                        </div>
+                                        <div>
+                                            <div class="d-flex align-items-center gap-2">
+                                                <h1 class="text-gray-900 fw-bolder fs-2 mb-0">Kelola Koneksi CRM</h1>
+                                                <span class="badge badge-light-success fw-bold fs-8">Multi-App Integrations</span>
+                                            </div>
+                                            <div class="text-muted fw-semibold fs-7 mt-1">Hubungkan bot WhatsApp Billey WA ke berbagai sistem CRM &amp; aplikasi web eksternal secara simultan</div>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex align-items-center flex-wrap gap-2">
+                                        <button class="btn btn-sm btn-light-info fw-bold" onclick="testAllConnections()" id="btn-test-all">
+                                            <i class="bi bi-broadcast me-1"></i>Test Semua Koneksi
+                                        </button>
+                                        <a href="/integration-simulator.html" class="btn btn-sm btn-light-warning fw-bold">
+                                            <i class="bi bi-play-circle-fill me-1"></i>Buka Simulator
+                                        </a>
+                                        <button class="btn btn-sm btn-primary fw-bold" onclick="openCreateModal()">
+                                            <i class="bi bi-plus-lg me-1"></i>+ Tambah Koneksi Baru
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- ============================================================
+                                     2. Stat Summary Cards
+                                     ============================================================ -->
+                                <div class="row g-4 mb-6">
+                                    <div class="col-xl-3 col-sm-6">
+                                        <div class="stat-card-sleek">
+                                            <div>
+                                                <div class="text-muted fw-bold fs-7 text-uppercase mb-1">TOTAL KONEKSI</div>
+                                                <div class="text-gray-900 fw-bolder fs-2hx" id="stat-total-conn">0</div>
+                                                <div class="text-muted fs-8 mt-1">Aplikasi CRM terdaftar</div>
+                                            </div>
+                                            <div class="stat-icon bg-light-primary text-primary">
+                                                <i class="bi bi-hdd-network-fill"></i>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-xl-3 col-sm-6">
+                                        <div class="stat-card-sleek">
+                                            <div>
+                                                <div class="text-muted fw-bold fs-7 text-uppercase mb-1">KONEKSI AKTIF</div>
+                                                <div class="text-success fw-bolder fs-2hx" id="stat-active-conn">0</div>
+                                                <div class="text-muted fs-8 mt-1">Status switch aktif</div>
+                                            </div>
+                                            <div class="stat-icon bg-light-success text-success">
+                                                <i class="bi bi-check-circle-fill"></i>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-xl-3 col-sm-6">
+                                        <div class="stat-card-sleek">
+                                            <div>
+                                                <div class="text-muted fw-bold fs-7 text-uppercase mb-1">SESI TERHUBUNG</div>
+                                                <div class="text-info fw-bolder fs-2hx" id="stat-sessions-conn">0</div>
+                                                <div class="text-muted fs-8 mt-1">Cakupan sesi WhatsApp</div>
+                                            </div>
+                                            <div class="stat-icon bg-light-info text-info">
+                                                <i class="bi bi-whatsapp"></i>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-xl-3 col-sm-6">
+                                        <div class="stat-card-sleek">
+                                            <div>
+                                                <div class="text-muted fw-bold fs-7 text-uppercase mb-1">FITUR SINKRONISASI</div>
+                                                <div class="text-warning fw-bolder fs-2hx" id="stat-features-active">3/3</div>
+                                                <div class="text-muted fs-8 mt-1">Order, Kontak, Worker</div>
+                                            </div>
+                                            <div class="stat-icon bg-light-warning text-warning">
+                                                <i class="bi bi-lightning-charge-fill"></i>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Tips Banner -->
+                                <div class="alert bg-light-primary border border-primary border-opacity-20 d-flex align-items-center p-4 mb-6 rounded-3">
+                                    <i class="bi bi-info-circle-fill text-primary fs-2 me-3"></i>
+                                    <div class="d-flex flex-column">
+                                        <span class="fw-bold text-gray-800">Tentang Integrasi Multi-CRM</span>
+                                        <span class="text-muted fs-7">
+                                            Setiap profil koneksi dapat dihubungkan ke <strong>Semua Sesi</strong> atau <strong>Sesi Tertentu</strong>. Saat pesan dengan prefix perintah (misal <code>*proses</code>, <code>*selesai</code>) masuk pada suatu sesi, sistem akan meneruskannya ke CRM yang bersangkutan dan membalas chat secara otomatis.
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <!-- ============================================================
+                                     3. Connections Grid
+                                     ============================================================ -->
+                                <div id="connections-grid" class="row g-4 mb-6">
+                                    <!-- Dynamic Cards Rendered by JS -->
+                                    <div class="col-12 text-center py-8 text-muted">
+                                        <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                                        Memuat daftar koneksi CRM...
+                                    </div>
+                                </div>
+
+                                <!-- Empty State (Hidden by default) -->
+                                <div id="empty-state" class="empty-state-box d-none mb-6">
+                                    <div class="mb-4">
+                                        <i class="bi bi-cloud-slash text-muted" style="font-size: 3.5rem;"></i>
+                                    </div>
+                                    <h3 class="text-gray-800 fw-bold mb-2">Belum Ada Koneksi CRM</h3>
+                                    <p class="text-muted fs-7 mb-5" style="max-width: 480px; margin: 0 auto;">
+                                        Tambahkan profil koneksi CRM pertama Anda untuk mulai mengotomatisasi pesan order dan sinkronisasi kontak WhatsApp.
+                                    </p>
+                                    <button class="btn btn-primary btn-sm fw-bold" onclick="openCreateModal()">
+                                        <i class="bi bi-plus-lg me-1"></i>Tambah Koneksi Sekarang
+                                    </button>
+                                </div>
+
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================
+         Modal: Tambah / Edit Koneksi CRM
+         ============================================================ -->
+    <div class="modal fade" id="connectionModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content rounded-4 border-0 shadow">
+                
+                <!-- Modal Header -->
+                <div class="modal-header border-0 pb-0 pt-6 px-6">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="symbol symbol-40px">
+                            <span class="symbol-label bg-light-primary text-primary" id="modal-icon">
+                                <i class="bi bi-diagram-3-fill fs-3"></i>
+                            </span>
+                        </div>
+                        <div>
+                            <h3 class="modal-title fw-bolder text-gray-900 fs-4 mb-0" id="modal-title">Tambah Koneksi CRM</h3>
+                            <span class="text-muted fs-8">Konfigurasi endpoint API dan pemetaan sesi WhatsApp</span>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-icon btn-light" data-bs-dismiss="modal">
+                        <i class="bi bi-x fs-2"></i>
+                    </button>
+                </div>
+
+                <!-- Modal Body -->
+                <div class="modal-body py-6 px-6">
+                    <form id="connectionForm" onsubmit="event.preventDefault(); saveConnection();">
+                        <input type="hidden" id="conn-id">
+
+                        <div class="row g-4 mb-4">
+                            <!-- Nama Aplikasi -->
+                            <div class="col-md-6">
+                                <label class="form-label required fw-bold fs-7 text-gray-800">Nama Aplikasi / Profil CRM</label>
+                                <input type="text" class="form-control form-control-solid" id="conn-name" 
+                                       placeholder="Contoh: CRM Jokiin Academy" required>
+                                <span class="form-text text-muted fs-8">Label pengenal untuk membedakan koneksi ini</span>
+                            </div>
+
+                            <!-- Status Aktif Switch -->
+                            <div class="col-md-6 d-flex flex-column justify-content-center">
+                                <label class="form-label fw-bold fs-7 text-gray-800 mb-2">Status Koneksi</label>
+                                <div class="form-check form-switch form-check-custom form-check-solid">
+                                    <input class="form-check-input h-20px w-35px cursor-pointer" type="checkbox" id="conn-is-active" checked>
+                                    <label class="form-check-label fw-bold fs-7 text-gray-700 ms-2" for="conn-is-active">
+                                        Aktifkan Koneksi Ini
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Base URL API -->
+                        <div class="mb-4">
+                            <label class="form-label required fw-bold fs-7 text-gray-800">Base URL API Laravel</label>
+                            <div class="input-group input-group-solid">
+                                <span class="input-group-text"><i class="bi bi-link-45deg fs-4 text-muted"></i></span>
+                                <input type="url" class="form-control" id="conn-base-url" 
+                                       placeholder="http://academy-service.test/api" required>
+                            </div>
+                            <span class="form-text text-muted fs-8">
+                                URL dasar API Laravel. Sistem akan memanggil <code>/automation/process-message</code> dan <code>/automation/commands</code> di bawah URL ini.
+                            </span>
+                        </div>
+
+                        <!-- API Token / Secret -->
+                        <div class="mb-5">
+                            <label class="form-label required fw-bold fs-7 text-gray-800">API Token / Secret (Bearer)</label>
+                            <div class="input-group input-group-solid">
+                                <span class="input-group-text"><i class="bi bi-shield-lock-fill fs-4 text-muted"></i></span>
+                                <input type="password" class="form-control" id="conn-api-token" 
+                                       placeholder="Nilai AUTOMATION_API_TOKEN di Laravel" required>
+                                <button class="btn btn-light" type="button" onclick="toggleTokenVisibility('conn-api-token', this)" title="Lihat/Sembunyikan Token">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            </div>
+                            <span class="form-text text-muted fs-8">Token otentikasi rahasia untuk otorisasi request HTTP Bearer</span>
+                        </div>
+
+                        <!-- Cakupan Sesi WhatsApp -->
+                        <div class="card bg-light-secondary border border-gray-300 p-4 mb-5 rounded-3">
+                            <div class="d-flex align-items-center justify-content-between mb-3">
+                                <div>
+                                    <label class="fw-bold fs-7 text-gray-900 mb-0 d-flex align-items-center">
+                                        <i class="bi bi-whatsapp text-success me-2 fs-5"></i>Cakupan Sesi WhatsApp
+                                    </label>
+                                    <span class="text-muted fs-8">Tentukan nomor WhatsApp mana saja yang terhubung ke CRM ini</span>
+                                </div>
+                                <div class="form-check form-switch form-check-custom form-check-solid">
+                                    <input class="form-check-input h-20px w-35px cursor-pointer" type="checkbox" id="conn-all-sessions" checked onchange="toggleAllSessionsMode(this.checked)">
+                                    <label class="form-check-label fw-bold fs-8 text-gray-700 ms-1" for="conn-all-sessions">
+                                        Semua Sesi
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Sesi Multi-Select Checklist (Hidden if all_sessions = 1) -->
+                            <div id="session-select-box" class="d-none mt-2 pt-2 border-top border-gray-300">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="fs-8 text-muted fw-semibold">Pilih satu atau beberapa sesi WhatsApp:</span>
+                                    <div class="d-flex gap-2">
+                                        <a href="javascript:void(0)" class="fs-8 text-primary fw-bold" onclick="setSelectAllSessions(true)">Pilih Semua</a>
+                                        <span class="text-gray-300">|</span>
+                                        <a href="javascript:void(0)" class="fs-8 text-danger fw-bold" onclick="setSelectAllSessions(false)">Kosongkan</a>
+                                    </div>
+                                </div>
+                                <div id="session-checkbox-list" class="d-flex flex-wrap gap-2 max-h-120px overflow-y-auto p-2 bg-white rounded-2 border">
+                                    <!-- Dynamic Session Checkboxes -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Fitur Sinkronisasi Granular -->
+                        <div class="mb-5">
+                            <label class="form-label fw-bold fs-7 text-gray-800 mb-2">Fitur Sinkronisasi Aktif</label>
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <div class="border rounded-3 p-3 bg-white d-flex align-items-center justify-content-between">
+                                        <div>
+                                            <div class="fw-bold fs-7 text-gray-800">📦 Order Sync</div>
+                                            <div class="text-muted fs-9">Forward perintah chat</div>
+                                        </div>
+                                        <div class="form-check form-switch form-check-solid ms-2">
+                                            <input class="form-check-input h-18px w-30px" type="checkbox" id="conn-sync-orders" checked>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="border rounded-3 p-3 bg-white d-flex align-items-center justify-content-between">
+                                        <div>
+                                            <div class="fw-bold fs-7 text-gray-800">👥 Kontak Baru</div>
+                                            <div class="text-muted fs-9">Sync chat nomor baru</div>
+                                        </div>
+                                        <div class="form-check form-switch form-check-solid ms-2">
+                                            <input class="form-check-input h-18px w-30px" type="checkbox" id="conn-sync-contacts" checked>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="border rounded-3 p-3 bg-white d-flex align-items-center justify-content-between">
+                                        <div>
+                                            <div class="fw-bold fs-7 text-gray-800">👷 Worker Sync</div>
+                                            <div class="text-muted fs-9">Notif akun worker</div>
+                                        </div>
+                                        <div class="form-check form-switch form-check-solid ms-2">
+                                            <input class="form-check-input h-18px w-30px" type="checkbox" id="conn-sync-workers" checked>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Test Live Ping Alert in Modal -->
+                        <div id="modal-ping-result" class="d-none mb-4 p-3 rounded-3 fs-8"></div>
+
+                        <!-- Modal Actions -->
+                        <div class="d-flex align-items-center justify-content-between pt-4 border-top">
+                            <button type="button" class="btn btn-sm btn-light-info fw-bold" id="btn-modal-test-ping" onclick="testModalCredentials()">
+                                <i class="bi bi-broadcast me-1"></i>Test Koneksi Sekarang
+                            </button>
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-sm btn-light fw-bold" data-bs-dismiss="modal">Batal</button>
+                                <button type="submit" class="btn btn-sm btn-primary fw-bold" id="btn-save-conn">
+                                    <i class="bi bi-check-lg me-1"></i>Simpan Koneksi
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="assets/plugins/global/plugins.bundle.js"></script>
+    <script src="assets/js/scripts.bundle.js"></script>
+    <script src="js/app-init.js"></script>
+    <script src="js/components-loader.js"></script>
+
+    <script>
+        // State
+        let connections = [];
+        let sessions = [];
+        let connectionModalInstance = null;
+        const colorPalette = ['#009EF7', '#10b981', '#7c3aed', '#f59e0b', '#ec4899', '#06b6d4', '#64748b'];
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Load Standard Components (Header, Sidebar, Footer)
+            if (typeof loadStandardComponents === 'function') {
+                await loadStandardComponents();
+            }
+
+            // Init Bootstrap Modal
+            const modalEl = document.getElementById('connectionModal');
+            if (modalEl) {
+                connectionModalInstance = new bootstrap.Modal(modalEl);
+            }
+
+            // Fetch Data
+            await loadSessions();
+            await loadConnections();
+        });
+
+        // ============================================================
+        // Fetch Sessions
+        // ============================================================
+        async function loadSessions() {
+            try {
+                const res = await fetch('/api/sessions');
+                const data = await res.json();
+                if (data.success && Array.isArray(data.sessions)) {
+                    sessions = data.sessions;
+                }
+            } catch (err) {
+                console.error('Error loading sessions:', err);
+            }
+        }
+
+        // ============================================================
+        // Fetch CRM Connections
+        // ============================================================
+        async function loadConnections() {
+            try {
+                const res = await fetch('/api/crm-connections');
+                const data = await res.json();
+                if (data.success) {
+                    connections = data.connections || [];
+                    renderConnections();
+                    updateStats();
+                } else {
+                    Swal.fire('Error', data.error || 'Gagal memuat koneksi CRM', 'error');
+                }
+            } catch (err) {
+                console.error('Error loading connections:', err);
+                Swal.fire('Error', 'Gagal menghubungi server untuk memuat koneksi CRM', 'error');
+            }
+        }
+
+        // ============================================================
+        // Update Stats
+        // ============================================================
+        function updateStats() {
+            const total = connections.length;
+            const active = connections.filter(c => c.is_active === 1).length;
+            
+            // Calculate unique connected sessions
+            const sessionSet = new Set();
+            connections.filter(c => c.is_active === 1).forEach(c => {
+                if (c.all_sessions === 1) {
+                    sessions.forEach(s => sessionSet.add(s.id));
+                } else if (Array.isArray(c.sessions)) {
+                    c.sessions.forEach(s => sessionSet.add(s));
+                }
+            });
+
+            document.getElementById('stat-total-conn').textContent = total;
+            document.getElementById('stat-active-conn').textContent = active;
+            document.getElementById('stat-sessions-conn').textContent = sessionSet.size || (active > 0 ? `${sessions.length} (Semua)` : '0');
+        }
+
+        // ============================================================
+        // Render Connections Grid
+        // ============================================================
+        function renderConnections() {
+            const grid = document.getElementById('connections-grid');
+            const emptyState = document.getElementById('empty-state');
+            if (!grid) return;
+
+            if (connections.length === 0) {
+                grid.innerHTML = '';
+                emptyState?.classList.remove('d-none');
+                return;
+            }
+
+            emptyState?.classList.add('d-none');
+
+            grid.innerHTML = connections.map((conn, idx) => {
+                const color = colorPalette[idx % colorPalette.length];
+                const isActive = conn.is_active === 1;
+
+                // Session badges
+                let sessionHtml = '';
+                if (conn.all_sessions === 1) {
+                    sessionHtml = `<span class="badge badge-light-primary fw-bold fs-8"><i class="bi bi-asterisk me-1"></i>Semua Sesi WhatsApp (${sessions.length})</span>`;
+                } else if (Array.isArray(conn.sessions) && conn.sessions.length > 0) {
+                    sessionHtml = conn.sessions.map(s => `
+                        <span class="badge badge-light fs-8 text-gray-800 border me-1 mb-1">
+                            <i class="bi bi-whatsapp text-success me-1"></i>${escapeHtml(s)}
+                        </span>
+                    `).join('');
+                } else {
+                    sessionHtml = `<span class="badge badge-light-danger fw-bold fs-8"><i class="bi bi-exclamation-triangle me-1"></i>Belum ada sesi dipilih</span>`;
+                }
+
+                return `
+                    <div class="col-xl-6 col-lg-12">
+                        <div class="conn-card ${isActive ? '' : 'inactive'}" id="conn-card-${conn.id}">
+                            <div class="conn-top-stripe" style="background-color: ${color};"></div>
+                            
+                            <div class="p-5 d-flex flex-column justify-content-between flex-grow-1">
+                                <div>
+                                    <!-- Card Header -->
+                                    <div class="d-flex align-items-start justify-content-between gap-3 mb-4">
+                                        <div class="d-flex align-items-center gap-3 overflow-hidden">
+                                            <div class="conn-app-icon" style="background-color: ${hexToRgba(color, 0.12)}; color: ${color};">
+                                                <i class="bi bi-diagram-3-fill"></i>
+                                            </div>
+                                            <div class="overflow-hidden">
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <h4 class="fw-bolder text-gray-900 mb-0 text-truncate" title="${escapeHtml(conn.name)}">
+                                                        ${escapeHtml(conn.name)}
+                                                    </h4>
+                                                </div>
+                                                <div class="mt-1">
+                                                    <span class="ping-pill idle" id="ping-pill-${conn.id}">
+                                                        <span class="status-dot idle"></span>
+                                                        <span class="ping-text">Belum dites</span>
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Toggle Switch -->
+                                        <div class="form-check form-switch form-check-custom form-check-solid flex-shrink-0" title="${isActive ? 'Nonaktifkan koneksi' : 'Aktifkan koneksi'}">
+                                            <input class="form-check-input h-20px w-35px cursor-pointer" type="checkbox" ${isActive ? 'checked' : ''} onchange="toggleConnection(${conn.id}, this.checked)">
+                                        </div>
+                                    </div>
+
+                                    <!-- Base URL Box -->
+                                    <div class="mb-3">
+                                        <label class="text-muted fs-9 fw-bolder text-uppercase d-block mb-1">BASE URL API:</label>
+                                        <div class="url-box">
+                                            <span class="text-truncate">${escapeHtml(conn.base_url)}</span>
+                                            <button class="copy-url-btn" onclick="copyText('${escapeHtml(conn.base_url)}', 'URL disalin!')" title="Salin URL">
+                                                <i class="bi bi-clipboard"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Sesi WhatsApp Terhubung -->
+                                    <div class="mb-3">
+                                        <label class="text-muted fs-9 fw-bolder text-uppercase d-block mb-1">SESI WHATSAPP:</label>
+                                        <div class="session-badges-wrap">
+                                            ${sessionHtml}
+                                        </div>
+                                    </div>
+
+                                    <!-- Fitur Aktif -->
+                                    <div class="mb-2">
+                                        <label class="text-muted fs-9 fw-bolder text-uppercase d-block mb-1">FITUR SINKRONISASI:</label>
+                                        <div class="d-flex flex-wrap gap-2">
+                                            <span class="feature-chip ${conn.sync_orders ? 'bg-light-success text-success border border-success border-opacity-20' : 'bg-light text-muted text-decoration-line-through'}">
+                                                <i class="bi bi-bag-check"></i> Order Sync
+                                            </span>
+                                            <span class="feature-chip ${conn.sync_contacts ? 'bg-light-info text-info border border-info border-opacity-20' : 'bg-light text-muted text-decoration-line-through'}">
+                                                <i class="bi bi-person-lines-fill"></i> Kontak Sync
+                                            </span>
+                                            <span class="feature-chip ${conn.sync_workers ? 'bg-light-warning text-warning border border-warning border-opacity-20' : 'bg-light text-muted text-decoration-line-through'}">
+                                                <i class="bi bi-person-badge"></i> Worker Sync
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Card Footer Actions -->
+                                <div class="pt-4 mt-3 border-top d-flex align-items-center justify-content-between">
+                                    <button class="btn btn-sm btn-light-info fw-bold" onclick="testConnection(${conn.id})" id="btn-ping-${conn.id}">
+                                        <i class="bi bi-broadcast me-1"></i>Test Ping
+                                    </button>
+                                    <div class="d-flex gap-2">
+                                        <button class="btn btn-sm btn-light-warning fw-bold" onclick="openEditModal(${conn.id})">
+                                            <i class="bi bi-pencil me-1"></i>Edit
+                                        </button>
+                                        <button class="btn btn-sm btn-light-danger fw-bold" onclick="deleteConnection(${conn.id}, '${escapeHtml(conn.name)}')">
+                                            <i class="bi bi-trash me-1"></i>Hapus
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // ============================================================
+        // Toggle Connection Active Status
+        // ============================================================
+        async function toggleConnection(id, isActive) {
+            try {
+                const res = await fetch(`/api/crm-connections/${id}/toggle`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ is_active: isActive ? 1 : 0 })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    const conn = connections.find(c => c.id === id);
+                    if (conn) conn.is_active = isActive ? 1 : 0;
+                    renderConnections();
+                    updateStats();
+                    showToast('success', `Koneksi ${isActive ? 'diaktifkan' : 'dinonaktifkan'}`);
+                } else {
+                    Swal.fire('Gagal', data.error || 'Gagal mengubah status', 'error');
+                    renderConnections();
+                }
+            } catch (err) {
+                console.error('Error toggling connection:', err);
+                Swal.fire('Error', 'Gagal menghubungi server', 'error');
+                renderConnections();
+            }
+        }
+
+        // ============================================================
+        // Test Ping Single Connection
+        // ============================================================
+        async function testConnection(id) {
+            const btn = document.getElementById(`btn-ping-${id}`);
+            const pill = document.getElementById(`ping-pill-${id}`);
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Testing...';
+            }
+            if (pill) {
+                pill.className = 'ping-pill checking';
+                pill.innerHTML = '<span class="status-dot checking"></span><span class="ping-text">Memeriksa...</span>';
+            }
+
+            try {
+                const res = await fetch('/api/crm-connections/test', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id })
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                    if (pill) {
+                        pill.className = 'ping-pill online';
+                        pill.innerHTML = `<span class="status-dot online"></span><span class="ping-text">Online (200 OK)</span>`;
+                    }
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Koneksi Berhasil!',
+                        html: `
+                            <div class="text-start bg-light p-3 rounded fs-7">
+                                <div><i class="bi bi-check-circle-fill text-success me-2"></i>Status: <strong>Terhubung</strong></div>
+                                <div><i class="bi bi-shield-check text-primary me-2"></i>Token: <strong>Valid</strong></div>
+                                <div class="mt-2 text-muted fs-8">${data.message || ''}</div>
+                            </div>
+                        `,
+                        confirmButtonText: 'Tutup'
+                    });
+                } else {
+                    if (pill) {
+                        pill.className = 'ping-pill offline';
+                        pill.innerHTML = `<span class="status-dot offline"></span><span class="ping-text">Offline / Error</span>`;
+                    }
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Koneksi Gagal',
+                        html: `
+                            <div class="text-start bg-light p-3 rounded fs-7">
+                                <div class="text-danger fw-bold mb-1">${escapeHtml(data.message || 'Server tidak dapat dihubungi')}</div>
+                                <div class="text-muted fs-8">Pastikan server Laravel aktif dan URL/Token API valid.</div>
+                            </div>
+                        `,
+                        confirmButtonText: 'Tutup'
+                    });
+                }
+            } catch (err) {
+                if (pill) {
+                    pill.className = 'ping-pill offline';
+                    pill.innerHTML = `<span class="status-dot offline"></span><span class="ping-text">Offline</span>`;
+                }
+                Swal.fire('Error', 'Gagal melakukan request test ping.', 'error');
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-broadcast me-1"></i>Test Ping';
+                }
+            }
+        }
+
+        // ============================================================
+        // Test All Connections in Parallel
+        // ============================================================
+        async function testAllConnections() {
+            const btn = document.getElementById('btn-test-all');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Menguji semua...';
+            }
+
+            const promises = connections.map(conn => {
+                const pill = document.getElementById(`ping-pill-${conn.id}`);
+                if (pill) {
+                    pill.className = 'ping-pill checking';
+                    pill.innerHTML = '<span class="status-dot checking"></span><span class="ping-text">Memeriksa...</span>';
+                }
+                return fetch('/api/crm-connections/test', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: conn.id })
+                }).then(async r => {
+                    const d = await r.json().catch(() => ({}));
+                    return { id: conn.id, ok: d.success, data: d };
+                }).catch(() => ({ id: conn.id, ok: false }));
+            });
+
+            const results = await Promise.all(promises);
+            let successCount = 0;
+            results.forEach(res => {
+                const pill = document.getElementById(`ping-pill-${res.id}`);
+                if (pill) {
+                    if (res.ok) {
+                        successCount++;
+                        pill.className = 'ping-pill online';
+                        pill.innerHTML = `<span class="status-dot online"></span><span class="ping-text">Online</span>`;
+                    } else {
+                        pill.className = 'ping-pill offline';
+                        pill.innerHTML = `<span class="status-dot offline"></span><span class="ping-text">Offline</span>`;
+                    }
+                }
+            });
+
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-broadcast me-1"></i>Test Semua Koneksi';
+            }
+
+            showToast('info', `Hasil pengujian: ${successCount}/${connections.length} koneksi online.`);
+        }
+
+        // ============================================================
+        // Modal Handlers (Create & Edit)
+        // ============================================================
+        function populateSessionCheckboxes(selectedSessions = []) {
+            const container = document.getElementById('session-checkbox-list');
+            if (!container) return;
+
+            if (sessions.length === 0) {
+                container.innerHTML = '<div class="text-muted fs-8 p-2">Belum ada sesi WhatsApp yang dibuat di sistem.</div>';
+                return;
+            }
+
+            container.innerHTML = sessions.map(s => {
+                const isChecked = selectedSessions.includes(s.id);
+                const phone = s.phoneNumber ? ` (${s.phoneNumber})` : '';
+                return `
+                    <div class="form-check form-check-custom form-check-solid form-check-sm me-3 mb-1">
+                        <input class="form-check-input session-checkbox cursor-pointer" type="checkbox" value="${escapeHtml(s.id)}" id="sess-chk-${escapeHtml(s.id)}" ${isChecked ? 'checked' : ''}>
+                        <label class="form-check-label fs-8 text-gray-800 cursor-pointer" for="sess-chk-${escapeHtml(s.id)}">
+                            <i class="bi bi-whatsapp text-success me-1"></i>${escapeHtml(s.id)}${phone}
+                        </label>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function toggleAllSessionsMode(isAll) {
+            const box = document.getElementById('session-select-box');
+            if (!box) return;
+            if (isAll) {
+                box.classList.add('d-none');
+            } else {
+                box.classList.remove('d-none');
+            }
+        }
+
+        function setSelectAllSessions(checked) {
+            document.querySelectorAll('.session-checkbox').forEach(cb => cb.checked = checked);
+        }
+
+        function toggleTokenVisibility(inputId, btn) {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+            if (input.type === 'password') {
+                input.type = 'text';
+                btn.innerHTML = '<i class="bi bi-eye-slash"></i>';
+            } else {
+                input.type = 'password';
+                btn.innerHTML = '<i class="bi bi-eye"></i>';
+            }
+        }
+
+        function openCreateModal() {
+            document.getElementById('modal-title').textContent = 'Tambah Koneksi CRM';
+            document.getElementById('conn-id').value = '';
+            document.getElementById('conn-name').value = '';
+            document.getElementById('conn-base-url').value = '';
+            document.getElementById('conn-api-token').value = '';
+            document.getElementById('conn-is-active').checked = true;
+            document.getElementById('conn-all-sessions').checked = true;
+            document.getElementById('conn-sync-orders').checked = true;
+            document.getElementById('conn-sync-contacts').checked = true;
+            document.getElementById('conn-sync-workers').checked = true;
+
+            const pingResult = document.getElementById('modal-ping-result');
+            if (pingResult) pingResult.className = 'd-none mb-4 p-3 rounded-3 fs-8';
+
+            populateSessionCheckboxes([]);
+            toggleAllSessionsMode(true);
+
+            if (connectionModalInstance) connectionModalInstance.show();
+        }
+
+        function openEditModal(id) {
+            const conn = connections.find(c => c.id === id);
+            if (!conn) return;
+
+            document.getElementById('modal-title').textContent = 'Edit Koneksi CRM';
+            document.getElementById('conn-id').value = conn.id;
+            document.getElementById('conn-name').value = conn.name || '';
+            document.getElementById('conn-base-url').value = conn.base_url || '';
+            document.getElementById('conn-api-token').value = conn.api_token || '';
+            document.getElementById('conn-is-active').checked = conn.is_active === 1;
+            document.getElementById('conn-all-sessions').checked = conn.all_sessions === 1;
+            document.getElementById('conn-sync-orders').checked = conn.sync_orders === 1;
+            document.getElementById('conn-sync-contacts').checked = conn.sync_contacts === 1;
+            document.getElementById('conn-sync-workers').checked = conn.sync_workers === 1;
+
+            const pingResult = document.getElementById('modal-ping-result');
+            if (pingResult) pingResult.className = 'd-none mb-4 p-3 rounded-3 fs-8';
+
+            populateSessionCheckboxes(conn.sessions || []);
+            toggleAllSessionsMode(conn.all_sessions === 1);
+
+            if (connectionModalInstance) connectionModalInstance.show();
+        }
+
+        // ============================================================
+        // Test Credentials Inside Modal
+        // ============================================================
+        async function testModalCredentials() {
+            const baseUrl = document.getElementById('conn-base-url').value.trim();
+            const apiToken = document.getElementById('conn-api-token').value.trim();
+            const resultBox = document.getElementById('modal-ping-result');
+            const btn = document.getElementById('btn-modal-test-ping');
+
+            if (!baseUrl || !apiToken) {
+                Swal.fire('Peringatan', 'Isi Base URL dan API Token terlebih dahulu untuk melakukan test', 'warning');
+                return;
+            }
+
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Menguji...';
+            }
+            if (resultBox) {
+                resultBox.className = 'd-block mb-4 p-3 rounded-3 fs-8 bg-light-primary text-primary';
+                resultBox.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Menghubungi endpoint Laravel CRM...';
+            }
+
+            try {
+                const res = await fetch('/api/crm-connections/test', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ base_url: baseUrl, api_token: apiToken })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    resultBox.className = 'd-block mb-4 p-3 rounded-3 fs-8 bg-light-success text-success border border-success border-opacity-25';
+                    resultBox.innerHTML = `<strong><i class="bi bi-check-circle-fill me-1"></i>Sukses:</strong> ${escapeHtml(data.message || 'Koneksi valid!')}`;
+                } else {
+                    resultBox.className = 'd-block mb-4 p-3 rounded-3 fs-8 bg-light-danger text-danger border border-danger border-opacity-25';
+                    resultBox.innerHTML = `<strong><i class="bi bi-exclamation-triangle-fill me-1"></i>Gagal (${data.httpStatus || 502}):</strong> ${escapeHtml(data.message || 'Tidak dapat terhubung')}`;
+                }
+            } catch (err) {
+                resultBox.className = 'd-block mb-4 p-3 rounded-3 fs-8 bg-light-danger text-danger border border-danger border-opacity-25';
+                resultBox.innerHTML = `<strong><i class="bi bi-exclamation-triangle-fill me-1"></i>Error:</strong> Gagal melakukan request`;
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-broadcast me-1"></i>Test Koneksi Sekarang';
+                }
+            }
+        }
+
+        // ============================================================
+        // Save Connection (Create or Update)
+        // ============================================================
+        async function saveConnection() {
+            const id = document.getElementById('conn-id').value;
+            const name = document.getElementById('conn-name').value.trim();
+            const baseUrl = document.getElementById('conn-base-url').value.trim();
+            const apiToken = document.getElementById('conn-api-token').value.trim();
+            const isActive = document.getElementById('conn-is-active').checked ? 1 : 0;
+            const allSessions = document.getElementById('conn-all-sessions').checked ? 1 : 0;
+            const syncOrders = document.getElementById('conn-sync-orders').checked ? 1 : 0;
+            const syncContacts = document.getElementById('conn-sync-contacts').checked ? 1 : 0;
+            const syncWorkers = document.getElementById('conn-sync-workers').checked ? 1 : 0;
+
+            if (!name || !baseUrl || !apiToken) {
+                Swal.fire('Validasi Gagal', 'Nama, Base URL, dan API Token wajib diisi.', 'warning');
+                return;
+            }
+
+            // Gather selected sessions
+            let selectedSessions = [];
+            if (!allSessions) {
+                document.querySelectorAll('.session-checkbox:checked').forEach(cb => {
+                    selectedSessions.push(cb.value);
+                });
+            }
+
+            const payload = {
+                name,
+                base_url: baseUrl,
+                api_token: apiToken,
+                is_active: isActive,
+                all_sessions: allSessions,
+                sync_orders: syncOrders,
+                sync_contacts: syncContacts,
+                sync_workers: syncWorkers,
+                sessions: selectedSessions
+            };
+
+            const submitBtn = document.getElementById('btn-save-conn');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Menyimpan...';
+            }
+
+            try {
+                const url = id ? `/api/crm-connections/${id}` : '/api/crm-connections';
+                const method = id ? 'PUT' : 'POST';
+
+                const res = await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    if (connectionModalInstance) connectionModalInstance.hide();
+                    showToast('success', id ? 'Koneksi CRM berhasil diperbarui!' : 'Koneksi CRM berhasil ditambahkan!');
+                    await loadConnections();
+                } else {
+                    Swal.fire('Gagal Menyimpan', data.error || 'Terjadi kesalahan pada server', 'error');
+                }
+            } catch (err) {
+                console.error('Error saving connection:', err);
+                Swal.fire('Error', 'Gagal menghubungi server untuk menyimpan data', 'error');
+            } finally {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Simpan Koneksi';
+                }
+            }
+        }
+
+        // ============================================================
+        // Delete Connection
+        // ============================================================
+        async function deleteConnection(id, name) {
+            const confirm = await Swal.fire({
+                title: 'Hapus Koneksi CRM?',
+                html: `Apakah Anda yakin ingin menghapus profil koneksi <strong>"${escapeHtml(name)}"</strong>?<br><span class="text-danger fs-8">Tindakan ini tidak dapat dibatalkan.</span>`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#6e7881',
+                confirmButtonText: 'Ya, Hapus!',
+                cancelButtonText: 'Batal'
+            });
+
+            if (!confirm.isConfirmed) return;
+
+            try {
+                const res = await fetch(`/api/crm-connections/${id}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (data.success) {
+                    showToast('success', 'Koneksi berhasil dihapus');
+                    await loadConnections();
+                } else {
+                    Swal.fire('Gagal', data.error || 'Gagal menghapus koneksi', 'error');
+                }
+            } catch (err) {
+                console.error('Error deleting connection:', err);
+                Swal.fire('Error', 'Gagal menghubungi server', 'error');
+            }
+        }
+
+        // ============================================================
+        // Utility Functions
+        // ============================================================
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function hexToRgba(hex, alpha = 1) {
+            let c;
+            if (/^#([A-Fa-f0-9]{3}){1,2}$/.test(hex)) {
+                c = hex.substring(1).split('');
+                if (c.length === 3) c = [c[0], c[0], c[1], c[1], c[2], c[2]];
+                c = '0x' + c.join('');
+                return `rgba(${[(c >> 16) & 255, (c >> 8) & 255, c & 255].join(',')},${alpha})`;
+            }
+            return hex;
+        }
+
+        function copyText(text, successMsg = 'Teks disalin!') {
+            navigator.clipboard.writeText(text).then(() => {
+                showToast('success', successMsg);
+            }).catch(() => {
+                prompt('Salin teks:', text);
+            });
+        }
+
+        function showToast(icon, title) {
+            const Toast = Swal.mixin({
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 2500,
+                timerProgressBar: true
+            });
+            Toast.fire({ icon, title });
+        }
+    </script>
+</body>
+</html>

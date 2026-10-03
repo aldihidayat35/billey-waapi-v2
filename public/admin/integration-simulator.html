@@ -65,8 +65,22 @@
         </section>
         <section class="grid">
             <article class="card">
-                <div class="card-head"><h2>Pesan Masuk</h2><p>Secara default transaksi di-rollback setelah diproses.</p></div>
+                <div class="card-head">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <h2>Pesan Masuk</h2>
+                        <a href="/crm-connections.html" style="font-size:12px; font-weight:700; color:var(--brand); text-decoration:none;">
+                            <i class="bi bi-gear-fill"></i> Kelola Koneksi
+                        </a>
+                    </div>
+                    <p>Secara default transaksi di-rollback setelah diproses.</p>
+                </div>
                 <form id="simulatorForm" class="card-body">
+                    <div class="field" style="margin-bottom: 14px;">
+                        <label for="connectionSelect">Target Aplikasi CRM</label>
+                        <select id="connectionSelect" name="connection_id" style="width:100%; border:1px solid #cfd9d4; border-radius:10px; padding:10px 12px; color:var(--ink); background:#fff; font:inherit; outline:none;">
+                            <option value="">Otomatis (Berdasarkan Sesi WA / Default)</option>
+                        </select>
+                    </div>
                     <div class="row">
                         <div><label for="sender">Nomor pengirim</label><input id="sender" name="sender" inputmode="numeric" value="6281234567890" required></div>
                         <div><label for="sessionId">Session ID</label><input id="sessionId" name="session_id" value="simulator" required></div>
@@ -104,6 +118,7 @@ Harga: Rp 200.000</textarea></div>
         const reply = document.getElementById('reply');
         const submitButton = document.getElementById('submitButton');
         const statusBox = document.getElementById('connectionStatus');
+        const connSelect = document.getElementById('connectionSelect');
         const templates = {
             create: '*proses\nTugas - Laporan Keuangan BAB 3\nHarga: Rp 200.000',
             finish: '*selesai INV-XXXXXXXX-0001',
@@ -114,13 +129,37 @@ Harga: Rp 200.000</textarea></div>
             message.value = templates[button.dataset.template]; message.focus();
         }));
 
-        async function loadIntegration() {
+        connSelect.addEventListener('change', () => {
+            loadIntegration(connSelect.value);
+        });
+
+        async function loadConnectionsList() {
             try {
-                const response = await fetch('/api/integrations/crm', { headers: { Accept: 'application/json' } });
+                const res = await fetch('/api/crm-connections');
+                const data = await res.json();
+                if (data.success && Array.isArray(data.connections)) {
+                    connSelect.innerHTML = '<option value="">Otomatis (Berdasarkan Sesi WA / Default)</option>';
+                    data.connections.forEach(c => {
+                        const opt = document.createElement('option');
+                        opt.value = c.id;
+                        opt.textContent = `${c.name} (${c.base_url}) ${c.is_active ? '● Aktif' : '○ Nonaktif'}`;
+                        connSelect.appendChild(opt);
+                    });
+                }
+            } catch (err) {
+                console.error('Error loading CRM connections:', err);
+            }
+        }
+
+        async function loadIntegration(connId = '') {
+            try {
+                const query = connId ? `?connection_id=${encodeURIComponent(connId)}` : '';
+                const response = await fetch(`/api/integrations/crm${query}`, { headers: { Accept: 'application/json' } });
                 if (response.status === 401) return location.assign('/auth/login');
                 const data = await response.json();
                 statusBox.className = `status ${data.success ? 'ok' : 'error'}`;
-                statusBox.querySelector('span').textContent = data.success ? 'Laravel terhubung' : 'Koneksi bermasalah';
+                const connName = data.integration?.name ? ` [${data.integration.name}]` : '';
+                statusBox.querySelector('span').textContent = data.success ? `Laravel terhubung${connName}` : `Koneksi bermasalah${connName}`;
                 const statuses = data.commands?.statuses || [];
                 document.getElementById('commandList').innerHTML = statuses.length
                     ? statuses.map(item => `<span class="command-item"><strong>${item.status}</strong> · ${item.aliases.join(', ')}</span>`).join('')
@@ -134,9 +173,16 @@ Harga: Rp 200.000</textarea></div>
         form.addEventListener('submit', async event => {
             event.preventDefault(); submitButton.disabled = true; reply.style.display = 'none'; result.textContent = 'Memproses...';
             try {
+                const connIdVal = form.connection_id?.value;
                 const response = await fetch('/api/integrations/crm/simulate', {
                     method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-                    body: JSON.stringify({ sender: form.sender.value, session_id: form.session_id.value, message: form.message.value, persist: form.persist.checked })
+                    body: JSON.stringify({
+                        sender: form.sender.value,
+                        session_id: form.session_id.value,
+                        message: form.message.value,
+                        persist: form.persist.checked,
+                        connection_id: connIdVal ? Number(connIdVal) : undefined
+                    })
                 });
                 if (response.status === 401) return location.assign('/auth/login');
                 const data = await response.json();
@@ -147,6 +193,7 @@ Harga: Rp 200.000</textarea></div>
             finally { submitButton.disabled = false; }
         });
 
+        loadConnectionsList();
         loadIntegration();
     </script>
 </body>

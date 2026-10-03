@@ -3665,4 +3665,215 @@ export const contactDb = {
     },
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+//  CRM CONNECTIONS (Multi-App Integrations)
+// ═══════════════════════════════════════════════════════════════════════
+
+export interface CrmConnection {
+    id: number
+    name: string
+    base_url: string
+    api_token: string
+    is_active: number
+    all_sessions: number
+    sync_orders: number
+    sync_contacts: number
+    sync_workers: number
+    created_at?: string
+    updated_at?: string
+    sessions?: string[]
+}
+
+try {
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS crm_connections (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            base_url TEXT NOT NULL,
+            api_token TEXT NOT NULL,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            all_sessions INTEGER NOT NULL DEFAULT 1,
+            sync_orders INTEGER NOT NULL DEFAULT 1,
+            sync_contacts INTEGER NOT NULL DEFAULT 1,
+            sync_workers INTEGER NOT NULL DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS crm_connection_sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            connection_id INTEGER NOT NULL REFERENCES crm_connections(id) ON DELETE CASCADE,
+            session_id TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(connection_id, session_id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_crm_conn_active ON crm_connections(is_active);
+        CREATE INDEX IF NOT EXISTS idx_crm_conn_sess_conn ON crm_connection_sessions(connection_id);
+        CREATE INDEX IF NOT EXISTS idx_crm_conn_sess_sess ON crm_connection_sessions(session_id);
+    `)
+    console.log('✅ CRM connections tables initialized')
+
+    // Auto-seed from .env if table is empty
+    const connCount = (db.prepare('SELECT COUNT(*) as count FROM crm_connections').get() as any)?.count || 0
+    if (connCount === 0 && process.env.CRM_API_URL && process.env.CRM_API_TOKEN) {
+        console.log('🔄 Seeding initial CRM connection from .env...')
+        const isActive = process.env.CRM_SYNC_ENABLED === 'false' ? 0 : 1
+        const ins = db.prepare(`
+            INSERT INTO crm_connections (name, base_url, api_token, is_active, all_sessions, sync_orders, sync_contacts, sync_workers)
+            VALUES (?, ?, ?, ?, 1, 1, 1, 1)
+        `).run('Default CRM (.env)', process.env.CRM_API_URL, process.env.CRM_API_TOKEN, isActive)
+        console.log(`✅ Default CRM connection seeded with ID: ${ins.lastInsertRowid}`)
+    }
+} catch (e: any) {
+    console.error('⚠️ Error initializing CRM connection tables:', e.message)
+}
+
+export const crmConnectionDb = {
+    getAll: (): CrmConnection[] => {
+        const rows = db.prepare('SELECT * FROM crm_connections ORDER BY id ASC').all() as CrmConnection[]
+        const sessStmt = db.prepare('SELECT session_id FROM crm_connection_sessions WHERE connection_id = ?')
+        return rows.map(r => ({
+            ...r,
+            sessions: (sessStmt.all(r.id) as any[]).map(s => s.session_id)
+        }))
+    },
+
+    getActive: (): CrmConnection[] => {
+        const rows = db.prepare('SELECT * FROM crm_connections WHERE is_active = 1 ORDER BY id ASC').all() as CrmConnection[]
+        const sessStmt = db.prepare('SELECT session_id FROM crm_connection_sessions WHERE connection_id = ?')
+        return rows.map(r => ({
+            ...r,
+            sessions: (sessStmt.all(r.id) as any[]).map(s => s.session_id)
+        }))
+    },
+
+    getById: (id: number): CrmConnection | null => {
+        const row = db.prepare('SELECT * FROM crm_connections WHERE id = ?').get(id) as CrmConnection | undefined
+        if (!row) return null
+        const sessions = (db.prepare('SELECT session_id FROM crm_connection_sessions WHERE connection_id = ?').all(id) as any[]).map(s => s.session_id)
+        return { ...row, sessions }
+    },
+
+    getForSession: (sessionId: string, filterType?: 'orders' | 'contacts' | 'workers'): CrmConnection[] => {
+        let typeFilter = ''
+        if (filterType === 'orders') typeFilter = 'AND sync_orders = 1'
+        if (filterType === 'contacts') typeFilter = 'AND sync_contacts = 1'
+        if (filterType === 'workers') typeFilter = 'AND sync_workers = 1'
+
+        const sql = `
+            SELECT DISTINCT c.*
+            FROM crm_connections c
+            LEFT JOIN crm_connection_sessions cs ON cs.connection_id = c.id
+            WHERE c.is_active = 1
+              ${typeFilter}
+              AND (c.all_sessions = 1 OR cs.session_id = ?)
+            ORDER BY c.id ASC
+        `
+        const rows = db.prepare(sql).all(sessionId) as CrmConnection[]
+        const sessStmt = db.prepare('SELECT session_id FROM crm_connection_sessions WHERE connection_id = ?')
+        return rows.map(r => ({
+            ...r,
+            sessions: (sessStmt.all(r.id) as any[]).map(s => s.session_id)
+        }))
+    },
+
+    create: (data: {
+        name: string
+        base_url: string
+        api_token: string
+        is_active?: number
+        all_sessions?: number
+        sync_orders?: number
+        sync_contacts?: number
+        sync_workers?: number
+        sessions?: string[]
+    }): number => {
+        const info = db.prepare(`
+            INSERT INTO crm_connections (name, base_url, api_token, is_active, all_sessions, sync_orders, sync_contacts, sync_workers)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+            data.name.trim(),
+            data.base_url.trim().replace(/\/+$/, ''),
+            data.api_token.trim(),
+            data.is_active ?? 1,
+            data.all_sessions ?? 0,
+            data.sync_orders ?? 1,
+            data.sync_contacts ?? 1,
+            data.sync_workers ?? 1
+        )
+        const connId = Number(info.lastInsertRowid)
+
+        if (data.sessions && Array.isArray(data.sessions) && data.sessions.length > 0) {
+            const insSess = db.prepare('INSERT OR IGNORE INTO crm_connection_sessions (connection_id, session_id) VALUES (?, ?)')
+            for (const s of data.sessions) {
+                if (s) insSess.run(connId, s.trim())
+            }
+        }
+        return connId
+    },
+
+    update: (id: number, data: {
+        name?: string
+        base_url?: string
+        api_token?: string
+        is_active?: number
+        all_sessions?: number
+        sync_orders?: number
+        sync_contacts?: number
+        sync_workers?: number
+        sessions?: string[]
+    }): boolean => {
+        const existing = db.prepare('SELECT * FROM crm_connections WHERE id = ?').get(id) as any
+        if (!existing) return false
+
+        db.prepare(`
+            UPDATE crm_connections
+            SET name = COALESCE(?, name),
+                base_url = COALESCE(?, base_url),
+                api_token = COALESCE(?, api_token),
+                is_active = COALESCE(?, is_active),
+                all_sessions = COALESCE(?, all_sessions),
+                sync_orders = COALESCE(?, sync_orders),
+                sync_contacts = COALESCE(?, sync_contacts),
+                sync_workers = COALESCE(?, sync_workers),
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        `).run(
+            data.name !== undefined ? data.name.trim() : null,
+            data.base_url !== undefined ? data.base_url.trim().replace(/\/+$/, '') : null,
+            data.api_token !== undefined ? data.api_token.trim() : null,
+            data.is_active !== undefined ? data.is_active : null,
+            data.all_sessions !== undefined ? data.all_sessions : null,
+            data.sync_orders !== undefined ? data.sync_orders : null,
+            data.sync_contacts !== undefined ? data.sync_contacts : null,
+            data.sync_workers !== undefined ? data.sync_workers : null,
+            id
+        )
+
+        if (data.sessions !== undefined && Array.isArray(data.sessions)) {
+            db.prepare('DELETE FROM crm_connection_sessions WHERE connection_id = ?').run(id)
+            if (data.sessions.length > 0) {
+                const insSess = db.prepare('INSERT OR IGNORE INTO crm_connection_sessions (connection_id, session_id) VALUES (?, ?)')
+                for (const s of data.sessions) {
+                    if (s) insSess.run(id, s.trim())
+                }
+            }
+        }
+        return true
+    },
+
+    delete: (id: number): boolean => {
+        db.prepare('DELETE FROM crm_connection_sessions WHERE connection_id = ?').run(id)
+        const info = db.prepare('DELETE FROM crm_connections WHERE id = ?').run(id)
+        return info.changes > 0
+    },
+
+    toggleActive: (id: number, isActive: number): boolean => {
+        const info = db.prepare('UPDATE crm_connections SET is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(isActive ? 1 : 0, id)
+        return info.changes > 0
+    }
+}
+
 console.log('✅ Database initialized at:', DB_PATH)
+

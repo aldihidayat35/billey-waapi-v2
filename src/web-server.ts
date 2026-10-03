@@ -3,7 +3,7 @@ import { createServer } from 'http'
 import { Server as SocketIO } from 'socket.io'
 import { SessionManager } from './session-manager'
 import { logger as activityLogger } from './logger'
-import { messageLogDb, messageMutationDb, sessionLogDb, chatTemplateDb, chatTemplatePackageDb, autoReplyPackageDb, groupExportDb, autoReplyDb, autoReplyLogDb, autoReplyCooldownDb, autoForwardConfigDb, autoForwardTokenDb, autoForwardLogDb, db, dbMaintenance, memberSessionDb, startMediaAutoCleanup, fcmTokenDb, notificationDb, appSettingDb } from './database.js'
+import { messageLogDb, messageMutationDb, sessionLogDb, chatTemplateDb, chatTemplatePackageDb, autoReplyPackageDb, groupExportDb, autoReplyDb, autoReplyLogDb, autoReplyCooldownDb, autoForwardConfigDb, autoForwardTokenDb, autoForwardLogDb, db, dbMaintenance, memberSessionDb, startMediaAutoCleanup, fcmTokenDb, notificationDb, appSettingDb, crmConnectionDb } from './database.js'
 import * as fs from 'fs'
 import * as path from 'path'
 import { fileURLToPath } from 'url'
@@ -2017,13 +2017,123 @@ app.post('/api/webhook/order-status', apiKeyMiddleware, async (req, res) => {
 	}
 })
 
-// POST /api/wa/send — kirim pesan teks
-// Body (JSON): { to, message, session_id? }
+// ============================================
+// CRM CONNECTIONS API (Multi-App Integrations)
+// ============================================
+
+app.get('/api/crm-connections', adminOrApiKeyMiddleware, (_req, res) => {
+	try {
+		const connections = crmConnectionDb.getAll()
+		res.json({ success: true, connections })
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+app.post('/api/crm-connections', adminOrApiKeyMiddleware, (req, res) => {
+	try {
+		const { name, base_url, api_token, is_active, all_sessions, sync_orders, sync_contacts, sync_workers, sessions } = req.body
+		if (!name || !base_url || !api_token) {
+			return res.status(400).json({ success: false, error: 'Nama, Base URL, dan API Token wajib diisi.' })
+		}
+		const id = crmConnectionDb.create({
+			name,
+			base_url,
+			api_token,
+			is_active: is_active !== undefined ? (is_active ? 1 : 0) : 1,
+			all_sessions: all_sessions !== undefined ? (all_sessions ? 1 : 0) : 0,
+			sync_orders: sync_orders !== undefined ? (sync_orders ? 1 : 0) : 1,
+			sync_contacts: sync_contacts !== undefined ? (sync_contacts ? 1 : 0) : 1,
+			sync_workers: sync_workers !== undefined ? (sync_workers ? 1 : 0) : 1,
+			sessions: Array.isArray(sessions) ? sessions : []
+		})
+		const conn = crmConnectionDb.getById(id)
+		res.json({ success: true, message: 'Koneksi CRM berhasil dibuat.', connection: conn })
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+app.get('/api/crm-connections/:id', adminOrApiKeyMiddleware, (req, res) => {
+	try {
+		const conn = crmConnectionDb.getById(parseInt(req.params.id))
+		if (!conn) return res.status(404).json({ success: false, error: 'Koneksi CRM tidak ditemukan.' })
+		res.json({ success: true, connection: conn })
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+app.put('/api/crm-connections/:id', adminOrApiKeyMiddleware, (req, res) => {
+	try {
+		const id = parseInt(req.params.id)
+		const { name, base_url, api_token, is_active, all_sessions, sync_orders, sync_contacts, sync_workers, sessions } = req.body
+		const ok = crmConnectionDb.update(id, {
+			name,
+			base_url,
+			api_token,
+			is_active: is_active !== undefined ? (is_active ? 1 : 0) : undefined,
+			all_sessions: all_sessions !== undefined ? (all_sessions ? 1 : 0) : undefined,
+			sync_orders: sync_orders !== undefined ? (sync_orders ? 1 : 0) : undefined,
+			sync_contacts: sync_contacts !== undefined ? (sync_contacts ? 1 : 0) : undefined,
+			sync_workers: sync_workers !== undefined ? (sync_workers ? 1 : 0) : undefined,
+			sessions: Array.isArray(sessions) ? sessions : undefined
+		})
+		if (!ok) return res.status(404).json({ success: false, error: 'Koneksi CRM tidak ditemukan.' })
+		const updated = crmConnectionDb.getById(id)
+		res.json({ success: true, message: 'Koneksi CRM berhasil diperbarui.', connection: updated })
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+app.delete('/api/crm-connections/:id', adminOrApiKeyMiddleware, (req, res) => {
+	try {
+		const id = parseInt(req.params.id)
+		const ok = crmConnectionDb.delete(id)
+		if (!ok) return res.status(404).json({ success: false, error: 'Koneksi CRM tidak ditemukan.' })
+		res.json({ success: true, message: 'Koneksi CRM berhasil dihapus.' })
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+app.post('/api/crm-connections/:id/toggle', adminOrApiKeyMiddleware, (req, res) => {
+	try {
+		const id = parseInt(req.params.id)
+		const { is_active } = req.body
+		const ok = crmConnectionDb.toggleActive(id, is_active ? 1 : 0)
+		if (!ok) return res.status(404).json({ success: false, error: 'Koneksi CRM tidak ditemukan.' })
+		res.json({ success: true, is_active: is_active ? 1 : 0 })
+	} catch (error: any) {
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+app.post('/api/crm-connections/test', adminOrApiKeyMiddleware, async (req, res) => {
+	try {
+		let { base_url, api_token, id } = req.body
+		if (id && (!base_url || !api_token)) {
+			const conn = crmConnectionDb.getById(Number(id))
+			if (conn) {
+				base_url = base_url || conn.base_url
+				api_token = api_token || conn.api_token
+			}
+		}
+		const { testCrmConnection } = await import('./crm-sync.js')
+		const result = await testCrmConnection(base_url, api_token)
+		res.status(result.success ? 200 : (result.httpStatus || 502)).json(result)
+	} catch (error: any) {
+		res.status(500).json({ success: false, message: error.message })
+	}
+})
+
 // Simulator integrasi: menjalankan alur Node -> Laravel tanpa mengirim WhatsApp.
-app.get('/api/integrations/crm', adminOrApiKeyMiddleware, async (_req, res) => {
+app.get('/api/integrations/crm', adminOrApiKeyMiddleware, async (req, res) => {
+	const connectionId = req.query.connection_id ? Number(req.query.connection_id) : undefined
 	const { getCrmCommands, getCrmIntegrationStatus } = await import('./crm-sync.js')
-	const integration = getCrmIntegrationStatus()
-	const commands = integration.enabled ? await getCrmCommands() : null
+	const integration = getCrmIntegrationStatus(connectionId)
+	const commands = integration.enabled ? await getCrmCommands(connectionId) : null
 
 	res.status(commands && !commands.success ? (commands.httpStatus || 502) : 200).json({
 		success: integration.enabled && (!commands || commands.success),
@@ -2037,6 +2147,7 @@ app.post('/api/integrations/crm/simulate', adminOrApiKeyMiddleware, async (req, 
 	const message = typeof req.body.message === 'string' ? req.body.message.trim() : ''
 	const sender = typeof req.body.sender === 'string' ? req.body.sender.replace(/[^0-9]/g, '') : ''
 	const sessionId = typeof req.body.session_id === 'string' ? req.body.session_id.trim() : 'simulator'
+	const connectionId = req.body.connection_id ? Number(req.body.connection_id) : undefined
 	const persist = req.body.persist === true
 
 	if (!message || !sender) {
@@ -2053,7 +2164,8 @@ app.post('/api/integrations/crm/simulate', adminOrApiKeyMiddleware, async (req, 
 
 	const result = await forwardMessageToCrm(message, sender, sessionId, {
 		simulate: !persist,
-		source: 'whatsapp'
+		source: 'whatsapp',
+		connectionId
 	})
 
 	return res.status(result.httpStatus || (result.success ? 200 : 502)).json({
