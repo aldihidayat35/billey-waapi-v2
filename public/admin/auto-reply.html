@@ -3,430 +3,313 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Auto Reply - WhatsApp Gateway</title>
+    <title>Auto Reply Rules - Billey WA</title>
     
-    <!-- Metronic 8 Styles -->
+    <!-- Metronic CSS -->
     <link rel="stylesheet" href="assets/plugins/global/plugins.bundle.css">
     <link rel="stylesheet" href="assets/css/style.bundle.css">
+    <!-- FontAwesome & Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     
     <style>
         :root {
             --wa-green: #25D366;
-            --wa-dark-green: #128C7E;
-            --wa-teal: #075E54;
-            --wa-blue: #34B7F1;
+            --wa-teal: #128C7E;
+            --wa-dark-green: #075E54;
             --wa-light-green: #DCF8C6;
+            --wa-blue: #34B7F1;
         }
-        
-        /* Page Header */
-        .page-header {
-            background: linear-gradient(135deg, var(--wa-teal) 0%, var(--wa-dark-green) 100%);
-            padding: 25px 30px;
-            border-radius: 12px;
-            margin-bottom: 25px;
-            color: white;
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: #f8fafc;
         }
-        
-        .page-header h1 {
-            margin: 0;
-            font-size: 24px;
-            font-weight: 600;
+
+        /* Stat Cards */
+        .stat-card-sleek {
+            background: #ffffff;
+            border-radius: 14px;
+            border: 1px solid #e9edf2;
+            padding: 18px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: all 0.25s ease;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
         }
-        
-        .page-header p {
-            margin: 5px 0 0;
-            opacity: 0.9;
-            font-size: 14px;
+        .stat-card-sleek:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
+            border-color: #d1d9e2;
         }
-        
-        /* Stats Cards */
-        .stat-card {
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            text-align: center;
-            box-shadow: 0 2px 15px rgba(0,0,0,0.05);
-            border: 1px solid #e9edef;
-            transition: all 0.3s;
-        }
-        
-        .stat-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 5px 25px rgba(0,0,0,0.1);
-        }
-        
-        .stat-card .stat-icon {
-            width: 50px;
-            height: 50px;
+        .stat-card-sleek .stat-icon {
+            width: 48px;
+            height: 48px;
             border-radius: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin: 0 auto 15px;
             font-size: 22px;
         }
-        
-        .stat-card .stat-icon.primary { background: rgba(0,158,247,0.1); color: #009ef7; }
-        .stat-card .stat-icon.success { background: rgba(37,211,102,0.1); color: var(--wa-green); }
-        .stat-card .stat-icon.warning { background: rgba(255,199,0,0.1); color: #ffc700; }
-        .stat-card .stat-icon.danger { background: rgba(241,65,108,0.1); color: #f1416c; }
-        
-        .stat-card .stat-value {
-            font-size: 32px;
-            font-weight: 700;
-            color: #181c32;
-            line-height: 1;
-        }
-        
-        .stat-card .stat-label {
-            font-size: 13px;
-            color: #a1a5b7;
-            margin-top: 8px;
-        }
-        
-        /* Rules Container */
-        .rules-container {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 2px 15px rgba(0,0,0,0.05);
-            border: 1px solid #e9edef;
-        }
-        
-        .rules-header {
-            padding: 20px;
-            border-bottom: 1px solid #e9edef;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 15px;
-        }
-        
-        .rules-header h5 {
-            margin: 0;
-            font-weight: 600;
-            color: #181c32;
-        }
-        
-        .rules-toolbar {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-        
-        /* Filter Bar */
-        .filter-bar {
-            padding: 15px 20px;
-            background: #f9fafb;
-            border-bottom: 1px solid #e9edef;
-            display: flex;
-            gap: 15px;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-        
-        .filter-bar .search-input {
-            flex: 1;
-            min-width: 200px;
+
+        /* ============================================================
+           Folder Cards (Package Folders)
+           ============================================================ */
+        .package-folder-card {
+            background: #ffffff;
+            border-radius: 14px;
+            border: 2px solid #e9edf2;
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
             position: relative;
-        }
-        
-        .filter-bar .search-input i {
-            position: absolute;
-            left: 12px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #a1a5b7;
-        }
-        
-        .filter-bar .search-input input {
-            width: 100%;
-            padding: 10px 15px 10px 38px;
-            border: 1px solid #e9edef;
-            border-radius: 8px;
-            font-size: 13px;
-        }
-        
-        .filter-bar .search-input input:focus {
-            outline: none;
-            border-color: var(--wa-green);
-        }
-        
-        .filter-bar select {
-            padding: 10px 15px;
-            border: 1px solid #e9edef;
-            border-radius: 8px;
-            font-size: 13px;
-            min-width: 150px;
-        }
-        
-        /* Rules Table */
-        .rules-table {
-            width: 100%;
-        }
-        
-        .rules-table thead th {
-            background: #f9fafb;
-            padding: 14px 20px;
-            font-size: 12px;
-            font-weight: 600;
-            color: #7e8299;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            border-bottom: 1px solid #e9edef;
-        }
-        
-        .rules-table tbody td {
-            padding: 16px 20px;
-            border-bottom: 1px solid #f1f1f4;
-            vertical-align: middle;
-        }
-        
-        .rules-table tbody tr:hover {
-            background: #f9fafb;
-        }
-        
-        .rules-table tbody tr.inactive {
-            opacity: 0.6;
-            background: #fafafa;
-        }
-        
-        /* Rule Name Cell */
-        .rule-name-cell {
+            cursor: pointer;
+            overflow: hidden;
             display: flex;
-            align-items: center;
-            gap: 12px;
+            flex-direction: column;
+            height: 100%;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
         }
-        
-        .rule-icon {
-            width: 42px;
-            height: 42px;
-            border-radius: 10px;
+        .package-folder-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+            border-color: #cbd5e1;
+        }
+        .package-folder-card.active {
+            border-color: #009EF7 !important;
+            background: #ffffff;
+            box-shadow: 0 8px 24px rgba(0, 158, 247, 0.16);
+        }
+        .package-folder-card .folder-top-stripe {
+            height: 6px;
+            width: 100%;
+        }
+        .package-folder-card .folder-icon-box {
+            width: 46px;
+            height: 46px;
+            border-radius: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 18px;
-            flex-shrink: 0;
+            font-size: 24px;
+            transition: transform 0.25s ease;
         }
-        
-        .rule-icon.active { background: rgba(37,211,102,0.1); color: var(--wa-green); }
-        .rule-icon.inactive { background: #f1f1f4; color: #a1a5b7; }
-        
-        .rule-info h6 {
-            margin: 0;
-            font-size: 14px;
-            font-weight: 600;
-            color: #181c32;
+        .package-folder-card:hover .folder-icon-box {
+            transform: scale(1.08);
         }
-        
-        .rule-info small {
-            color: #a1a5b7;
+        .package-folder-card .folder-name {
+            font-size: 15px;
+            font-weight: 700;
+            color: #1e293b;
+            line-height: 1.3;
+            margin-bottom: 4px;
+            display: -webkit-box;
+            -webkit-line-clamp: 1;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .package-folder-card .folder-desc {
             font-size: 12px;
+            color: #64748b;
+            line-height: 1.4;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            min-height: 34px;
+            margin-bottom: 12px;
         }
-        
-        /* Trigger Badge */
-        .trigger-badge {
-            display: inline-flex;
+        .package-folder-card .folder-footer {
+            margin-top: auto;
+            padding-top: 10px;
+            border-top: 1px dashed #e2e8f0;
+            display: flex;
             align-items: center;
-            gap: 6px;
-            padding: 6px 12px;
-            border-radius: 6px;
-            font-size: 12px;
-            font-weight: 600;
-            font-family: 'Consolas', monospace;
+            justify-content: space-between;
         }
-        
-        .trigger-badge.exact { background: #e8fff3; color: #50cd89; }
-        .trigger-badge.contains { background: #fff8dd; color: #ffc700; }
-        .trigger-badge.starts_with { background: #f1faff; color: #009ef7; }
-        .trigger-badge.ends_with { background: #f8f5ff; color: #7239ea; }
-        .trigger-badge.regex { background: #fff5f8; color: #f1416c; }
-        
-        /* Scope Badge */
-        .scope-badge {
+        .package-folder-card.active .folder-active-indicator {
             display: inline-flex;
             align-items: center;
             gap: 4px;
-            padding: 4px 10px;
-            border-radius: 20px;
             font-size: 11px;
-            font-weight: 600;
+            font-weight: 700;
+            color: #009EF7;
+            background: #e1f0ff;
+            padding: 2px 8px;
+            border-radius: 20px;
         }
-        
-        .scope-badge.all { background: #e4e6ef; color: #5e6278; }
-        .scope-badge.private { background: #f1faff; color: #009ef7; }
-        .scope-badge.group { background: #e8fff3; color: #50cd89; }
-        
-        /* Status Toggle */
-        .status-toggle {
+
+        /* ============================================================
+           Modern Interactive Rule Cards (Grid View)
+           ============================================================ */
+        .rule-interactive-card {
+            background: #ffffff;
+            border-radius: 14px;
+            border: 1px solid #e2e8f0;
+            transition: all 0.25s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
             display: flex;
-            align-items: center;
-            gap: 8px;
+            flex-direction: column;
+            position: relative;
         }
-        
-        .status-toggle .form-check-input {
+        .rule-interactive-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.07);
+            border-color: #cbd5e1;
+        }
+        .rule-interactive-card.inactive-rule {
+            opacity: 0.72;
+            background: #f8fafc;
+            border-style: dashed;
+        }
+        .rule-interactive-card .card-head-area {
+            padding: 16px 18px 12px;
+            border-bottom: 1px solid #f1f5f9;
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+        }
+        .rule-interactive-card .robot-symbol {
             width: 40px;
-            height: 22px;
-            cursor: pointer;
-        }
-        
-        .status-toggle .form-check-input:checked {
-            background-color: var(--wa-green);
-            border-color: var(--wa-green);
-        }
-        
-        /* Actions */
-        .action-buttons {
-            display: flex;
-            gap: 8px;
-        }
-        
-        .action-btn {
-            width: 34px;
-            height: 34px;
-            border-radius: 8px;
-            border: none;
+            height: 40px;
+            border-radius: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        
-        .action-btn.edit { background: #f1faff; color: #009ef7; }
-        .action-btn.edit:hover { background: #009ef7; color: white; }
-        
-        .action-btn.test { background: #fff8dd; color: #ffc700; }
-        .action-btn.test:hover { background: #ffc700; color: white; }
-        
-        .action-btn.delete { background: #fff5f8; color: #f1416c; }
-        .action-btn.delete:hover { background: #f1416c; color: white; }
-        
-        /* Empty State */
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-        }
-        
-        .empty-state i {
-            font-size: 80px;
-            color: #e4e6ef;
-            margin-bottom: 20px;
-        }
-        
-        .empty-state h4 {
-            color: #181c32;
-            margin-bottom: 10px;
-        }
-        
-        .empty-state p {
-            color: #a1a5b7;
-            margin-bottom: 20px;
-        }
-        
-        /* Modal Styles */
-        .modal-header {
-            background: linear-gradient(135deg, var(--wa-teal) 0%, var(--wa-dark-green) 100%);
-            color: white;
-            border-radius: 12px 12px 0 0;
-        }
-        
-        .modal-header .btn-close {
-            filter: brightness(0) invert(1);
-        }
-        
-        .form-label {
-            font-weight: 600;
-            color: #181c32;
-            font-size: 13px;
-            margin-bottom: 8px;
-        }
-        
-        .form-control, .form-select {
-            border: 1px solid #e9edef;
-            border-radius: 8px;
-            padding: 10px 15px;
-            font-size: 13px;
-        }
-        
-        .form-control:focus, .form-select:focus {
-            border-color: var(--wa-green);
-            box-shadow: 0 0 0 3px rgba(37,211,102,0.15);
-        }
-        
-        .response-textarea {
-            font-family: 'Consolas', monospace;
-            min-height: 120px;
-            line-height: 1.6;
-        }
-        
-        /* Test Area */
-        .test-area {
-            background: #f9fafb;
-            border: 1px solid #e9edef;
-            border-radius: 8px;
-            padding: 15px;
-            margin-top: 15px;
-        }
-        
-        .test-result {
-            margin-top: 10px;
-            padding: 12px;
-            border-radius: 6px;
-            font-size: 13px;
-        }
-        
-        .test-result.success { background: #e8fff3; border: 1px solid #50cd89; color: #50cd89; }
-        .test-result.failed { background: #fff5f8; border: 1px solid #f1416c; color: #f1416c; }
-        
-        /* Usage Hint */
-        .usage-hint {
-            background: linear-gradient(135deg, #fff8dd 0%, #fffaf0 100%);
-            border: 1px solid #ffc700;
-            border-radius: 10px;
-            padding: 15px 20px;
-            margin-bottom: 25px;
-            display: flex;
-            align-items: flex-start;
-            gap: 12px;
-        }
-        
-        .usage-hint i {
-            color: #ffc700;
             font-size: 20px;
             flex-shrink: 0;
-            margin-top: 2px;
         }
-        
-        .usage-hint-content h6 {
-            margin: 0 0 5px;
-            font-size: 14px;
-            color: #181c32;
+        .rule-interactive-card .rule-title-text {
+            font-size: 14.5px;
+            font-weight: 700;
+            color: #0f172a;
+            margin-bottom: 4px;
+            line-height: 1.3;
+            display: -webkit-box;
+            -webkit-line-clamp: 1;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
         }
-        
-        .usage-hint-content p {
-            margin: 0;
-            font-size: 13px;
-            color: #5e6278;
-        }
-        
-        /* Tag Input for Multiple Triggers */
-        .tag-input-container {
-            border: 1px solid #e9edef;
-            border-radius: 8px;
-            padding: 6px 10px;
-            min-height: 42px;
+
+        /* Trigger Chips */
+        .multi-trigger-chips-box {
             display: flex;
             flex-wrap: wrap;
-            align-items: center;
             gap: 5px;
-            cursor: text;
+            max-height: 72px;
+            overflow-y: auto;
+            padding: 2px 0;
+        }
+        .modern-trigger-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: #f1f5f9;
+            color: #334155;
+            font-family: 'JetBrains Mono', 'Consolas', monospace;
+            font-size: 11.5px;
+            font-weight: 600;
+            padding: 3px 9px;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+            max-width: 180px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* WhatsApp Chat Bubble Preview */
+        .wa-chat-bubble {
+            background: #e7fce3;
+            border: 1px solid #c8f5c0;
+            border-radius: 4px 14px 14px 14px;
+            padding: 10px 14px;
+            font-size: 12.5px;
+            color: #111b21;
+            line-height: 1.45;
+            position: relative;
+            max-height: 90px;
+            overflow-y: auto;
+            word-break: break-word;
+            white-space: pre-wrap;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+        .wa-bubble-meta {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 3px;
+            font-size: 10px;
+            color: #667781;
+            margin-top: 4px;
+        }
+
+        /* Rule Card Footer */
+        .rule-card-footer {
+            padding: 10px 16px;
+            background: #fafcff;
+            border-top: 1px solid #f1f5f9;
+            border-radius: 0 0 14px 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        /* ============================================================
+           Compact Table / List View
+           ============================================================ */
+        .rules-table-modern {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+        .rules-table-modern th {
+            background: #f8fafc;
+            color: #64748b;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 12px 16px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        .rules-table-modern td {
+            padding: 14px 16px;
+            border-bottom: 1px solid #edf2f7;
+            background: #ffffff;
+            vertical-align: middle;
+        }
+        .rules-table-modern tr:hover td {
+            background: #f8fbff;
+        }
+        .rules-table-modern tr.inactive-rule td {
+            opacity: 0.65;
+            background: #fbfbfb;
+        }
+
+        /* Tag Input inside Modal */
+        .tag-input-container {
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 6px 10px;
+            min-height: 44px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            align-items: center;
             background: white;
-            transition: border-color 0.15s;
+            cursor: text;
         }
         .tag-input-container:focus-within {
             border-color: var(--wa-green);
-            box-shadow: 0 0 0 3px rgba(37,211,102,0.15);
+            box-shadow: 0 0 0 3px rgba(37, 211, 102, 0.15);
         }
         .tag-input-container #tag-text-input {
             border: none;
@@ -446,10 +329,10 @@
             border: 1px solid #b3e9cc;
             padding: 3px 8px 3px 10px;
             border-radius: 20px;
-            font-size: 11px;
+            font-size: 11.5px;
             font-weight: 600;
-            font-family: 'Consolas', monospace;
-            max-width: 200px;
+            font-family: 'JetBrains Mono', monospace;
+            max-width: 220px;
         }
         .trigger-chip .chip-text {
             overflow: hidden;
@@ -458,10 +341,10 @@
         }
         .trigger-chip .chip-remove {
             cursor: pointer;
-            width: 15px;
-            height: 15px;
+            width: 16px;
+            height: 16px;
             border-radius: 50%;
-            background: rgba(26,122,74,0.2);
+            background: rgba(26,122,74,0.18);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -473,42 +356,12 @@
             background: #f1416c;
             color: white;
         }
-        .multi-trigger-pills {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 3px;
-            margin-top: 4px;
-        }
-        .mini-trigger-pill {
-            font-family: monospace;
-            font-size: 11px;
-            background: #f1f1f4;
-            padding: 2px 7px;
-            border-radius: 4px;
-            color: #5e6278;
-            max-width: 120px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
 
-        /* Responsive */
+        /* Responsive Adjustments */
         @media (max-width: 768px) {
-            .rules-header {
+            .page-title-area {
                 flex-direction: column;
-                align-items: stretch;
-            }
-            
-            .filter-bar {
-                flex-direction: column;
-            }
-            
-            .filter-bar .search-input {
-                width: 100%;
-            }
-            
-            .stat-card .stat-value {
-                font-size: 24px;
+                align-items: stretch !important;
             }
         }
     </style>
@@ -538,163 +391,266 @@
                     <div class="d-flex flex-column flex-column-fluid">
                         
                         <div id="kt_app_content" class="app-content flex-column-fluid">
-                            <div id="kt_app_content_container" class="app-container container-fluid">
+                            <div id="kt_app_content_container" class="app-container container-fluid py-6">
                                 
-                                <!-- Page Header -->
-                                <div class="page-header">
-                                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+                                <!-- ============================================================
+                                     1. Page Header & Action Bar
+                                     ============================================================ -->
+                                <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-6 page-title-area">
+                                    <div class="d-flex align-items-center gap-3">
+                                        <div class="symbol symbol-45px">
+                                            <span class="symbol-label bg-light-primary text-primary border border-primary border-opacity-20 shadow-xs">
+                                                <i class="bi bi-robot fs-2"></i>
+                                            </span>
+                                        </div>
                                         <div>
-                                            <h1><i class="bi bi-robot me-2"></i>Auto Reply</h1>
-                                            <p>Kelola balasan otomatis untuk pesan WhatsApp yang masuk</p>
+                                            <div class="d-flex align-items-center gap-2">
+                                                <h1 class="text-gray-900 fw-bolder fs-2 mb-0">Auto Reply</h1>
+                                                <span class="badge badge-light-success fw-bold fs-8">Multi-Pack</span>
+                                            </div>
+                                            <div class="text-muted fw-semibold fs-7 mt-1">Kelola balasan otomatis WhatsApp berbasis kelompok paket & multi-session</div>
                                         </div>
-                                        <div class="d-flex gap-2">
-                                            <button class="btn btn-light btn-sm" onclick="seedDefaultRules()">
-                                                <i class="bi bi-magic me-1"></i>Default Rules
-                                            </button>
-                                            <a href="auto-reply-logs.html" class="btn btn-light btn-sm">
-                                                <i class="bi bi-clock-history me-1"></i>Lihat Log
-                                            </a>
-                                        </div>
+                                    </div>
+                                    <div class="d-flex align-items-center flex-wrap gap-2">
+                                        <button class="btn btn-sm btn-light-warning fw-bold" onclick="openPackageManagementModal()" title="Kelola kelompok paket auto reply">
+                                            <i class="bi bi-collection-fill me-1"></i>Kelola Paket
+                                        </button>
+                                        <button class="btn btn-sm btn-light-success fw-bold" onclick="exportAutoReplyRules()" title="Export backup semua rules ke JSON">
+                                            <i class="bi bi-download me-1"></i>Export
+                                        </button>
+                                        <button class="btn btn-sm btn-light-info fw-bold" onclick="openImportModal()" title="Import rules dari file JSON">
+                                            <i class="bi bi-upload me-1"></i>Import
+                                        </button>
+                                        <button class="btn btn-sm btn-light fw-bold" onclick="seedDefaultRules()" title="Buat contoh rules bawaan">
+                                            <i class="bi bi-magic me-1"></i>Default
+                                        </button>
+                                        <a href="auto-reply-logs.html" class="btn btn-sm btn-light fw-bold" title="Lihat riwayat log balasan">
+                                            <i class="bi bi-clock-history me-1"></i>Log
+                                        </a>
+                                        <button class="btn btn-sm btn-light fw-bold" onclick="loadRules()" title="Muat ulang data">
+                                            <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+                                        </button>
+                                        <button class="btn btn-sm btn-primary fw-bolder px-4" onclick="openCreateModal()">
+                                            <i class="bi bi-plus-lg me-1"></i>Tambah Rule
+                                        </button>
                                     </div>
                                 </div>
                                 
-                                <!-- Usage Hint -->
-                                <div class="usage-hint">
-                                    <i class="bi bi-lightbulb-fill"></i>
-                                    <div class="usage-hint-content">
-                                        <h6>Cara Kerja Auto Reply</h6>
-                                        <p>Auto Reply akan merespon pesan masuk secara otomatis berdasarkan rule yang Anda buat. 
-                                           Atur trigger (kata kunci), tipe pencocokan, dan response yang akan dikirim. 
-                                           Gunakan cooldown untuk mencegah spam reply.</p>
-                                    </div>
-                                </div>
-                                
-                                <!-- Stats Row -->
-                                <div class="row g-4 mb-4">
-                                    <div class="col-xl-3 col-md-6">
-                                        <div class="stat-card">
-                                            <div class="stat-icon primary">
+                                <!-- ============================================================
+                                     2. Sleek Stat Row
+                                     ============================================================ -->
+                                <div class="row g-4 mb-6">
+                                    <div class="col-xl-3 col-sm-6">
+                                        <div class="stat-card-sleek">
+                                            <div>
+                                                <div class="fs-2hx fw-bolder text-gray-900" id="total-rules">0</div>
+                                                <div class="text-muted fs-7 fw-semibold mt-1">Total Rules Terdaftar</div>
+                                            </div>
+                                            <div class="stat-icon bg-light-primary text-primary">
                                                 <i class="bi bi-list-check"></i>
                                             </div>
-                                            <div class="stat-value" id="total-rules">0</div>
-                                            <div class="stat-label">Total Rules</div>
                                         </div>
                                     </div>
-                                    <div class="col-xl-3 col-md-6">
-                                        <div class="stat-card">
-                                            <div class="stat-icon success">
-                                                <i class="bi bi-check-circle"></i>
+                                    <div class="col-xl-3 col-sm-6">
+                                        <div class="stat-card-sleek">
+                                            <div>
+                                                <div class="fs-2hx fw-bolder text-success" id="active-rules">0</div>
+                                                <div class="text-muted fs-7 fw-semibold mt-1">Rules Aktif Berjalan</div>
                                             </div>
-                                            <div class="stat-value" id="active-rules">0</div>
-                                            <div class="stat-label">Active Rules</div>
+                                            <div class="stat-icon bg-light-success text-success">
+                                                <i class="bi bi-check-circle-fill"></i>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div class="col-xl-3 col-md-6">
-                                        <div class="stat-card">
-                                            <div class="stat-icon warning">
-                                                <i class="bi bi-send-check"></i>
+                                    <div class="col-xl-3 col-sm-6">
+                                        <div class="stat-card-sleek">
+                                            <div>
+                                                <div class="fs-2hx fw-bolder text-info" id="total-replies">0</div>
+                                                <div class="text-muted fs-7 fw-semibold mt-1">Balasan Berhasil Terkirim</div>
                                             </div>
-                                            <div class="stat-value" id="total-replies">0</div>
-                                            <div class="stat-label">Total Replies</div>
+                                            <div class="stat-icon bg-light-info text-info">
+                                                <i class="bi bi-send-check-fill"></i>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div class="col-xl-3 col-md-6">
-                                        <div class="stat-card">
-                                            <div class="stat-icon danger">
-                                                <i class="bi bi-x-circle"></i>
+                                    <div class="col-xl-3 col-sm-6">
+                                        <div class="stat-card-sleek">
+                                            <div>
+                                                <div class="fs-2hx fw-bolder text-danger" id="failed-replies">0</div>
+                                                <div class="text-muted fs-7 fw-semibold mt-1">Gagal Terkirim</div>
                                             </div>
-                                            <div class="stat-value" id="failed-replies">0</div>
-                                            <div class="stat-label">Failed Replies</div>
+                                            <div class="stat-icon bg-light-danger text-danger">
+                                                <i class="bi bi-exclamation-triangle-fill"></i>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
                                 
-                                <!-- Package Filter Bar -->
-                                <div class="card card-flush shadow-sm mb-4">
-                                    <div class="card-body py-3 px-5 d-flex align-items-center justify-content-between flex-wrap gap-3">
-                                        <div class="d-flex align-items-center flex-wrap gap-2" id="package-pills-container">
-                                            <span class="text-muted fs-7"><span class="spinner-border spinner-border-sm me-1"></span>Memuat kelompok paket...</span>
+                                <!-- ============================================================
+                                     3. Dismissible Usage Hint Banner
+                                     ============================================================ -->
+                                <div class="alert alert-dismissible bg-light-primary border border-primary border-opacity-25 d-flex align-items-center p-4 mb-6 shadow-xs" id="usageHintBox">
+                                    <i class="bi bi-lightbulb-fill fs-2x text-primary me-4"></i>
+                                    <div class="d-flex flex-column pe-0 pe-sm-10 flex-grow-1">
+                                        <div class="fw-bold text-primary fs-6 mb-1">Navigasi Berbasis Folder Paket</div>
+                                        <span class="fs-7 text-gray-700">
+                                            Klik salah satu <strong>folder paket</strong> di bawah untuk membuka dan mengelola rules di dalam paket tersebut. Session WhatsApp dapat memilih paket mana saja yang aktif lewat tombol <em>Atur Sesi</em> di tiap kartu folder.
+                                        </span>
+                                    </div>
+                                    <button type="button" class="btn btn-icon btn-sm btn-light-primary ms-auto" data-bs-dismiss="alert" aria-label="Close">
+                                        <i class="bi bi-x fs-2"></i>
+                                    </button>
+                                </div>
+
+                                <!-- ============================================================
+                                     4. Section: Folder-Folder Paket Auto Reply
+                                     ============================================================ -->
+                                <div class="mb-7">
+                                    <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <i class="bi bi-folder2-open text-warning fs-3"></i>
+                                            <h4 class="text-gray-900 fw-bolder mb-0">Kelompok Paket Auto Reply</h4>
+                                            <span class="badge badge-light-warning fw-bold fs-8" id="total-packages-badge">0 Paket</span>
                                         </div>
                                         <div class="d-flex align-items-center gap-2">
-                                            <button class="btn btn-sm btn-light-warning fw-semibold" onclick="openCreatePackageModal()">
+                                            <button class="btn btn-sm btn-light-primary fw-bold" onclick="openPackageManagementModal()">
+                                                <i class="bi bi-sliders me-1"></i>Kelola Urutan &amp; Prioritas
+                                            </button>
+                                            <button class="btn btn-sm btn-warning fw-bold" onclick="openCreatePackageModal()">
                                                 <i class="bi bi-folder-plus me-1"></i>Paket Baru
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Grid Folder Cards -->
+                                    <div class="row g-4" id="package-folders-grid">
+                                        <div class="col-12 text-center py-6 text-muted">
+                                            <span class="spinner-border spinner-border-sm me-2 text-warning"></span>Memuat kelompok paket auto reply...
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- ============================================================
+                                     5. Context Banner Folder Terpilih
+                                     ============================================================ -->
+                                <div class="card card-flush shadow-sm mb-4 border border-gray-200" id="active-folder-banner">
+                                    <div class="card-body py-3 px-5 d-flex align-items-center justify-content-between flex-wrap gap-3">
+                                        <div class="d-flex align-items-center gap-3">
+                                            <div class="symbol symbol-40px">
+                                                <span class="symbol-label rounded-circle shadow-xs" id="banner-pkg-icon" style="background-color: #009EF7; color: #ffffff;">
+                                                    <i class="bi bi-folder-fill fs-4"></i>
+                                                </span>
+                                            </div>
+                                            <div>
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <span class="text-muted fs-8 text-uppercase fw-bold">FOLDER TERPILIH:</span>
+                                                    <h5 class="mb-0 fw-bolder text-gray-900" id="banner-pkg-name">Semua Paket</h5>
+                                                    <span class="badge badge-light-primary fs-8 fw-bold" id="banner-pkg-count">0 rules</span>
+                                                </div>
+                                                <div class="text-muted fs-8" id="banner-pkg-desc">Menampilkan seluruh aturan auto-reply dari semua paket</div>
+                                            </div>
+                                        </div>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <button class="btn btn-sm btn-light fw-bold" id="btn-reset-folder" onclick="selectPackageFolder('all')" style="display: none;">
+                                                <i class="bi bi-arrow-left me-1"></i>Tampilkan Semua Paket
+                                            </button>
+                                            <button class="btn btn-sm btn-primary fw-bold" onclick="openCreateModalCurrentPackage()">
+                                                <i class="bi bi-plus-lg me-1"></i>Tambah Rule di Folder Ini
                                             </button>
                                         </div>
                                     </div>
                                 </div>
 
-                                <!-- Rules Container -->
-                                <div class="rules-container">
-                                    <div class="rules-header">
-                                        <h5><i class="bi bi-gear me-2"></i>Daftar Auto Reply Rules</h5>
-                                        <div class="rules-toolbar">
-                                            <button class="btn btn-sm btn-light-warning fw-bold" onclick="openPackageManagementModal()" title="Kelola Kelompok / Paket Auto Reply">
-                                                <i class="bi bi-collection-fill me-1"></i>Kelola Paket
-                                            </button>
-                                            <button class="btn btn-sm btn-light-success fw-bold" onclick="exportAutoReplyRules()" title="Export backup semua rules ke file JSON">
-                                                <i class="bi bi-download me-1"></i>Export Backup
-                                            </button>
-                                            <button class="btn btn-sm btn-light-primary fw-bold" onclick="openImportModal()" title="Import rules dari file backup JSON">
-                                                <i class="bi bi-upload me-1"></i>Import Rules
-                                            </button>
-                                            <button class="btn btn-sm btn-light-secondary" onclick="loadRules()">
-                                                <i class="bi bi-arrow-clockwise me-1"></i>Refresh
-                                            </button>
-                                            <button class="btn btn-sm btn-primary fw-bold" onclick="openCreateModal()">
-                                                <i class="bi bi-plus-lg me-1"></i>Tambah Rule
-                                            </button>
+                                <!-- ============================================================
+                                     6. Filter Bar & View Mode Toggle
+                                     ============================================================ -->
+                                <div class="card card-flush shadow-sm mb-5 border border-gray-200">
+                                    <div class="card-body py-3 px-5">
+                                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+                                            <!-- Filters -->
+                                            <div class="d-flex align-items-center flex-wrap gap-2 flex-grow-1">
+                                                <div class="position-relative flex-grow-1" style="min-width: 220px; max-width: 340px;">
+                                                    <i class="bi bi-search position-absolute top-50 translate-middle-y ms-3 text-gray-500"></i>
+                                                    <input type="text" class="form-control form-control-sm form-control-solid ps-9" id="search-input" placeholder="Cari nama rule atau keyword trigger...">
+                                                </div>
+                                                <select class="form-select form-select-sm form-select-solid w-auto" id="filter-status">
+                                                    <option value="">Semua Status</option>
+                                                    <option value="1">Aktif</option>
+                                                    <option value="0">Nonaktif</option>
+                                                </select>
+                                                <select class="form-select form-select-sm form-select-solid w-auto" id="filter-scope">
+                                                    <option value="">Semua Scope</option>
+                                                    <option value="all">Semua Chat</option>
+                                                    <option value="private">Private Only</option>
+                                                    <option value="group">Group Only</option>
+                                                </select>
+                                                <select class="form-select form-select-sm form-select-solid w-auto" id="filter-session">
+                                                    <option value="">Semua Session</option>
+                                                </select>
+                                            </div>
+                                            
+                                            <!-- Right: Counter & View Mode Switcher -->
+                                            <div class="d-flex align-items-center gap-3">
+                                                <span class="text-muted fs-8 fw-semibold" id="filter-count">0 rules</span>
+                                                <div class="btn-group btn-group-sm" role="group">
+                                                    <button type="button" class="btn btn-light-primary active px-3" id="btn-view-grid" onclick="setViewMode('grid')" title="Tampilan Grid Kartu Interaktif">
+                                                        <i class="bi bi-grid-fill me-1"></i>Grid
+                                                    </button>
+                                                    <button type="button" class="btn btn-light px-3" id="btn-view-list" onclick="setViewMode('list')" title="Tampilan List Baris Kompak">
+                                                        <i class="bi bi-list-ul me-1"></i>List
+                                                    </button>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
-                                    
-                                    <!-- Filter Bar -->
-                                    <div class="filter-bar">
-                                        <div class="search-input">
-                                            <i class="bi bi-search"></i>
-                                            <input type="text" id="search-input" placeholder="Cari rule...">
+                                </div>
+
+                                <!-- ============================================================
+                                     7. Rules View Containers (Grid & List)
+                                     ============================================================ -->
+                                <!-- Grid View Container -->
+                                <div id="rules-grid-wrapper">
+                                    <div class="row g-4" id="rules-grid-container">
+                                        <!-- Interactive Cards Rendered via JS -->
+                                    </div>
+                                </div>
+
+                                <!-- List View Container -->
+                                <div id="rules-list-wrapper" class="d-none">
+                                    <div class="card card-flush shadow-sm border border-gray-200 overflow-hidden">
+                                        <div class="table-responsive">
+                                            <table class="rules-table-modern">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Rule &amp; Paket</th>
+                                                        <th>Tipe &amp; Keyword Trigger</th>
+                                                        <th>Respons Balasan</th>
+                                                        <th>Scope &amp; Sesi</th>
+                                                        <th>Jeda &amp; Prioritas</th>
+                                                        <th>Status</th>
+                                                        <th class="text-end" style="width: 140px;">Aksi</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="rules-list-tbody">
+                                                    <!-- Table Rows Rendered via JS -->
+                                                </tbody>
+                                            </table>
                                         </div>
-                                        <select id="filter-session">
-                                            <option value="">Semua Session</option>
-                                        </select>
-                                        <select id="filter-scope">
-                                            <option value="">Semua Scope</option>
-                                            <option value="all">All Chat</option>
-                                            <option value="private">Private Only</option>
-                                            <option value="group">Group Only</option>
-                                        </select>
-                                        <select id="filter-status">
-                                            <option value="">Semua Status</option>
-                                            <option value="1">Aktif</option>
-                                            <option value="0">Nonaktif</option>
-                                        </select>
-                                        <span class="text-muted" id="filter-count">0 rules</span>
                                     </div>
-                                    
-                                    <!-- Rules Table -->
-                                    <div class="table-responsive">
-                                        <table class="rules-table">
-                                            <thead>
-                                                <tr>
-                                                    <th>Rule</th>
-                                                    <th>Trigger</th>
-                                                    <th>Response</th>
-                                                    <th>Scope</th>
-                                                    <th>Status</th>
-                                                    <th style="width: 140px;">Aksi</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody id="rules-tbody">
-                                                <!-- Rules will be rendered here -->
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                    
-                                    <!-- Empty State -->
-                                    <div class="empty-state d-none" id="empty-state">
-                                        <i class="bi bi-robot"></i>
-                                        <h4>Belum Ada Auto Reply Rule</h4>
-                                        <p>Buat rule pertama Anda untuk memulai auto reply otomatis</p>
-                                        <button class="btn btn-primary" onclick="openCreateModal()">
-                                            <i class="bi bi-plus-lg me-2"></i>Tambah Rule Pertama
+                                </div>
+
+                                <!-- Empty State -->
+                                <div class="card card-flush shadow-sm border border-dashed border-gray-300 d-none" id="empty-state">
+                                    <div class="card-body text-center py-12 px-6">
+                                        <div class="symbol symbol-80px symbol-circle bg-light-primary text-primary mx-auto mb-4 d-flex align-items-center justify-content-center">
+                                            <i class="bi bi-robot fs-2tx"></i>
+                                        </div>
+                                        <h4 class="text-gray-900 fw-bolder mb-2" id="empty-state-title">Belum Ada Auto Reply Rule</h4>
+                                        <p class="text-muted fs-7 max-w-400px mx-auto mb-5" id="empty-state-desc">
+                                            Tidak ditemukan aturan auto reply untuk folder paket atau kriteria pencarian ini. Buat rule baru untuk mulai merespon pesan otomatis.
+                                        </p>
+                                        <button class="btn btn-primary fw-bold" onclick="openCreateModalCurrentPackage()">
+                                            <i class="bi bi-plus-lg me-2"></i>Tambah Rule Sekarang
                                         </button>
                                     </div>
                                 </div>
@@ -707,31 +663,35 @@
         </div>
     </div>
     
-    <!-- Create/Edit Modal -->
+    <!-- ============================================================
+         Modals
+         ============================================================ -->
+
+    <!-- Create/Edit Rule Modal -->
     <div class="modal fade" id="ruleModal" tabindex="-1">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="ruleModalTitle">
-                        <i class="bi bi-plus-circle me-2"></i>Tambah Auto Reply Rule
+                <div class="modal-header bg-primary py-4 px-6">
+                    <h5 class="modal-title text-white fw-bold" id="ruleModalTitle">
+                        <i class="bi bi-plus-circle text-white me-2"></i>Tambah Auto Reply Rule
                     </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body">
+                <div class="modal-body p-6">
                     <form id="ruleForm">
                         <input type="hidden" id="rule-id">
                         
                         <div class="row g-4">
                             <!-- Nama Rule -->
                             <div class="col-md-6">
-                                <label class="form-label">Nama Rule <span class="text-danger">*</span></label>
+                                <label class="form-label required fw-bold text-gray-800">Nama Rule</label>
                                 <input type="text" class="form-control" id="rule-name" 
-                                       placeholder="Contoh: Greeting Hallo" required>
+                                       placeholder="Contoh: Greeting Halo CS" required>
                             </div>
 
                             <!-- Paket Kelompok -->
                             <div class="col-md-6">
-                                <label class="form-label">Kelompok / Paket <span class="text-danger">*</span></label>
+                                <label class="form-label required fw-bold text-gray-800">Kelompok / Paket</label>
                                 <select class="form-select" id="rule-package-id" required>
                                     <!-- Populated via JS -->
                                 </select>
@@ -739,126 +699,268 @@
                             
                             <!-- Session -->
                             <div class="col-md-6">
-                                <label class="form-label">Session <small class="text-muted">(kosongkan untuk global)</small></label>
+                                <label class="form-label fw-bold text-gray-800">Session Target <small class="text-muted fw-normal">(kosongkan untuk global)</small></label>
                                 <select class="form-select" id="rule-session">
                                     <option value="">Semua Session (Global)</option>
                                 </select>
                             </div>
                             
                             <!-- Trigger Type -->
-                            <div class="col-md-4">
-                                <label class="form-label">Tipe Trigger <span class="text-danger">*</span></label>
+                            <div class="col-md-6">
+                                <label class="form-label required fw-bold text-gray-800">Tipe Trigger</label>
                                 <select class="form-select" id="rule-trigger-type" required>
-                                    <option value="contains">Contains (Mengandung)</option>
-                                    <option value="exact">Exact (Persis)</option>
-                                    <option value="starts_with">Starts With (Diawali)</option>
-                                    <option value="ends_with">Ends With (Diakhiri)</option>
-                                    <option value="regex">Regex</option>
+                                    <option value="contains">Contains (Mengandung Kata)</option>
+                                    <option value="exact">Exact (Sama Persis)</option>
+                                    <option value="starts_with">Starts With (Diawali Kata)</option>
+                                    <option value="ends_with">Ends With (Diakhiri Kata)</option>
+                                    <option value="regex">Regex (Ekspresi Reguler)</option>
                                 </select>
                             </div>
                             
                             <!-- Trigger Value (Multi-Trigger) -->
-                            <div class="col-md-5">
-                                <label class="form-label">Nilai Trigger <span class="text-danger">*</span></label>
+                            <div class="col-md-8">
+                                <label class="form-label required fw-bold text-gray-800">Kata Kunci / Trigger Value</label>
                                 <div class="tag-input-container" id="tag-input-container" 
                                      onclick="document.getElementById('tag-text-input').focus()">
                                     <span id="trigger-tags-wrapper"></span>
                                     <input type="text" id="tag-text-input" 
-                                           placeholder="Ketik lalu Enter atau koma... (paste otomatis split)"
+                                           placeholder="Ketik kata kunci lalu Enter atau koma..."
                                            onkeydown="handleTagKeydown(event)"
                                            oninput="handleTagInput(event)"
                                            onpaste="handleTagPaste(event)">
                                 </div>
-                                <small class="text-muted">Tekan <kbd>Enter</kbd> atau <kbd>,</kbd> untuk tambah. Bisa tambah banyak kata kunci/typo — salah satu cocok = auto-reply jalan.</small>
+                                <div class="form-text fs-8 mt-1">Tekan <kbd>Enter</kbd> atau <kbd>,</kbd> untuk menambah. Bisa input beberapa variasi kata kunci.</div>
                             </div>
                             
                             <!-- Match Case -->
-                            <div class="col-md-3">
-                                <label class="form-label">Case Sensitive</label>
+                            <div class="col-md-4">
+                                <label class="form-label fw-bold text-gray-800">Case Sensitive</label>
                                 <select class="form-select" id="rule-match-case">
-                                    <option value="0">Tidak</option>
-                                    <option value="1">Ya</option>
+                                    <option value="0">Tidak (Huruf besar/kecil sama)</option>
+                                    <option value="1">Ya (Perhatikan besar/kecil)</option>
                                 </select>
                             </div>
                             
                             <!-- Response Content -->
                             <div class="col-12">
-                                <label class="form-label">Response <span class="text-danger">*</span></label>
-                                <textarea class="form-control response-textarea" id="rule-response" rows="4"
-                                          placeholder="Halo! Terima kasih sudah menghubungi kami. Ada yang bisa dibantu?" required></textarea>
-                                <small class="text-muted">Tip: Gunakan {name} untuk nama pengirim, {number} untuk nomor</small>
+                                <label class="form-label required fw-bold text-gray-800">Respons Balasan WhatsApp</label>
+                                <textarea class="form-control" id="rule-response" rows="4"
+                                          placeholder="Halo {name}! Terima kasih sudah menghubungi kami. Ada yang bisa dibantu?" required></textarea>
+                                <div class="form-text fs-8 mt-1">💡 Variabel otomatis: <code>{name}</code> (nama kontak) dan <code>{number}</code> (nomor WhatsApp pengirim).</div>
                             </div>
                             
                             <!-- Chat Type -->
                             <div class="col-md-4">
-                                <label class="form-label">Tipe Chat</label>
+                                <label class="form-label fw-bold text-gray-800">Tipe Chat (Scope)</label>
                                 <select class="form-select" id="rule-chat-type">
-                                    <option value="all">Semua Chat</option>
-                                    <option value="private">Private Only</option>
-                                    <option value="group">Group Only</option>
+                                    <option value="all">Semua Chat (Pribadi &amp; Grup)</option>
+                                    <option value="private">Private Only (Chat Pribadi)</option>
+                                    <option value="group">Group Only (Khusus Grup)</option>
                                 </select>
                             </div>
                             
                             <!-- Priority -->
                             <div class="col-md-4">
-                                <label class="form-label">Prioritas</label>
+                                <label class="form-label fw-bold text-gray-800">Prioritas Rule</label>
                                 <input type="number" class="form-control" id="rule-priority" 
                                        value="0" min="0" max="100">
-                                <small class="text-muted">Makin tinggi, makin prioritas</small>
+                                <div class="form-text fs-8">Nilai lebih tinggi diprioritaskan.</div>
                             </div>
                             
                             <!-- Cooldown -->
                             <div class="col-md-4">
-                                <label class="form-label">Cooldown (detik)</label>
+                                <label class="form-label fw-bold text-gray-800">Jeda Cooldown (detik)</label>
                                 <input type="number" class="form-control" id="rule-cooldown" 
                                        value="60" min="0">
-                                <small class="text-muted">Jeda antar reply ke nomor sama</small>
+                                <div class="form-text fs-8">Mencegah spam balasan ke nomor sama.</div>
                             </div>
                             
                             <!-- Status -->
                             <div class="col-12">
-                                <div class="form-check form-switch">
+                                <div class="form-check form-switch form-check-custom form-check-solid">
                                     <input class="form-check-input" type="checkbox" id="rule-enabled" checked>
-                                    <label class="form-check-label" for="rule-enabled">Aktifkan rule ini</label>
+                                    <label class="form-check-label fw-bold text-gray-800 ms-2" for="rule-enabled">
+                                        Aktifkan rule ini
+                                    </label>
                                 </div>
                             </div>
                         </div>
                         
-                        <!-- Test Area -->
-                        <div class="test-area">
-                            <h6 class="mb-3"><i class="bi bi-play-circle me-2"></i>Test Rule</h6>
-                            <div class="input-group">
+                        <!-- Test Area inside form -->
+                        <div class="p-4 bg-light rounded-3 mt-4 border border-dashed border-gray-300">
+                            <label class="form-label fw-bold text-gray-800 fs-7 mb-2"><i class="bi bi-play-circle text-primary me-1"></i>Simulasi Uji Rule</label>
+                            <div class="input-group input-group-sm">
                                 <input type="text" class="form-control" id="test-message" 
-                                       placeholder="Ketik pesan untuk test...">
-                                <button type="button" class="btn btn-outline-primary" onclick="testRule()">
-                                    <i class="bi bi-lightning me-1"></i>Test
+                                       placeholder="Ketik contoh pesan masuk untuk tes kecocokan...">
+                                <button type="button" class="btn btn-outline-primary fw-bold" onclick="testRule()">
+                                    <i class="bi bi-lightning-charge me-1"></i>Uji
                                 </button>
                             </div>
-                            <div id="test-result" class="test-result d-none"></div>
+                            <div id="test-result" class="d-none mt-2"></div>
                         </div>
                     </form>
                 </div>
-                <div class="modal-footer">
+                <div class="modal-footer py-3 px-6">
                     <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
-                    <button type="button" class="btn btn-primary" onclick="saveRule()">
+                    <button type="button" class="btn btn-primary fw-bold" onclick="saveRule()">
                         <i class="bi bi-check-lg me-1"></i>Simpan Rule
                     </button>
                 </div>
             </div>
         </div>
     </div>
-    
-    <!-- Import Auto Reply Rules Modal -->
-    <div class="modal fade" id="importModal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered">
+
+    <!-- Modal: Kelola Paket Auto Reply -->
+    <div class="modal fade" id="packageManageModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title d-flex align-items-center">
-                        <i class="bi bi-file-earmark-arrow-up text-primary fs-3 me-2"></i>Import Auto Reply Rules
+                <div class="modal-header bg-warning py-4 px-6">
+                    <h5 class="modal-title text-dark fw-bold">
+                        <i class="bi bi-collection-fill text-dark me-2"></i>Kelola Kelompok / Paket Auto Reply
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body">
+                <div class="modal-body p-6">
+                    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+                        <p class="text-muted fs-7 mb-0">
+                            Kelompokkan aturan auto-reply menjadi paket-paket tematik. Setiap session WhatsApp dapat mengaktifkan satu atau lebih paket sekaligus.
+                        </p>
+                        <button class="btn btn-sm btn-primary fw-bold" onclick="openCreatePackageModal()">
+                            <i class="bi bi-plus-lg me-1"></i>Tambah Paket
+                        </button>
+                    </div>
+                    
+                    <div class="table-responsive">
+                        <table class="table table-row-dashed table-row-gray-300 align-middle gs-0 gy-3">
+                            <thead>
+                                <tr class="fw-bold text-muted fs-7 text-uppercase">
+                                    <th>Paket</th>
+                                    <th>Warna</th>
+                                    <th>Prioritas</th>
+                                    <th>Rules</th>
+                                    <th>Status</th>
+                                    <th class="text-end">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="package-list-tbody">
+                                <tr>
+                                    <td colspan="6" class="text-center py-4 text-muted">Memuat paket...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer py-3 px-6">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Tutup</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Create / Edit Package -->
+    <div class="modal fade" id="packageEditModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-warning py-4 px-6">
+                    <h5 class="modal-title text-dark fw-bold" id="package-modal-title">
+                        <i class="bi bi-folder-plus text-dark me-2"></i>Tambah Paket Auto Reply
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-6">
+                    <form id="package-form">
+                        <input type="hidden" id="pkg-id">
+                        
+                        <div class="mb-4">
+                            <label class="form-label required fw-bold text-gray-800">Nama Paket</label>
+                            <input type="text" class="form-control" id="pkg-name" placeholder="Contoh: CS Umum, Promo Weekend" required>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="form-label fw-bold text-gray-800">Deskripsi Ringkas</label>
+                            <textarea class="form-control" id="pkg-description" rows="2" placeholder="Catatan kegunaan paket auto-reply ini..."></textarea>
+                        </div>
+                        
+                        <div class="row g-3 mb-4">
+                            <div class="col-6">
+                                <label class="form-label fw-bold text-gray-800">Warna Aksen Folder</label>
+                                <div class="d-flex align-items-center gap-2">
+                                    <input type="color" class="form-control form-control-color w-40px h-40px p-1" id="pkg-color" value="#25D366" title="Pilih warna">
+                                    <div class="d-flex gap-1" id="pkg-color-presets">
+                                        <button type="button" class="btn btn-xs p-2 rounded-circle" style="background:#25D366; width:22px; height:22px;" onclick="setColorPreset('#25D366')"></button>
+                                        <button type="button" class="btn btn-xs p-2 rounded-circle" style="background:#009EF7; width:22px; height:22px;" onclick="setColorPreset('#009EF7')"></button>
+                                        <button type="button" class="btn btn-xs p-2 rounded-circle" style="background:#F1416C; width:22px; height:22px;" onclick="setColorPreset('#F1416C')"></button>
+                                        <button type="button" class="btn btn-xs p-2 rounded-circle" style="background:#7239EA; width:22px; height:22px;" onclick="setColorPreset('#7239EA')"></button>
+                                        <button type="button" class="btn btn-xs p-2 rounded-circle" style="background:#FFA800; width:22px; height:22px;" onclick="setColorPreset('#FFA800')"></button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-6">
+                                <label class="form-label fw-bold text-gray-800">Prioritas Paket</label>
+                                <input type="number" class="form-control" id="pkg-priority" value="0" placeholder="0">
+                                <div class="form-text fs-8">Paket prioritas lebih tinggi dievaluasi lebih dulu.</div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-check form-check-custom form-check-solid mb-2">
+                            <input class="form-check-input" type="checkbox" id="pkg-is-default" value="1">
+                            <label class="form-check-label fw-semibold fs-7 text-gray-800" for="pkg-is-default">
+                                Jadikan Paket Bawaan (Default untuk session baru)
+                            </label>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer py-3 px-6">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
+                    <button type="button" class="btn btn-warning fw-bold" id="btn-save-package" onclick="savePackage()">
+                        <i class="bi bi-check-lg me-1"></i>Simpan Paket
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Atur Sesi untuk Paket -->
+    <div class="modal fade" id="packageSessionsModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-success py-4 px-6">
+                    <h5 class="modal-title text-white fw-bold">
+                        <i class="bi bi-whatsapp text-white me-2"></i>Atur Sesi WhatsApp: <span id="pkg-session-target-name" class="badge bg-white text-dark ms-1"></span>
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-6">
+                    <p class="text-muted fs-7 mb-3">
+                        Centang session WhatsApp yang mengaktifkan paket auto-reply ini:
+                    </p>
+                    <input type="hidden" id="pkg-session-target-id">
+                    <div id="pkg-sessions-list-container" class="d-flex flex-column gap-2 mb-3">
+                        <div class="text-muted fs-7"><span class="spinner-border spinner-border-sm me-2"></span>Memuat daftar sesi...</div>
+                    </div>
+                </div>
+                <div class="modal-footer py-3 px-6">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
+                    <button type="button" class="btn btn-success fw-bold" id="btn-save-pkg-sessions" onclick="savePackageSessions()">
+                        <i class="bi bi-check-lg me-1"></i>Simpan Sesi
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Import Auto Reply Rules -->
+    <div class="modal fade" id="importModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-primary py-4 px-6">
+                    <h5 class="modal-title text-white fw-bold d-flex align-items-center">
+                        <i class="bi bi-file-earmark-arrow-up text-white fs-3 me-2"></i>Import Auto Reply Rules
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-6">
                     <div class="alert alert-light-primary d-flex align-items-center p-4 mb-4 rounded-3 border border-primary border-opacity-25">
                         <i class="bi bi-info-circle text-primary fs-3 me-3"></i>
                         <div class="fs-8 text-gray-700">
@@ -906,13 +1008,10 @@
                             Timpa rule jika nama rule sudah ada di database
                         </label>
                     </div>
-                    <div class="text-muted fs-9 ps-4">
-                        Jika tidak dicentang, rule dengan nama yang sama akan otomatis dilewati (skip) agar konfigurasi yang sudah ada tetap aman.
-                    </div>
                 </div>
-                <div class="modal-footer">
+                <div class="modal-footer py-3 px-6">
                     <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
-                    <button type="button" class="btn btn-primary" id="btn-submit-import" onclick="submitImportRules()" disabled>
+                    <button type="button" class="btn btn-primary fw-bold" id="btn-submit-import" onclick="submitImportRules()" disabled>
                         <i class="bi bi-upload me-1"></i>Mulai Import
                     </button>
                 </div>
@@ -920,149 +1019,6 @@
         </div>
     </div>
     
-    <!-- Modal: Kelola Paket Auto Reply -->
-    <div class="modal fade" id="packageManageModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">
-                        <i class="bi bi-collection-fill text-warning me-2"></i>Kelola Kelompok / Paket Auto Reply
-                    </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-                        <p class="text-muted fs-7 mb-0">
-                            Kelompokkan aturan auto-reply menjadi paket-paket tematik (misal CS Standar, Promo, Info Pembayaran). Session WhatsApp hanya akan menjalankan auto-reply dari paket yang diaktifkan.
-                        </p>
-                        <button class="btn btn-sm btn-primary fw-bold" onclick="openCreatePackageModal()">
-                            <i class="bi bi-plus-lg me-1"></i>Tambah Paket
-                        </button>
-                    </div>
-                    
-                    <div class="table-responsive">
-                        <table class="table table-row-dashed table-row-gray-300 align-middle gs-0 gy-3">
-                            <thead>
-                                <tr class="fw-bold text-muted fs-7 text-uppercase">
-                                    <th>Paket</th>
-                                    <th>Warna</th>
-                                    <th>Prioritas</th>
-                                    <th>Rules</th>
-                                    <th>Status</th>
-                                    <th class="text-end">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody id="package-list-tbody">
-                                <tr>
-                                    <td colspan="6" class="text-center py-4 text-muted">Memuat paket...</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Tutup</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal: Create / Edit Package -->
-    <div class="modal fade" id="packageEditModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="package-modal-title">
-                        <i class="bi bi-folder-plus text-warning me-2"></i>Tambah Paket Auto Reply
-                    </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <form id="package-form">
-                        <input type="hidden" id="pkg-id">
-                        
-                        <div class="mb-4">
-                            <label class="form-label required fw-semibold">Nama Paket</label>
-                            <input type="text" class="form-control" id="pkg-name" placeholder="Contoh: CS Umum, Promo Weekend" required>
-                        </div>
-                        
-                        <div class="mb-4">
-                            <label class="form-label fw-semibold">Deskripsi</label>
-                            <textarea class="form-control" id="pkg-description" rows="2" placeholder="Catatan kegunaan paket ini..."></textarea>
-                        </div>
-                        
-                        <div class="row g-3 mb-4">
-                            <div class="col-6">
-                                <label class="form-label fw-semibold">Warna Badge</label>
-                                <div class="d-flex align-items-center gap-2">
-                                    <input type="color" class="form-control form-control-color" id="pkg-color" value="#25D366" title="Pilih warna">
-                                    <div class="d-flex gap-1" id="pkg-color-presets">
-                                        <button type="button" class="btn btn-xs p-2 rounded-circle" style="background:#25D366; width:22px; height:22px;" onclick="setColorPreset('#25D366')"></button>
-                                        <button type="button" class="btn btn-xs p-2 rounded-circle" style="background:#009EF7; width:22px; height:22px;" onclick="setColorPreset('#009EF7')"></button>
-                                        <button type="button" class="btn btn-xs p-2 rounded-circle" style="background:#F1416C; width:22px; height:22px;" onclick="setColorPreset('#F1416C')"></button>
-                                        <button type="button" class="btn btn-xs p-2 rounded-circle" style="background:#7239EA; width:22px; height:22px;" onclick="setColorPreset('#7239EA')"></button>
-                                        <button type="button" class="btn btn-xs p-2 rounded-circle" style="background:#FFA800; width:22px; height:22px;" onclick="setColorPreset('#FFA800')"></button>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="col-6">
-                                <label class="form-label fw-semibold">Prioritas</label>
-                                <input type="number" class="form-control" id="pkg-priority" value="0" placeholder="0">
-                                <div class="form-text fs-8">Paket prioritas lebih tinggi dievaluasi lebih dulu.</div>
-                            </div>
-                        </div>
-                        
-                        <div class="form-check form-check-custom form-check-solid mb-2">
-                            <input class="form-check-input" type="checkbox" id="pkg-is-default" value="1">
-                            <label class="form-check-label fw-semibold fs-7 text-gray-800" for="pkg-is-default">
-                                Jadikan Paket Bawaan (Default untuk session baru)
-                            </label>
-                        </div>
-                        <div class="form-text fs-8 ps-7">
-                            Digunakan sebagai template paket standar sistem.
-                        </div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
-                    <button type="button" class="btn btn-warning fw-bold" id="btn-save-package" onclick="savePackage()">
-                        <i class="bi bi-check-lg me-1"></i>Simpan Paket
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal: Atur Sesi untuk Paket -->
-    <div class="modal fade" id="packageSessionsModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">
-                        <i class="bi bi-whatsapp text-success me-2"></i>Atur Sesi WhatsApp untuk Paket: <span id="pkg-session-target-name" class="badge bg-warning text-dark"></span>
-                    </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <p class="text-muted fs-7 mb-3">
-                        Centang session WhatsApp yang mengaktifkan paket auto-reply ini:
-                    </p>
-                    <input type="hidden" id="pkg-session-target-id">
-                    <div id="pkg-sessions-list-container" class="d-flex flex-column gap-2 mb-3">
-                        <div class="text-muted fs-7"><span class="spinner-border spinner-border-sm me-2"></span>Memuat daftar sesi...</div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
-                    <button type="button" class="btn btn-success fw-bold" id="btn-save-pkg-sessions" onclick="savePackageSessions()">
-                        <i class="bi bi-check-lg me-1"></i>Simpan Sesi
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- Scripts -->
     <script src="assets/plugins/global/plugins.bundle.js"></script>
     <script src="assets/js/scripts.bundle.js"></script>
@@ -1093,10 +1049,9 @@
             });
         }
         
-        // Load components
+        // Load layout components
         fetch('components/header.html').then(r => r.text()).then(html => {
             loadHTMLWithScripts('header-container', html);
-            // Initialize header after loading
             if (typeof initializeHeader === 'function') initializeHeader();
         });
         
@@ -1115,17 +1070,31 @@
     </script>
     
     <script>
+        // ============================================================
+        // Application State
+        // ============================================================
         let rules = [];
         let sessions = [];
         let packages = [];
         let selectedPackageId = 'all';
+        let viewMode = localStorage.getItem('ar_view_mode') || 'grid';
+        let triggerTags = [];
+        const socket = io();
+
+        // Modal Instances
         let packageManageModalInstance = null;
         let packageEditModalInstance = null;
         let packageSessionsModalInstance = null;
-        let triggerTags = [];
-        const socket = io();
+        let ruleModalInstance = null;
+        let importModalInstance = null;
+        let importedRulesData = null;
         
         document.addEventListener('DOMContentLoaded', () => {
+            // Bootstrap Modal inits
+            const rmEl = document.getElementById('ruleModal');
+            if (rmEl && typeof bootstrap !== 'undefined') ruleModalInstance = new bootstrap.Modal(rmEl);
+            const imEl = document.getElementById('importModal');
+            if (imEl && typeof bootstrap !== 'undefined') importModalInstance = new bootstrap.Modal(imEl);
             const pmEl = document.getElementById('packageManageModal');
             if (pmEl && typeof bootstrap !== 'undefined') packageManageModalInstance = new bootstrap.Modal(pmEl);
             const peEl = document.getElementById('packageEditModal');
@@ -1133,23 +1102,77 @@
             const psEl = document.getElementById('packageSessionsModal');
             if (psEl && typeof bootstrap !== 'undefined') packageSessionsModalInstance = new bootstrap.Modal(psEl);
 
+            // Sync initial view mode buttons
+            setViewMode(viewMode, false);
+
             loadSessions();
             loadPackages();
             loadRules();
             loadStats();
             
             // Filter events
-            document.getElementById('search-input').addEventListener('input', filterRules);
-            document.getElementById('filter-session').addEventListener('change', filterRules);
-            document.getElementById('filter-scope').addEventListener('change', filterRules);
-            document.getElementById('filter-status').addEventListener('change', filterRules);
+            document.getElementById('search-input')?.addEventListener('input', filterRules);
+            document.getElementById('filter-session')?.addEventListener('change', filterRules);
+            document.getElementById('filter-scope')?.addEventListener('change', filterRules);
+            document.getElementById('filter-status')?.addEventListener('change', filterRules);
             
-            // Real-time updates
-            socket.on('auto-reply-sent', () => {
+            // Real-time socket updates
+            socket.on('auto-reply-sent', (data) => {
                 loadStats();
+                if (data && data.ruleName) {
+                    showToast('success', `Auto-reply terkirim: ${data.ruleName}`);
+                }
             });
         });
-        
+
+        // ============================================================
+        // Helper Functions (Color, HTML escaping)
+        // ============================================================
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function hexToRgba(hex, alpha = 0.15) {
+            if (!hex || typeof hex !== 'string') return `rgba(37, 211, 102, ${alpha})`;
+            hex = hex.replace('#', '');
+            if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+            const r = parseInt(hex.substring(0, 2), 16) || 0;
+            const g = parseInt(hex.substring(2, 4), 16) || 0;
+            const b = parseInt(hex.substring(4, 6), 16) || 0;
+            return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        }
+
+        function getTriggerTypeBadgeClass(type) {
+            switch (type) {
+                case 'exact': return 'primary';
+                case 'contains': return 'success';
+                case 'starts_with': return 'info';
+                case 'ends_with': return 'warning';
+                case 'regex': return 'danger';
+                default: return 'secondary';
+            }
+        }
+
+        function showToast(type, message) {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    toast: true,
+                    position: 'top-end',
+                    icon: type,
+                    title: message,
+                    showConfirmButton: false,
+                    timer: 2500,
+                    customClass: { popup: 'p-3' }
+                });
+            }
+        }
+
         // ============================================================
         // Multi-Trigger Tag Input Functions
         // ============================================================
@@ -1189,9 +1212,9 @@
         function parseTriggerValues(triggerValue) {
             try {
                 const parsed = JSON.parse(triggerValue);
-                if (Array.isArray(parsed)) return parsed.filter(v => v && v.trim());
+                if (Array.isArray(parsed)) return parsed.filter(v => v && String(v).trim());
             } catch (e) {}
-            return [triggerValue];
+            return triggerValue ? [String(triggerValue)] : [];
         }
 
         function handleTagKeydown(event) {
@@ -1216,7 +1239,6 @@
             event.preventDefault();
             const pastedText = (event.clipboardData || window.clipboardData).getData('text');
             if (!pastedText) return;
-            // Split by comma, newline, or tab — covers CSV, line-per-tag, spreadsheet copy
             const parts = pastedText.split(/[,\n\r\t]+/);
             let added = 0;
             parts.forEach(part => {
@@ -1224,27 +1246,35 @@
             });
             if (added > 0) {
                 event.target.value = '';
-                Swal.fire({ icon: 'success', title: `${added} trigger ditambahkan`, timer: 1500, showConfirmButton: false });
+                showToast('success', `${added} keyword trigger ditambahkan`);
             }
         }
-        // ============================================================
 
+        // ============================================================
+        // Load Data (Sessions, Packages, Rules, Stats)
+        // ============================================================
         async function loadSessions() {
             try {
+                const response = await fetch('/api/sessions');
                 const data = await response.json();
                 
                 if (data.success && data.sessions) {
                     sessions = data.sessions;
-                    const selects = ['filter-session', 'rule-session'];
+                    const selects = ['filter-session', 'rule-session', 'import-session-target'];
                     selects.forEach(id => {
                         const select = document.getElementById(id);
+                        if (!select) return;
                         const firstOption = select.options[0];
+                        const secondOption = select.options[1];
                         select.innerHTML = '';
-                        select.appendChild(firstOption);
+                        if (firstOption) select.appendChild(firstOption);
+                        if (id === 'import-session-target' && secondOption) select.appendChild(secondOption);
+
                         sessions.forEach(s => {
                             const opt = document.createElement('option');
                             opt.value = s.id;
-                            opt.textContent = s.id;
+                            const phone = s.phoneNumber ? ` (${s.phoneNumber})` : '';
+                            opt.textContent = `${s.id}${phone}`;
                             select.appendChild(opt);
                         });
                     });
@@ -1253,7 +1283,23 @@
                 console.error('Error loading sessions:', error);
             }
         }
-        
+
+        async function loadPackages() {
+            try {
+                const res = await fetch('/api/auto-reply-packages');
+                const data = await res.json();
+                if (data.success) {
+                    packages = data.packages || [];
+                    document.getElementById('total-packages-badge').textContent = `${packages.length} Paket`;
+                    renderFolderCards();
+                    populatePackageSelect();
+                    updateActiveFolderBanner();
+                }
+            } catch (err) {
+                console.error('Error loading auto-reply packages:', err);
+            }
+        }
+
         async function loadRules() {
             try {
                 const response = await fetch('/api/auto-reply');
@@ -1261,16 +1307,16 @@
                 
                 if (data.success) {
                     rules = data.rules || [];
-                    renderRules(rules);
+                    renderFolderCards();
+                    filterRules();
                     updateStats();
-                    renderPackagePills();
                 }
             } catch (error) {
                 console.error('Error loading rules:', error);
-                Swal.fire('Error', 'Gagal memuat rules', 'error');
+                Swal.fire('Error', 'Gagal memuat rules auto reply', 'error');
             }
         }
-        
+
         async function loadStats() {
             try {
                 const response = await fetch('/api/auto-reply-logs?limit=1');
@@ -1278,7 +1324,6 @@
                 
                 if (data.success) {
                     document.getElementById('total-replies').textContent = data.total || 0;
-                    // Get failed count
                     const failedRes = await fetch('/api/auto-reply-logs?status=failed&limit=1');
                     const failedData = await failedRes.json();
                     document.getElementById('failed-replies').textContent = failedData.total || 0;
@@ -1287,268 +1332,434 @@
                 console.error('Error loading stats:', error);
             }
         }
-        
+
         function updateStats() {
             document.getElementById('total-rules').textContent = rules.length;
             document.getElementById('active-rules').textContent = rules.filter(r => r.enabled).length;
         }
-        
+
+        // ============================================================
+        // Folder Cards Rendering & Selection
+        // ============================================================
+        function renderFolderCards() {
+            const grid = document.getElementById('package-folders-grid');
+            if (!grid) return;
+
+            const totalRules = rules.length;
+            const isAllActive = selectedPackageId === 'all';
+
+            // 1. "Semua Paket" Card
+            let html = `
+                <div class="col-xl-3 col-lg-4 col-sm-6">
+                    <div class="package-folder-card ${isAllActive ? 'active' : ''}" onclick="selectPackageFolder('all')">
+                        <div class="folder-top-stripe" style="background-color: #009EF7;"></div>
+                        <div class="card-body p-4 d-flex flex-column">
+                            <div class="d-flex align-items-start justify-content-between mb-3">
+                                <div class="folder-icon-box" style="background-color: rgba(0, 158, 247, 0.12); color: #009EF7;">
+                                    <i class="bi bi-collection-fill"></i>
+                                </div>
+                                <div>
+                                    ${isAllActive ? '<span class="folder-active-indicator"><i class="bi bi-check-circle-fill"></i> Dilihat</span>' : '<span class="badge badge-light-primary fw-bold fs-8">Semua</span>'}
+                                </div>
+                            </div>
+                            
+                            <h5 class="folder-name" title="Semua Paket">Semua Paket</h5>
+                            <p class="folder-desc">Menampilkan seluruh aturan auto-reply dari semua paket.</p>
+                            
+                            <div class="folder-footer">
+                                <span class="badge badge-light-primary fw-bolder fs-8">
+                                    <i class="bi bi-robot me-1 text-primary"></i>${totalRules} rules
+                                </span>
+                                <span class="text-primary fw-bold fs-8 d-flex align-items-center gap-1">
+                                    Pilih Folder <i class="bi bi-chevron-right fs-9"></i>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // 2. Individual Package Folder Cards
+            packages.forEach(pkg => {
+                const isActive = String(selectedPackageId) === String(pkg.id);
+                const color = pkg.color || '#25D366';
+                const count = pkg.rule_count !== undefined 
+                    ? pkg.rule_count 
+                    : rules.filter(r => Number(r.package_id) === Number(pkg.id)).length;
+                const isDefault = pkg.is_default === 1;
+
+                html += `
+                    <div class="col-xl-3 col-lg-4 col-sm-6">
+                        <div class="package-folder-card ${isActive ? 'active' : ''}" onclick="selectPackageFolder(${pkg.id})">
+                            <div class="folder-top-stripe" style="background-color: ${color};"></div>
+                            <div class="card-body p-4 d-flex flex-column">
+                                <div class="d-flex align-items-start justify-content-between mb-3">
+                                    <div class="folder-icon-box" style="background-color: ${hexToRgba(color, 0.12)}; color: ${color};">
+                                        <i class="bi ${isDefault ? 'bi-folder-check' : 'bi-folder-fill'}"></i>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-1">
+                                        ${isDefault ? '<span class="badge badge-light-success fw-bold fs-9 me-1">Default</span>' : ''}
+                                        ${isActive ? '<span class="folder-active-indicator me-1"><i class="bi bi-check-circle-fill"></i> Dilihat</span>' : ''}
+                                        
+                                        <!-- Dropdown Menu -->
+                                        <div class="dropdown" onclick="event.stopPropagation()">
+                                            <button class="btn btn-icon btn-sm btn-light btn-active-light-primary w-26px h-26px" data-bs-toggle="dropdown" aria-expanded="false">
+                                                <i class="bi bi-three-dots-vertical"></i>
+                                            </button>
+                                            <ul class="dropdown-menu dropdown-menu-end shadow-sm fs-7">
+                                                <li>
+                                                    <a class="dropdown-item py-2 fw-semibold" href="javascript:void(0)" onclick="openCreateModalForPackage(${pkg.id})">
+                                                        <i class="bi bi-plus-circle text-primary me-2"></i>Tambah Rule ke Paket Ini
+                                                    </a>
+                                                </li>
+                                                <li>
+                                                    <a class="dropdown-item py-2 fw-semibold" href="javascript:void(0)" onclick="openPackageSessionsModal(${pkg.id}, '${escapeHtml(pkg.name)}')">
+                                                        <i class="bi bi-whatsapp text-success me-2"></i>Atur Sesi WhatsApp
+                                                    </a>
+                                                </li>
+                                                <li>
+                                                    <a class="dropdown-item py-2 fw-semibold" href="javascript:void(0)" onclick="editPackage(${pkg.id})">
+                                                        <i class="bi bi-pencil text-warning me-2"></i>Edit Paket
+                                                    </a>
+                                                </li>
+                                                ${!isDefault && pkg.id !== 1 ? `
+                                                    <li><hr class="dropdown-divider my-1"></li>
+                                                    <li>
+                                                        <a class="dropdown-item py-2 fw-semibold text-danger" href="javascript:void(0)" onclick="deletePackage(${pkg.id}, '${escapeHtml(pkg.name)}')">
+                                                            <i class="bi bi-trash text-danger me-2"></i>Hapus Paket
+                                                        </a>
+                                                    </li>
+                                                ` : ''}
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <h5 class="folder-name" title="${escapeHtml(pkg.name)}">${escapeHtml(pkg.name)}</h5>
+                                <p class="folder-desc">${escapeHtml(pkg.description || 'Tidak ada deskripsi catatan.')}</p>
+                                
+                                <div class="folder-footer">
+                                    <span class="badge badge-light fs-8 text-gray-800 fw-bold">
+                                        <i class="bi bi-robot me-1" style="color: ${color};"></i>${count} rules
+                                    </span>
+                                    <span class="badge badge-light-secondary fs-9 fw-semibold">
+                                        Prioritas: ${pkg.priority || 0}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            grid.innerHTML = html;
+        }
+
+        function selectPackageFolder(pkgId) {
+            selectedPackageId = pkgId;
+            renderFolderCards();
+            updateActiveFolderBanner();
+            filterRules();
+        }
+
+        function updateActiveFolderBanner() {
+            const banner = document.getElementById('active-folder-banner');
+            const iconEl = document.getElementById('banner-pkg-icon');
+            const nameEl = document.getElementById('banner-pkg-name');
+            const countEl = document.getElementById('banner-pkg-count');
+            const descEl = document.getElementById('banner-pkg-desc');
+            const btnReset = document.getElementById('btn-reset-folder');
+
+            if (selectedPackageId === 'all') {
+                iconEl.style.backgroundColor = '#009EF7';
+                iconEl.innerHTML = '<i class="bi bi-collection-fill fs-4"></i>';
+                nameEl.textContent = 'Semua Paket';
+                countEl.textContent = `${rules.length} rules`;
+                descEl.textContent = 'Menampilkan seluruh aturan auto-reply dari semua paket';
+                if (btnReset) btnReset.style.display = 'none';
+            } else {
+                const pkg = packages.find(p => Number(p.id) === Number(selectedPackageId));
+                if (pkg) {
+                    const color = pkg.color || '#25D366';
+                    const pkgRulesCount = rules.filter(r => Number(r.package_id) === Number(pkg.id)).length;
+                    iconEl.style.backgroundColor = color;
+                    iconEl.innerHTML = '<i class="bi bi-folder-fill fs-4"></i>';
+                    nameEl.textContent = pkg.name;
+                    countEl.textContent = `${pkgRulesCount} rules`;
+                    descEl.textContent = pkg.description || 'Tidak ada deskripsi paket.';
+                    if (btnReset) btnReset.style.display = 'inline-flex';
+                }
+            }
+        }
+
+        // ============================================================
+        // View Mode Switcher (Grid vs List)
+        // ============================================================
+        function setViewMode(mode, triggerRender = true) {
+            viewMode = mode;
+            localStorage.setItem('ar_view_mode', mode);
+
+            const btnGrid = document.getElementById('btn-view-grid');
+            const btnList = document.getElementById('btn-view-list');
+            const gridWrapper = document.getElementById('rules-grid-wrapper');
+            const listWrapper = document.getElementById('rules-list-wrapper');
+
+            if (mode === 'grid') {
+                btnGrid?.classList.add('btn-light-primary', 'active');
+                btnGrid?.classList.remove('btn-light');
+                btnList?.classList.remove('btn-light-primary', 'active');
+                btnList?.classList.add('btn-light');
+
+                gridWrapper?.classList.remove('d-none');
+                listWrapper?.classList.add('d-none');
+            } else {
+                btnList?.classList.add('btn-light-primary', 'active');
+                btnList?.classList.remove('btn-light');
+                btnGrid?.classList.remove('btn-light-primary', 'active');
+                btnGrid?.classList.add('btn-light');
+
+                listWrapper?.classList.remove('d-none');
+                gridWrapper?.classList.add('d-none');
+            }
+
+            if (triggerRender) filterRules();
+        }
+
+        // ============================================================
+        // Filtering & Rendering Rules (Grid & List)
+        // ============================================================
         function filterRules() {
-            const search = document.getElementById('search-input').value.toLowerCase();
-            const sessionFilter = document.getElementById('filter-session').value;
-            const scopeFilter = document.getElementById('filter-scope').value;
-            const statusFilter = document.getElementById('filter-status').value;
+            const search = document.getElementById('search-input')?.value.toLowerCase().trim() || '';
+            const sessionFilter = document.getElementById('filter-session')?.value || '';
+            const scopeFilter = document.getElementById('filter-scope')?.value || '';
+            const statusFilter = document.getElementById('filter-status')?.value || '';
             
             const filtered = rules.filter(rule => {
+                // Filter by active folder
                 if (selectedPackageId !== 'all' && Number(rule.package_id) !== Number(selectedPackageId)) return false;
-                if (search && !rule.name.toLowerCase().includes(search) && 
-                    !parseTriggerValues(rule.trigger_value).some(v => v.toLowerCase().includes(search))) return false;
+                
+                // Search keyword & trigger values
+                if (search) {
+                    const matchName = rule.name && rule.name.toLowerCase().includes(search);
+                    const matchTriggers = parseTriggerValues(rule.trigger_value).some(v => v.toLowerCase().includes(search));
+                    const matchResponse = rule.response_content && rule.response_content.toLowerCase().includes(search);
+                    if (!matchName && !matchTriggers && !matchResponse) return false;
+                }
+                
+                // Filters
                 if (sessionFilter && rule.session_id !== sessionFilter) return false;
                 if (scopeFilter && rule.scope !== scopeFilter) return false;
                 if (statusFilter !== '' && rule.enabled !== parseInt(statusFilter)) return false;
+                
                 return true;
             });
             
             renderRules(filtered);
         }
-        
+
         function renderRules(rulesToRender) {
-            const tbody = document.getElementById('rules-tbody');
+            const countEl = document.getElementById('filter-count');
             const emptyState = document.getElementById('empty-state');
+            const gridContainer = document.getElementById('rules-grid-container');
+            const listTbody = document.getElementById('rules-list-tbody');
             
-            document.getElementById('filter-count').textContent = `${rulesToRender.length} rules`;
+            if (countEl) countEl.textContent = `${rulesToRender.length} rules`;
             
             if (rulesToRender.length === 0) {
-                tbody.innerHTML = '';
-                emptyState.classList.remove('d-none');
+                if (gridContainer) gridContainer.innerHTML = '';
+                if (listTbody) listTbody.innerHTML = '';
+                emptyState?.classList.remove('d-none');
                 return;
             }
             
-            emptyState.classList.add('d-none');
+            emptyState?.classList.add('d-none');
             
-            tbody.innerHTML = rulesToRender.map(rule => `
-                <tr class="${rule.enabled ? '' : 'inactive'}">
-                    <td>
-                        <div class="rule-name-cell">
-                            <div class="rule-icon ${rule.enabled ? 'active' : 'inactive'}">
-                                <i class="bi bi-robot"></i>
-                            </div>
-                            <div class="rule-info">
-                                <div class="d-flex align-items-center gap-2 mb-1">
-                                    <h6 class="mb-0">${escapeHtml(rule.name)}</h6>
-                                    <span class="badge" style="background-color: ${rule.package_color || '#25D366'}; color: #fff; font-size: 0.72rem; padding: 2px 7px;">
-                                        ${escapeHtml(rule.package_name || 'Umum')}
-                                    </span>
-                                </div>
-                                <small>${rule.session_id || 'Global'} · Priority: ${rule.priority}</small>
-                            </div>
-                        </div>
-                    </td>
-                    <td>
-                        <span class="trigger-badge ${rule.trigger_type}">
-                            ${rule.trigger_type}
-                        </span>
-                        <div class="multi-trigger-pills">
-                            ${parseTriggerValues(rule.trigger_value).map(v => 
-                                `<span class="mini-trigger-pill" title="${escapeHtml(v)}">${escapeHtml(v.length > 20 ? v.substring(0,20)+'…' : v)}</span>`
-                            ).join('')}
-                        </div>
-                    </td>
-                    <td>
-                        <div style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; 
-                                    font-size: 13px; color: #5e6278;">
-                            ${escapeHtml(rule.response_content?.substring(0, 50) || '')}${rule.response_content?.length > 50 ? '...' : ''}
-                        </div>
-                    </td>
-                    <td>
-                        <span class="scope-badge ${rule.scope}">
-                            <i class="bi bi-${rule.scope === 'private' ? 'person' : rule.scope === 'group' ? 'people' : 'chat-dots'}"></i>
-                            ${rule.scope === 'all' ? 'All' : rule.scope}
-                        </span>
-                    </td>
-                    <td>
-                        <div class="status-toggle">
-                            <input type="checkbox" class="form-check-input" 
-                                   ${rule.enabled ? 'checked' : ''} 
-                                   onchange="toggleRule(${rule.id}, this.checked)">
-                        </div>
-                    </td>
-                    <td>
-                        <div class="action-buttons">
-                            <button class="action-btn edit" onclick="editRule(${rule.id})" title="Edit">
-                                <i class="bi bi-pencil"></i>
-                            </button>
-                            <button class="action-btn test" onclick="testRuleById(${rule.id})" title="Test">
-                                <i class="bi bi-lightning"></i>
-                            </button>
-                            <button class="action-btn delete" onclick="deleteRule(${rule.id})" title="Hapus">
-                                <i class="bi bi-trash"></i>
-                            </button>
-                        </div>
-                    </td>
-                </tr>
-            `).join('');
-        }
-        
-        function escapeHtml(str) {
-            if (!str) return '';
-            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-                      .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
-        }
-        
-        function openCreateModal() {
-            document.getElementById('ruleModalTitle').innerHTML = '<i class="bi bi-plus-circle me-2"></i>Tambah Auto Reply Rule';
-            document.getElementById('ruleForm').reset();
-            document.getElementById('rule-id').value = '';
-            document.getElementById('rule-enabled').checked = true;
-            document.getElementById('test-result').classList.add('d-none');
-            setTriggerTags([]);
-            document.getElementById('tag-text-input').value = '';
-            populatePackageSelect(selectedPackageId !== 'all' ? selectedPackageId : null);
-            new bootstrap.Modal(document.getElementById('ruleModal')).show();
-        }
-        
-        async function editRule(id) {
-            const rule = rules.find(r => r.id === id);
-            if (!rule) return;
-            
-            document.getElementById('ruleModalTitle').innerHTML = '<i class="bi bi-pencil me-2"></i>Edit Auto Reply Rule';
-            document.getElementById('rule-id').value = rule.id;
-            document.getElementById('rule-name').value = rule.name;
-            populatePackageSelect(rule.package_id || 1);
-            document.getElementById('rule-session').value = rule.session_id || '';
-            document.getElementById('rule-trigger-type').value = rule.trigger_type;
-            // Populate multi-trigger tags
-            setTriggerTags(parseTriggerValues(rule.trigger_value));
-            document.getElementById('tag-text-input').value = '';
-            document.getElementById('rule-match-case').value = rule.match_case ? '1' : '0';
-            document.getElementById('rule-response').value = rule.response_content || '';
-            document.getElementById('rule-chat-type').value = rule.scope || 'all';
-            document.getElementById('rule-priority').value = rule.priority || 0;
-            document.getElementById('rule-cooldown').value = rule.cooldown_seconds || 60;
-            document.getElementById('rule-enabled').checked = rule.enabled;
-            document.getElementById('test-result').classList.add('d-none');
-            
-            new bootstrap.Modal(document.getElementById('ruleModal')).show();
-        }
-        
-        async function saveRule() {
-            const id = document.getElementById('rule-id').value;
-            
-            // Flush any pending input in the tag text field
-            const pendingInput = document.getElementById('tag-text-input').value.trim();
-            if (pendingInput) { addTriggerTag(pendingInput); document.getElementById('tag-text-input').value = ''; }
-            const triggerValueArr = getTriggerTags();
-            
-            const data = {
-                name: document.getElementById('rule-name').value,
-                package_id: parseInt(document.getElementById('rule-package-id').value) || 1,
-                session_id: document.getElementById('rule-session').value || null,
-                trigger_type: document.getElementById('rule-trigger-type').value,
-                trigger_value: triggerValueArr,
-                match_case: document.getElementById('rule-match-case').value === '1',
-                response_type: 'text',
-                response_content: document.getElementById('rule-response').value,
-                scope: document.getElementById('rule-chat-type').value,
-                priority: parseInt(document.getElementById('rule-priority').value) || 0,
-                cooldown_seconds: parseInt(document.getElementById('rule-cooldown').value) || 60,
-                enabled: document.getElementById('rule-enabled').checked
-            };
-            
-            if (!data.name || triggerValueArr.length === 0 || !data.response_content) {
-                Swal.fire('Error', 'Mohon lengkapi semua field yang wajib (nama, minimal 1 nilai trigger, response)', 'error');
-                return;
-            }
-            
-            try {
-                const url = id ? `/api/auto-reply/${id}` : '/api/auto-reply';
-                const method = id ? 'PUT' : 'POST';
-                
-                const response = await fetch(url, {
-                    method,
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    bootstrap.Modal.getInstance(document.getElementById('ruleModal')).hide();
-                    Swal.fire('Berhasil', id ? 'Rule berhasil diupdate' : 'Rule berhasil ditambahkan', 'success');
-                    loadRules();
-                } else {
-                    Swal.fire('Error', result.error || 'Gagal menyimpan rule', 'error');
-                }
-            } catch (error) {
-                console.error('Error saving rule:', error);
-                Swal.fire('Error', 'Gagal menyimpan rule', 'error');
-            }
-        }
-        
-        // ============================================================
-        // Package Management Functions
-        // ============================================================
-        async function loadPackages() {
-            try {
-                const res = await fetch('/api/auto-reply-packages');
-                const data = await res.json();
-                if (data.success) {
-                    packages = data.packages || [];
-                    renderPackagePills();
-                    populatePackageSelect();
-                }
-            } catch (err) {
-                console.error('Error loading auto-reply packages:', err);
+            if (viewMode === 'grid') {
+                renderGridCards(rulesToRender);
+            } else {
+                renderListRows(rulesToRender);
             }
         }
 
-        function renderPackagePills() {
-            const container = document.getElementById('package-pills-container');
+        function renderGridCards(rulesList) {
+            const container = document.getElementById('rules-grid-container');
             if (!container) return;
 
-            const totalRules = rules.length;
-            const isAllActive = selectedPackageId === 'all';
+            container.innerHTML = rulesList.map(rule => {
+                const triggers = parseTriggerValues(rule.trigger_value);
+                const pkgColor = rule.package_color || '#25D366';
+                const pkgName = rule.package_name || 'Umum';
+                const triggerBadgeType = getTriggerTypeBadgeClass(rule.trigger_type);
 
-            let html = `
-                <button type="button" class="btn btn-sm ${isAllActive ? 'btn-warning text-dark' : 'btn-light'} fw-bold px-4 py-2" onclick="selectPackageFilter('all')">
-                    Semua <span class="badge badge-circle ${isAllActive ? 'bg-dark text-white' : 'badge-light-dark'} ms-1 fs-8">${totalRules}</span>
-                </button>
-            `;
+                return `
+                    <div class="col-xl-4 col-md-6">
+                        <div class="rule-interactive-card ${rule.enabled ? '' : 'inactive-rule'}">
+                            <!-- Card Head -->
+                            <div class="card-head-area">
+                                <div class="d-flex align-items-center gap-3 overflow-hidden">
+                                    <div class="robot-symbol" style="background-color: ${hexToRgba(pkgColor, 0.14)}; color: ${pkgColor};">
+                                        <i class="bi bi-robot"></i>
+                                    </div>
+                                    <div class="overflow-hidden">
+                                        <div class="rule-title-text" title="${escapeHtml(rule.name)}">
+                                            ${escapeHtml(rule.name)}
+                                        </div>
+                                        <div class="d-flex align-items-center gap-1 flex-wrap">
+                                            <span class="badge" style="background-color: ${pkgColor}; color: #ffffff; font-size: 0.72rem; padding: 2px 7px;">
+                                                <i class="bi bi-folder-fill text-white fs-9 me-1"></i>${escapeHtml(pkgName)}
+                                            </span>
+                                            ${rule.priority > 0 ? `<span class="badge badge-light-warning fs-9 fw-bold">⭐ P:${rule.priority}</span>` : ''}
+                                        </div>
+                                    </div>
+                                </div>
 
-            packages.forEach(pkg => {
-                const isActive = String(selectedPackageId) === String(pkg.id);
-                const count = pkg.rule_count || 0;
-                const color = pkg.color || '#25D366';
+                                <!-- Toggle Switch iOS-style -->
+                                <div class="form-check form-switch form-check-custom form-check-solid flex-shrink-0" title="${rule.enabled ? 'Nonaktifkan rule' : 'Aktifkan rule'}">
+                                    <input class="form-check-input h-20px w-35px cursor-pointer" type="checkbox" ${rule.enabled ? 'checked' : ''} onchange="toggleRule(${rule.id}, this.checked)">
+                                </div>
+                            </div>
 
-                if (isActive) {
-                    html += `
-                        <button type="button" class="btn btn-sm text-white fw-bold px-3 py-2 d-flex align-items-center gap-1 shadow-sm" 
-                                style="background-color: ${color};" onclick="selectPackageFilter(${pkg.id})">
-                            <span>${escapeHtml(pkg.name)}</span>
-                            <span class="badge badge-circle bg-white text-dark ms-1 fs-8">${count}</span>
-                        </button>
-                    `;
-                } else {
-                    html += `
-                        <button type="button" class="btn btn-sm btn-light fw-semibold px-3 py-2 d-flex align-items-center gap-1" 
-                                onclick="selectPackageFilter(${pkg.id})">
-                            <span class="bullet bullet-dot me-1" style="background-color: ${color}; width:8px; height:8px;"></span>
-                            <span>${escapeHtml(pkg.name)}</span>
-                            <span class="badge badge-light-secondary ms-1 fs-8">${count}</span>
-                        </button>
-                    `;
-                }
-            });
+                            <!-- Card Body -->
+                            <div class="p-4 d-flex flex-column justify-content-between flex-grow-1">
+                                <div>
+                                    <!-- Trigger Chips -->
+                                    <div class="mb-3">
+                                        <div class="d-flex align-items-center justify-content-between mb-1">
+                                            <span class="text-muted fs-9 fw-bolder text-uppercase">TRIGGER:</span>
+                                            <span class="badge badge-light-${triggerBadgeType} fs-9 text-uppercase fw-bold">
+                                                ${rule.trigger_type}
+                                            </span>
+                                        </div>
+                                        <div class="multi-trigger-chips-box">
+                                            ${triggers.map(t => `<span class="modern-trigger-chip" title="${escapeHtml(t)}">${escapeHtml(t)}</span>`).join('')}
+                                        </div>
+                                    </div>
 
-            container.innerHTML = html;
+                                    <!-- Chat Bubble Preview -->
+                                    <div class="mb-3">
+                                        <span class="text-muted fs-9 fw-bolder text-uppercase d-block mb-1">RESPONS BALASAN:</span>
+                                        <div class="wa-chat-bubble">
+                                            <div>${escapeHtml(rule.response_content)}</div>
+                                            <div class="wa-bubble-meta">
+                                                <span>Auto</span>
+                                                <i class="bi bi-check2-all text-primary"></i>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Meta Badges Bar -->
+                                <div>
+                                    <div class="d-flex align-items-center flex-wrap gap-1 mb-3 pt-2 border-top border-gray-200">
+                                        <span class="badge badge-light-${rule.scope === 'private' ? 'info' : rule.scope === 'group' ? 'success' : 'secondary'} fs-9">
+                                            <i class="bi bi-${rule.scope === 'private' ? 'person' : rule.scope === 'group' ? 'people' : 'chat-dots'} me-1"></i>${rule.scope === 'all' ? 'Semua Chat' : rule.scope === 'private' ? 'Private' : 'Grup'}
+                                        </span>
+                                        <span class="badge badge-light fs-9 text-gray-700">
+                                            <i class="bi bi-clock-history me-1 text-warning"></i>${rule.cooldown_seconds || 0}s jeda
+                                        </span>
+                                        <span class="badge badge-light fs-9 text-gray-700" title="Target Session">
+                                            <i class="bi bi-phone me-1 text-primary"></i>${rule.session_id ? escapeHtml(rule.session_id) : 'Global'}
+                                        </span>
+                                    </div>
+
+                                    <!-- Card Actions -->
+                                    <div class="d-flex align-items-center justify-content-end gap-2 pt-2 border-top border-gray-100">
+                                        <button class="btn btn-xs btn-light-warning fw-bold py-1 px-3" onclick="testRuleById(${rule.id})" title="Uji kecocokan pesan rule ini">
+                                            <i class="bi bi-lightning-charge-fill me-1"></i>Test
+                                        </button>
+                                        <button class="btn btn-xs btn-light-primary fw-bold py-1 px-3" onclick="editRule(${rule.id})" title="Edit konfigurasi rule">
+                                            <i class="bi bi-pencil-square me-1"></i>Edit
+                                        </button>
+                                        <button class="btn btn-xs btn-light-danger fw-bold py-1 px-2" onclick="deleteRule(${rule.id})" title="Hapus rule ini">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
         }
 
-        function selectPackageFilter(pkgId) {
-            selectedPackageId = pkgId;
-            renderPackagePills();
-            filterRules();
+        function renderListRows(rulesList) {
+            const tbody = document.getElementById('rules-list-tbody');
+            if (!tbody) return;
+
+            tbody.innerHTML = rulesList.map(rule => {
+                const triggers = parseTriggerValues(rule.trigger_value);
+                const pkgColor = rule.package_color || '#25D366';
+                const pkgName = rule.package_name || 'Umum';
+                const triggerBadgeType = getTriggerTypeBadgeClass(rule.trigger_type);
+
+                return `
+                    <tr class="${rule.enabled ? '' : 'inactive-rule'}">
+                        <td>
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="robot-symbol" style="width:34px; height:34px; border-radius:8px; background-color:${hexToRgba(pkgColor, 0.15)}; color:${pkgColor}; font-size:16px;">
+                                    <i class="bi bi-robot"></i>
+                                </div>
+                                <div>
+                                    <div class="fw-bold text-gray-900 fs-7 mb-1">${escapeHtml(rule.name)}</div>
+                                    <span class="badge" style="background-color: ${pkgColor}; color: #ffffff; font-size: 0.7rem; padding: 2px 7px;">
+                                        <i class="bi bi-folder-fill text-white fs-9 me-1"></i>${escapeHtml(pkgName)}
+                                    </span>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="mb-1">
+                                <span class="badge badge-light-${triggerBadgeType} fs-9 text-uppercase fw-bold">${rule.trigger_type}</span>
+                            </div>
+                            <div class="d-flex flex-wrap gap-1 max-w-200px">
+                                ${triggers.map(t => `<span class="modern-trigger-chip" style="font-size:10.5px; padding:2px 6px;">${escapeHtml(t)}</span>`).join('')}
+                            </div>
+                        </td>
+                        <td>
+                            <div class="text-gray-700 fs-8" style="max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                ${escapeHtml(rule.response_content)}
+                            </div>
+                        </td>
+                        <td>
+                            <div class="d-flex flex-column gap-1">
+                                <span class="badge badge-light-${rule.scope === 'private' ? 'info' : rule.scope === 'group' ? 'success' : 'secondary'} fs-9">
+                                    ${rule.scope === 'all' ? 'Semua Chat' : rule.scope === 'private' ? 'Private' : 'Grup'}
+                                </span>
+                                <span class="text-muted fs-9">${rule.session_id ? escapeHtml(rule.session_id) : 'Global'}</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="d-flex flex-column gap-1">
+                                <span class="badge badge-light fs-9 text-gray-700">⏱️ ${rule.cooldown_seconds || 0}s</span>
+                                ${rule.priority > 0 ? `<span class="badge badge-light-warning fs-9">P: ${rule.priority}</span>` : ''}
+                            </div>
+                        </td>
+                        <td>
+                            <div class="form-check form-switch form-check-custom form-check-solid">
+                                <input class="form-check-input h-18px w-32px cursor-pointer" type="checkbox" ${rule.enabled ? 'checked' : ''} onchange="toggleRule(${rule.id}, this.checked)">
+                            </div>
+                        </td>
+                        <td class="text-end">
+                            <div class="d-flex align-items-center justify-content-end gap-1">
+                                <button class="btn btn-icon btn-sm btn-light-warning w-30px h-30px" onclick="testRuleById(${rule.id})" title="Test">
+                                    <i class="bi bi-lightning-charge-fill"></i>
+                                </button>
+                                <button class="btn btn-icon btn-sm btn-light-primary w-30px h-30px" onclick="editRule(${rule.id})" title="Edit">
+                                    <i class="bi bi-pencil-square"></i>
+                                </button>
+                                <button class="btn btn-icon btn-sm btn-light-danger w-30px h-30px" onclick="deleteRule(${rule.id})" title="Hapus">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
         }
 
+        // ============================================================
+        // Modal & Form Handlers
+        // ============================================================
         function populatePackageSelect(selectedId = null) {
             const select = document.getElementById('rule-package-id');
             if (!select) return;
@@ -1568,6 +1779,290 @@
             select.innerHTML = html;
         }
 
+        function openCreateModal() {
+            document.getElementById('ruleModalTitle').innerHTML = '<i class="bi bi-plus-circle text-white me-2"></i>Tambah Auto Reply Rule';
+            document.getElementById('ruleForm').reset();
+            document.getElementById('rule-id').value = '';
+            document.getElementById('rule-enabled').checked = true;
+            document.getElementById('test-result').classList.add('d-none');
+            setTriggerTags([]);
+            document.getElementById('tag-text-input').value = '';
+            populatePackageSelect(selectedPackageId !== 'all' ? selectedPackageId : null);
+            if (ruleModalInstance) ruleModalInstance.show();
+        }
+
+        function openCreateModalForPackage(pkgId) {
+            selectPackageFolder(pkgId);
+            openCreateModal();
+        }
+
+        function openCreateModalCurrentPackage() {
+            openCreateModal();
+        }
+
+        async function editRule(id) {
+            const rule = rules.find(r => r.id === id);
+            if (!rule) return;
+            
+            document.getElementById('ruleModalTitle').innerHTML = '<i class="bi bi-pencil-square text-white me-2"></i>Edit Auto Reply Rule';
+            document.getElementById('rule-id').value = rule.id;
+            document.getElementById('rule-name').value = rule.name;
+            populatePackageSelect(rule.package_id || 1);
+            document.getElementById('rule-session').value = rule.session_id || '';
+            document.getElementById('rule-trigger-type').value = rule.trigger_type;
+            setTriggerTags(parseTriggerValues(rule.trigger_value));
+            document.getElementById('tag-text-input').value = '';
+            document.getElementById('rule-match-case').value = rule.match_case ? '1' : '0';
+            document.getElementById('rule-response').value = rule.response_content || '';
+            document.getElementById('rule-chat-type').value = rule.scope || 'all';
+            document.getElementById('rule-priority').value = rule.priority || 0;
+            document.getElementById('rule-cooldown').value = rule.cooldown_seconds || 60;
+            document.getElementById('rule-enabled').checked = rule.enabled;
+            document.getElementById('test-result').classList.add('d-none');
+            
+            if (ruleModalInstance) ruleModalInstance.show();
+        }
+
+        async function saveRule() {
+            const id = document.getElementById('rule-id').value;
+            
+            const pendingInput = document.getElementById('tag-text-input').value.trim();
+            if (pendingInput) { addTriggerTag(pendingInput); document.getElementById('tag-text-input').value = ''; }
+            const triggerValueArr = getTriggerTags();
+            
+            const data = {
+                name: document.getElementById('rule-name').value.trim(),
+                package_id: parseInt(document.getElementById('rule-package-id').value) || 1,
+                session_id: document.getElementById('rule-session').value || null,
+                trigger_type: document.getElementById('rule-trigger-type').value,
+                trigger_value: triggerValueArr,
+                match_case: document.getElementById('rule-match-case').value === '1',
+                response_type: 'text',
+                response_content: document.getElementById('rule-response').value.trim(),
+                scope: document.getElementById('rule-chat-type').value,
+                priority: parseInt(document.getElementById('rule-priority').value) || 0,
+                cooldown_seconds: parseInt(document.getElementById('rule-cooldown').value) || 60,
+                enabled: document.getElementById('rule-enabled').checked
+            };
+            
+            if (!data.name || triggerValueArr.length === 0 || !data.response_content) {
+                Swal.fire('Form Belum Lengkap', 'Mohon lengkapi nama rule, minimal 1 kata kunci trigger, dan pesan balasan.', 'warning');
+                return;
+            }
+            
+            try {
+                const url = id ? `/api/auto-reply/${id}` : '/api/auto-reply';
+                const method = id ? 'PUT' : 'POST';
+                
+                const response = await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    if (ruleModalInstance) ruleModalInstance.hide();
+                    showToast('success', id ? 'Rule berhasil diupdate!' : 'Rule baru berhasil ditambahkan!');
+                    await loadPackages();
+                    await loadRules();
+                } else {
+                    Swal.fire('Error', result.error || 'Gagal menyimpan rule', 'error');
+                }
+            } catch (error) {
+                console.error('Error saving rule:', error);
+                Swal.fire('Error', 'Terjadi kesalahan saat menyimpan rule', 'error');
+            }
+        }
+
+        async function toggleRule(id, enabled) {
+            try {
+                const response = await fetch(`/api/auto-reply/${id}/toggle`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enabled })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    const rule = rules.find(r => r.id === id);
+                    if (rule) rule.enabled = enabled;
+                    updateStats();
+                    showToast('success', enabled ? 'Rule diaktifkan' : 'Rule dinonaktifkan');
+                    filterRules();
+                }
+            } catch (error) {
+                console.error('Error toggling rule:', error);
+            }
+        }
+
+        async function deleteRule(id) {
+            const result = await Swal.fire({
+                title: 'Hapus Rule Auto Reply?',
+                text: 'Rule ini akan dihapus dan tidak akan membalas pesan lagi.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#f1416c',
+                cancelButtonColor: '#b5b5c3',
+                confirmButtonText: 'Ya, Hapus',
+                cancelButtonText: 'Batal'
+            });
+            
+            if (result.isConfirmed) {
+                try {
+                    const response = await fetch(`/api/auto-reply/${id}`, { method: 'DELETE' });
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        showToast('success', 'Rule berhasil dihapus');
+                        await loadPackages();
+                        await loadRules();
+                    } else {
+                        Swal.fire('Gagal', data.error || 'Gagal menghapus rule', 'error');
+                    }
+                } catch (error) {
+                    Swal.fire('Error', 'Terjadi kesalahan saat menghapus rule', 'error');
+                }
+            }
+        }
+
+        function testRule() {
+            const triggerType = document.getElementById('rule-trigger-type').value;
+            const matchCase = document.getElementById('rule-match-case').value === '1';
+            const testMessage = document.getElementById('test-message').value;
+            const resultDiv = document.getElementById('test-result');
+            
+            if (!testMessage) {
+                resultDiv.classList.add('d-none');
+                return;
+            }
+            
+            const pendingInput = document.getElementById('tag-text-input').value.trim();
+            const allTags = pendingInput ? [...triggerTags, pendingInput] : [...triggerTags];
+            
+            if (allTags.length === 0) {
+                resultDiv.classList.add('d-none');
+                return;
+            }
+            
+            const msg = matchCase ? testMessage : testMessage.toLowerCase();
+            let matched = false;
+            let matchedBy = '';
+            
+            for (const tag of allTags) {
+                const target = matchCase ? tag : tag.toLowerCase();
+                let isMatch = false;
+                
+                switch (triggerType) {
+                    case 'contains': isMatch = msg.includes(target); break;
+                    case 'exact': isMatch = msg === target; break;
+                    case 'starts_with': isMatch = msg.startsWith(target); break;
+                    case 'ends_with': isMatch = msg.endsWith(target); break;
+                    case 'regex':
+                        try {
+                            const re = new RegExp(tag, matchCase ? '' : 'i');
+                            isMatch = re.test(testMessage);
+                        } catch (e) {}
+                        break;
+                }
+                
+                if (isMatch) {
+                    matched = true;
+                    matchedBy = tag;
+                    break;
+                }
+            }
+            
+            resultDiv.classList.remove('d-none');
+            if (matched) {
+                resultDiv.innerHTML = `
+                    <div class="alert alert-success py-2 px-3 mb-0 fs-8 d-flex align-items-center gap-2">
+                        <i class="bi bi-check-circle-fill text-success fs-6"></i>
+                        <span>Pesan COCOK dengan keyword: <strong>${escapeHtml(matchedBy)}</strong></span>
+                    </div>
+                `;
+            } else {
+                resultDiv.innerHTML = `
+                    <div class="alert alert-danger py-2 px-3 mb-0 fs-8 d-flex align-items-center gap-2">
+                        <i class="bi bi-x-circle-fill text-danger fs-6"></i>
+                        <span>Pesan TIDAK COCOK dengan kata kunci manapun.</span>
+                    </div>
+                `;
+            }
+        }
+
+        async function testRuleById(id) {
+            const testMsg = await Swal.fire({
+                title: 'Uji Auto Reply Rule',
+                text: 'Ketik contoh pesan masuk untuk menguji kecocokan:',
+                input: 'text',
+                inputPlaceholder: 'Contoh: Halo kak, mau tanya harga...',
+                showCancelButton: true,
+                confirmButtonText: 'Uji Sekarang',
+                cancelButtonText: 'Batal'
+            });
+            
+            if (testMsg.isConfirmed && testMsg.value) {
+                try {
+                    const response = await fetch(`/api/auto-reply/${id}/test`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ message: testMsg.value })
+                    });
+                    const data = await response.json();
+                    
+                    if (data.matched) {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Kecocokan Ditemukan! (MATCH)',
+                            html: `
+                                <p class="text-muted fs-7 mb-2">Bot akan merespons dengan pesan berikut:</p>
+                                <div class="wa-chat-bubble text-start mb-2">
+                                    <div>${escapeHtml(data.response)}</div>
+                                </div>
+                            `
+                        });
+                    } else {
+                        Swal.fire('Tidak Cocok', 'Pesan yang dimasukkan tidak memicu rule ini.', 'info');
+                    }
+                } catch (error) {
+                    Swal.fire('Error', 'Gagal menguji rule', 'error');
+                }
+            }
+        }
+
+        async function seedDefaultRules() {
+            const result = await Swal.fire({
+                title: 'Buat Default Rules?',
+                text: 'Ini akan membuat contoh auto reply rules standar ke database.',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Ya, Buat',
+                cancelButtonText: 'Batal'
+            });
+            
+            if (result.isConfirmed) {
+                try {
+                    const response = await fetch('/api/auto-reply/seed', { method: 'POST' });
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        Swal.fire('Berhasil', `${data.created} default rules berhasil ditambahkan`, 'success');
+                        await loadPackages();
+                        await loadRules();
+                    } else {
+                        Swal.fire('Info', data.message || 'Gagal membuat default rules', 'info');
+                    }
+                } catch (error) {
+                    Swal.fire('Error', 'Gagal membuat default rules', 'error');
+                }
+            }
+        }
+
+        // ============================================================
+        // Package Management Functions
+        // ============================================================
         function setColorPreset(color) {
             const input = document.getElementById('pkg-color');
             if (input) input.value = color;
@@ -1647,7 +2142,7 @@
             document.getElementById('pkg-priority').value = '0';
             document.getElementById('pkg-is-default').checked = false;
 
-            document.getElementById('package-modal-title').innerHTML = '<i class="bi bi-folder-plus text-warning me-2"></i>Tambah Paket Auto Reply';
+            document.getElementById('package-modal-title').innerHTML = '<i class="bi bi-folder-plus text-dark me-2"></i>Tambah Paket Auto Reply';
             document.getElementById('btn-save-package').innerHTML = '<i class="bi bi-check-lg me-1"></i>Simpan Paket';
 
             if (packageEditModalInstance) {
@@ -1666,7 +2161,7 @@
             document.getElementById('pkg-priority').value = pkg.priority || 0;
             document.getElementById('pkg-is-default').checked = pkg.is_default === 1;
 
-            document.getElementById('package-modal-title').innerHTML = '<i class="bi bi-pencil text-warning me-2"></i>Edit Paket Auto Reply';
+            document.getElementById('package-modal-title').innerHTML = '<i class="bi bi-pencil text-dark me-2"></i>Edit Paket Auto Reply';
             document.getElementById('btn-save-package').innerHTML = '<i class="bi bi-check-lg me-1"></i>Update Paket';
 
             if (packageEditModalInstance) {
@@ -1719,13 +2214,7 @@
 
                 const data = await res.json();
                 if (data.success) {
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Berhasil',
-                        text: data.message || 'Paket auto reply berhasil disimpan',
-                        timer: 1500,
-                        showConfirmButton: false
-                    });
+                    showToast('success', data.message || 'Paket auto reply berhasil disimpan');
                     if (packageEditModalInstance) packageEditModalInstance.hide();
                     await loadPackages();
                     await loadRules();
@@ -1755,18 +2244,10 @@
             }).then(async (result) => {
                 if (result.isConfirmed) {
                     try {
-                        const res = await fetch(`/api/auto-reply-packages/${id}`, {
-                            method: 'DELETE'
-                        });
+                        const res = await fetch(`/api/auto-reply-packages/${id}`, { method: 'DELETE' });
                         const data = await res.json();
                         if (data.success) {
-                            Swal.fire({
-                                icon: 'success',
-                                title: 'Terhapus',
-                                text: 'Paket berhasil dihapus',
-                                timer: 1500,
-                                showConfirmButton: false
-                            });
+                            showToast('success', 'Paket berhasil dihapus');
                             if (selectedPackageId == id) {
                                 selectedPackageId = 'all';
                             }
@@ -1859,13 +2340,7 @@
                 });
                 const data = await res.json();
                 if (data.success) {
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Berhasil',
-                        text: 'Sesi untuk paket auto reply berhasil diperbarui',
-                        timer: 1500,
-                        showConfirmButton: false
-                    });
+                    showToast('success', 'Sesi untuk paket auto reply berhasil disimpan');
                     if (packageSessionsModalInstance) packageSessionsModalInstance.hide();
                     await loadPackages();
                 } else {
@@ -1879,213 +2354,28 @@
                 btn.innerHTML = origHtml;
             }
         }
-        
-        async function toggleRule(id, enabled) {
-            try {
-                const response = await fetch(`/api/auto-reply/${id}/toggle`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ enabled })
-                });
-                
-                const result = await response.json();
-                if (result.success) {
-                    const rule = rules.find(r => r.id === id);
-                    if (rule) rule.enabled = enabled;
-                    updateStats();
-                }
-            } catch (error) {
-                console.error('Error toggling rule:', error);
-            }
-        }
-        
-        async function deleteRule(id) {
-            const result = await Swal.fire({
-                title: 'Hapus Rule?',
-                text: 'Rule yang dihapus tidak dapat dikembalikan',
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#f1416c',
-                confirmButtonText: 'Ya, Hapus',
-                cancelButtonText: 'Batal'
-            });
-            
-            if (result.isConfirmed) {
-                try {
-                    const response = await fetch(`/api/auto-reply/${id}`, { method: 'DELETE' });
-                    const data = await response.json();
-                    
-                    if (data.success) {
-                        Swal.fire('Dihapus', 'Rule berhasil dihapus', 'success');
-                        loadRules();
-                    }
-                } catch (error) {
-                    Swal.fire('Error', 'Gagal menghapus rule', 'error');
-                }
-            }
-        }
-        
-        function testRule() {
-            const triggerType = document.getElementById('rule-trigger-type').value;
-            const matchCase = document.getElementById('rule-match-case').value === '1';
-            const testMessage = document.getElementById('test-message').value;
-            const resultDiv = document.getElementById('test-result');
-            
-            if (!testMessage) {
-                resultDiv.classList.add('d-none');
-                return;
-            }
-            
-            // Include any pending text in tag input
-            const pendingInput = document.getElementById('tag-text-input').value.trim();
-            const allTags = pendingInput ? [...triggerTags, pendingInput] : [...triggerTags];
-            
-            if (allTags.length === 0) {
-                resultDiv.classList.add('d-none');
-                return;
-            }
-            
-            const msg = matchCase ? testMessage : testMessage.toLowerCase();
-            let matched = false;
-            let matchedBy = '';
-            
-            for (const rawVal of allTags) {
-                if (!rawVal.trim()) continue;
-                const trigger = matchCase ? rawVal.trim() : rawVal.trim().toLowerCase();
-                switch (triggerType) {
-                    case 'exact': matched = msg === trigger; break;
-                    case 'contains': matched = msg.includes(trigger); break;
-                    case 'starts_with': matched = msg.startsWith(trigger); break;
-                    case 'ends_with': matched = msg.endsWith(trigger); break;
-                    case 'regex':
-                        try { matched = new RegExp(rawVal.trim(), matchCase ? '' : 'i').test(testMessage); }
-                        catch (e) { matched = false; }
-                        break;
-                }
-                if (matched) { matchedBy = rawVal.trim(); break; }
-            }
-            
-            resultDiv.classList.remove('d-none', 'success', 'failed');
-            resultDiv.classList.add(matched ? 'success' : 'failed');
-            resultDiv.innerHTML = matched 
-                ? `<i class="bi bi-check-circle me-2"></i>Match! Cocok dengan trigger "<strong>${escapeHtml(matchedBy)}</strong>" — rule akan merespon`
-                : '<i class="bi bi-x-circle me-2"></i>Tidak match dengan semua trigger. Rule tidak akan merespon';
-        }
-        
-        async function testRuleById(id) {
-            const testMsg = await Swal.fire({
-                title: 'Test Rule',
-                input: 'text',
-                inputPlaceholder: 'Ketik pesan untuk test...',
-                showCancelButton: true,
-                confirmButtonText: 'Test',
-                cancelButtonText: 'Batal'
-            });
-            
-            if (testMsg.isConfirmed && testMsg.value) {
-                try {
-                    const response = await fetch(`/api/auto-reply/${id}/test`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ message: testMsg.value })
-                    });
-                    const data = await response.json();
-                    
-                    if (data.matched) {
-                        Swal.fire({
-                            icon: 'success',
-                            title: 'Match!',
-                            html: `<p>Rule akan merespon dengan:</p><div style="background:#f5f5f5;padding:10px;border-radius:8px;text-align:left">${escapeHtml(data.response)}</div>`
-                        });
-                    } else {
-                        Swal.fire('Tidak Match', 'Pesan tidak cocok dengan trigger rule ini', 'info');
-                    }
-                } catch (error) {
-                    Swal.fire('Error', 'Gagal test rule', 'error');
-                }
-            }
-        }
-        
-        async function seedDefaultRules() {
-            const result = await Swal.fire({
-                title: 'Buat Default Rules?',
-                text: 'Ini akan membuat contoh auto reply rules standar',
-                icon: 'question',
-                showCancelButton: true,
-                confirmButtonText: 'Ya, Buat',
-                cancelButtonText: 'Batal'
-            });
-            
-            if (result.isConfirmed) {
-                try {
-                    const response = await fetch('/api/auto-reply/seed', { method: 'POST' });
-                    const data = await response.json();
-                    
-                    if (data.success) {
-                        Swal.fire('Berhasil', `${data.created} default rules berhasil dibuat`, 'success');
-                        loadRules();
-                    } else {
-                        Swal.fire('Info', data.message || 'Gagal membuat default rules', 'info');
-                    }
-                } catch (error) {
-                    Swal.fire('Error', 'Gagal membuat default rules', 'error');
-                }
-            }
-        }
 
         // ============================================================
-        // Export & Import Auto Reply Rules
+        // Export & Import Handlers
         // ============================================================
-        let importedRulesData = null;
-        let importModalInstance = null;
-
-        function showToast(type, message) {
-            if (typeof Swal !== 'undefined') {
-                Swal.fire({
-                    toast: true,
-                    position: 'top-end',
-                    icon: type,
-                    title: message,
-                    showConfirmButton: false,
-                    timer: 3000,
-                    timerProgressBar: true
-                });
-            } else {
-                console.log(`[Toast ${type}]: ${message}`);
-            }
-        }
-
         async function exportAutoReplyRules() {
             try {
-                const sessionFilter = document.getElementById('filter-session')?.value || '';
-                let url = '/api/auto-reply/export';
-                if (sessionFilter) {
-                    url += `?sessionId=${encodeURIComponent(sessionFilter)}`;
-                }
-
-                const response = await fetch(url, { credentials: 'include' });
-                if (!response.ok) {
-                    const errData = await response.json().catch(() => ({}));
-                    Swal.fire('Error', errData.error || `HTTP Error ${response.status}`, 'error');
-                    return;
-                }
-
+                showToast('info', 'Menyiapkan file export backup...');
+                const response = await fetch('/api/auto-reply/export');
                 const data = await response.json();
 
-                if (!data.success || !Array.isArray(data.rules)) {
-                    Swal.fire('Error', data.error || 'Gagal mengexport rules', 'error');
+                if (!data.success || !data.rules) {
+                    showToast('error', data.error || 'Gagal mengexport rules');
                     return;
                 }
 
                 if (data.rules.length === 0) {
-                    Swal.fire('Informasi', 'Belum ada rules auto reply untuk diexport.', 'info');
+                    showToast('warning', 'Belum ada rule untuk diexport');
                     return;
                 }
 
                 const dateStr = new Date().toISOString().split('T')[0];
-                const sessionSuffix = sessionFilter ? `-${sessionFilter}` : '';
-                const fileName = `auto-reply-rules-backup${sessionSuffix}-${dateStr}.json`;
-
+                const fileName = `auto-reply-rules-backup-${dateStr}.json`;
                 const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
                 const blobUrl = URL.createObjectURL(blob);
                 const downloadAnchor = document.createElement('a');
@@ -2096,10 +2386,10 @@
                 downloadAnchor.remove();
                 setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
 
-                showToast('success', `Berhasil mengexport ${data.rules.length} rules (${fileName})`);
+                showToast('success', `Berhasil mengexport ${data.rules.length} rule`);
             } catch (error) {
-                console.error('Error exporting auto reply rules:', error);
-                Swal.fire('Error', 'Terjadi kesalahan saat mengexport rules: ' + (error.message || error), 'error');
+                console.error('Error exporting rules:', error);
+                showToast('error', 'Terjadi kesalahan saat mengexport rules');
             }
         }
 
@@ -2120,50 +2410,21 @@
             const overwriteCb = document.getElementById('import-overwrite');
             if (overwriteCb) overwriteCb.checked = false;
 
-            // Populate session options in import modal
-            const sessionTargetSelect = document.getElementById('import-session-target');
-            if (sessionTargetSelect) {
-                sessionTargetSelect.innerHTML = `
-                    <option value="__keep__">Sesuai file backup (asli)</option>
-                    <option value="">Semua Session (Global)</option>
-                `;
-                if (Array.isArray(sessions)) {
-                    sessions.forEach(session => {
-                        const opt = document.createElement('option');
-                        opt.value = session.id;
-                        opt.textContent = `${session.id} ${session.isConnected ? '🟢' : '🔴'} ${session.phoneNumber || ''}`;
-                        sessionTargetSelect.appendChild(opt);
-                    });
-                }
-            }
-
-            if (!importModalInstance) {
-                const el = document.getElementById('importModal');
-                if (el) importModalInstance = new bootstrap.Modal(el);
-            }
             if (importModalInstance) {
                 importModalInstance.show();
             }
         }
 
         function handleImportFileSelect(event) {
-            const file = event.target.files?.[0];
-            const previewBox = document.getElementById('import-preview-box');
+            const file = event.target.files[0];
+            if (!file) return;
+
             const submitBtn = document.getElementById('btn-submit-import');
+            const previewBox = document.getElementById('import-preview-box');
 
-            if (!file) {
-                importedRulesData = null;
-                if (previewBox) previewBox.classList.add('d-none');
-                if (submitBtn) submitBtn.disabled = true;
-                return;
-            }
-
-            if (!file.name.toLowerCase().endsWith('.json')) {
-                Swal.fire('Format Salah', 'Harap pilih file backup dengan format .json', 'warning');
+            if (!file.name.endsWith('.json')) {
+                showToast('error', 'File harus berformat .json');
                 event.target.value = '';
-                importedRulesData = null;
-                if (previewBox) previewBox.classList.add('d-none');
-                if (submitBtn) submitBtn.disabled = true;
                 return;
             }
 
@@ -2171,54 +2432,42 @@
             reader.onload = function(e) {
                 try {
                     const content = JSON.parse(e.target.result);
-                    let rawRules = [];
+                    let rulesToImport = null;
 
                     if (Array.isArray(content)) {
-                        rawRules = content;
-                    } else if (content && Array.isArray(content.rules)) {
-                        rawRules = content.rules;
+                        rulesToImport = content;
+                    } else if (content.rules && Array.isArray(content.rules)) {
+                        rulesToImport = content.rules;
                     } else {
-                        throw new Error('Format file JSON tidak berisi array "rules" yang dikenali.');
+                        throw new Error('Format JSON tidak memiliki array rules');
                     }
 
-                    // Filter valid rules (requires name and response_content)
-                    const validRules = rawRules.filter(r => r && r.name && r.response_content);
+                    const validRules = rulesToImport.filter(r => r && (r.name || r.trigger_value));
 
                     if (validRules.length === 0) {
-                        Swal.fire('File Kosong', 'File JSON valid namun tidak ditemukan rule dengan nama dan isi balasan yang lengkap.', 'warning');
-                        importedRulesData = null;
-                        if (previewBox) previewBox.classList.add('d-none');
-                        if (submitBtn) submitBtn.disabled = true;
+                        showToast('warning', 'Tidak ada data rule yang valid di dalam file ini');
+                        event.target.value = '';
                         return;
                     }
 
                     importedRulesData = validRules;
 
-                    // Update UI preview
-                    const nameEl = document.getElementById('import-filename');
-                    const sizeEl = document.getElementById('import-filesize');
-                    const countEl = document.getElementById('import-rule-count');
-                    const metaEl = document.getElementById('import-file-meta');
-
-                    if (nameEl) nameEl.textContent = file.name;
-                    if (sizeEl) sizeEl.textContent = (file.size / 1024).toFixed(1) + ' KB';
-                    if (countEl) countEl.textContent = `${validRules.length} Rules`;
-
-                    if (metaEl) {
-                        let infoText = `Terdeteksi <strong>${validRules.length} rule</strong> siap diimpor.`;
-                        if (content.exported_at) {
-                            const d = new Date(content.exported_at);
-                            infoText += ` Dibuat pada: ${d.toLocaleString('id-ID')}.`;
-                        }
-                        metaEl.innerHTML = infoText;
+                    document.getElementById('import-filename').textContent = file.name;
+                    document.getElementById('import-filesize').textContent = (file.size / 1024).toFixed(1) + ' KB';
+                    document.getElementById('import-rule-count').textContent = `${validRules.length} Rules`;
+                    
+                    let infoText = `Terdeteksi <strong>${validRules.length} auto reply rule</strong> siap diimpor.`;
+                    if (content.exported_at) {
+                        infoText += ` Dibuat pada: ${new Date(content.exported_at).toLocaleDateString('id-ID')}.`;
                     }
+                    document.getElementById('import-file-meta').innerHTML = infoText;
 
                     if (previewBox) previewBox.classList.remove('d-none');
                     if (submitBtn) submitBtn.disabled = false;
 
                 } catch (err) {
                     console.error('JSON Parse error:', err);
-                    Swal.fire('Format Tidak Valid', 'File JSON rusak atau tidak valid: ' + err.message, 'error');
+                    showToast('error', 'File JSON rusak atau tidak valid: ' + err.message);
                     event.target.value = '';
                     importedRulesData = null;
                     if (previewBox) previewBox.classList.add('d-none');
@@ -2230,7 +2479,7 @@
 
         async function submitImportRules() {
             if (!importedRulesData || importedRulesData.length === 0) {
-                Swal.fire('Error', 'Tidak ada data rules untuk diimpor.', 'error');
+                showToast('error', 'Tidak ada data rule untuk diimpor.');
                 return;
             }
 
@@ -2246,7 +2495,7 @@
             if (targetSessionVal && targetSessionVal !== '__keep__') {
                 payload.session_id = targetSessionVal;
             } else if (targetSessionVal === '') {
-                payload.session_id = null; // force global
+                payload.session_id = null;
             }
 
             try {
@@ -2282,8 +2531,9 @@
                         confirmButtonText: 'Tutup'
                     });
 
-                    loadRules();
-                    loadStats();
+                    await loadPackages();
+                    await loadRules();
+                    await loadStats();
                 } else {
                     Swal.fire('Gagal Import', data.error || 'Gagal mengimpor rules.', 'error');
                     if (submitBtn) {
