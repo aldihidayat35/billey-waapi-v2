@@ -363,6 +363,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initial Fetch via REST API
     fetchSessionDetail();
+    fetchSessionTemplatePackages();
+
+    document.getElementById('btnSaveSessionPackages')?.addEventListener('click', saveSessionTemplatePackages);
 });
 
 // Socket.IO Events
@@ -605,4 +608,146 @@ function reconnectViaPairing() {
             });
         }
     });
+}
+
+// ============================================
+// Session Template Packages
+// ============================================
+async function fetchSessionTemplatePackages() {
+    if (!currentSessionId) return;
+    const container = document.getElementById('sessionTemplatePackagesContainer');
+    if (!container) return;
+
+    try {
+        const res = await fetch(`/api/sessions/${encodeURIComponent(currentSessionId)}/template-packages`);
+        const data = await res.json();
+
+        if (!data.success) {
+            container.innerHTML = `<div class="col-12 text-danger fs-7">Gagal memuat paket template: ${data.error || 'Unknown error'}</div>`;
+            return;
+        }
+
+        const allPackages = data.all || [];
+        const assigned = data.assigned || [];
+        const assignedIds = new Set(assigned.map(p => Number(p.id)));
+
+        if (allPackages.length === 0) {
+            container.innerHTML = `
+                <div class="col-12 text-muted fs-7">
+                    Belum ada kelompok paket template. Buat paket terlebih dahulu di <a href="templates.html" class="fw-bold text-primary">Halaman Chat Templates</a>.
+                </div>
+            `;
+            return;
+        }
+
+        const isNoneAssigned = assigned.length === 0;
+        let html = '';
+        allPackages.forEach(pkg => {
+            const isChecked = assignedIds.has(Number(pkg.id));
+            const isDefaultFallback = isNoneAssigned && pkg.is_default === 1;
+
+            html += `
+                <div class="col-md-6 col-lg-4">
+                    <div class="border rounded p-3 d-flex align-items-start gap-3 h-100 bg-light ${isChecked ? 'border-primary' : 'border-gray-300'}">
+                        <div class="form-check form-check-custom form-check-solid mt-1">
+                            <input class="form-check-input session-pkg-check" type="checkbox" value="${pkg.id}" id="pkg_${pkg.id}" ${isChecked ? 'checked' : ''}>
+                        </div>
+                        <div class="flex-grow-1">
+                            <label class="form-check-label fw-bold text-gray-800 d-flex align-items-center gap-2 cursor-pointer mb-1" for="pkg_${pkg.id}">
+                                <span class="badge" style="background-color: ${pkg.color || '#3699FF'}; color: #fff; font-size: 0.8rem;">
+                                    ${escapeHtml(pkg.name)}
+                                </span>
+                                ${pkg.is_default ? '<span class="badge badge-light-primary fs-8">Default</span>' : ''}
+                            </label>
+                            <div class="text-muted fs-8 mb-1">${escapeHtml(pkg.description || 'Tidak ada deskripsi')}</div>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge badge-light fs-8 text-gray-700">
+                                    <i class="bi bi-file-text me-1 text-primary"></i>${pkg.template_count || 0} template
+                                </span>
+                                ${isDefaultFallback ? '<span class="text-warning fs-8 fst-italic">(aktif otomatis sbg default)</span>' : ''}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        container.innerHTML = html;
+
+        // Status hint
+        const hint = document.getElementById('sessionPackageStatusHint');
+        if (hint) {
+            if (assigned.length > 0) {
+                const names = assigned.map(p => p.name).join(', ');
+                hint.innerHTML = `<i class="bi bi-check-circle-fill text-success me-1"></i>Paket aktif khusus: <strong>${escapeHtml(names)}</strong>`;
+            } else {
+                hint.innerHTML = `<i class="bi bi-info-circle text-primary me-1"></i>Tidak ada paket khusus dipilih. Menggunakan paket bawaan (Default).`;
+            }
+        }
+    } catch (err) {
+        console.error('Error fetching session template packages:', err);
+        container.innerHTML = `<div class="col-12 text-danger fs-7">Terjadi kesalahan saat memuat paket template.</div>`;
+    }
+}
+
+async function saveSessionTemplatePackages() {
+    if (!currentSessionId) return;
+
+    const btn = document.getElementById('btnSaveSessionPackages');
+    const checkedInputs = Array.from(document.querySelectorAll('.session-pkg-check:checked'));
+    const selectedIds = checkedInputs.map(el => Number(el.value));
+
+    const originalBtnHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Menyimpan...';
+    }
+
+    try {
+        const res = await fetch(`/api/sessions/${encodeURIComponent(currentSessionId)}/template-packages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ package_ids: selectedIds })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            Swal.fire({
+                icon: 'success',
+                title: 'Berhasil!',
+                text: 'Paket template untuk session ini berhasil disimpan.',
+                timer: 1800,
+                showConfirmButton: false
+            });
+            await fetchSessionTemplatePackages();
+        } else {
+            Swal.fire({
+                icon: 'error',
+                title: 'Gagal Menyimpan',
+                text: data.error || 'Terjadi kesalahan saat menyimpan paket template.'
+            });
+        }
+    } catch (err) {
+        console.error('Error saving session template packages:', err);
+        Swal.fire({
+            icon: 'error',
+            title: 'Kesalahan Server',
+            text: err.message
+        });
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalBtnHtml;
+        }
+    }
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
 }

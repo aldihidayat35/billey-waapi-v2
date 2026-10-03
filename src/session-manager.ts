@@ -779,7 +779,7 @@ export class SessionManager {
 							
 							// Process each template code
 							for (const templateCode of uniqueCodes) {
-								const template = chatTemplateDb.getByCode(templateCode)
+								const template = chatTemplateDb.getByCodeForSession(sessionId, templateCode)
 								
 								if (template) {
 									console.log(`✅ Template found: ${template.code} - "${template.title || 'No title'}"`)
@@ -1041,7 +1041,7 @@ export class SessionManager {
 										// Handle different response types
 										if (matchedRule.response_type === 'template') {
 											// Get template by code
-											const template = chatTemplateDb.getByCode(matchedRule.response_content)
+											const template = chatTemplateDb.getByCodeForSession(sessionId, matchedRule.response_content)
 											if (template) {
 												if (template.media_data) {
 													// Send template with media

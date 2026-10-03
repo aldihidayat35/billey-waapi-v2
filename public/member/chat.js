@@ -2836,15 +2836,20 @@ console.log('✅ Member chat portal initialized');
 const TPL = {
     templates: [],
     loaded: false,
+    lastSession: null,
 };
 
-async function loadTemplates() {
-    if (TPL.loaded) return;
+async function loadTemplates(force = false) {
+    if (TPL.loaded && !force && TPL.lastSession === S.activeSession) return;
     try {
-        const r = await fetch('/api/member/templates');
+        const url = S.activeSession 
+            ? `/api/member/templates?sessionId=${encodeURIComponent(S.activeSession)}`
+            : '/api/member/templates';
+        const r = await fetch(url);
         const d = await r.json();
         TPL.templates = d.templates || [];
         TPL.loaded = true;
+        TPL.lastSession = S.activeSession;
     } catch { TPL.templates = []; }
 }
 
@@ -2852,7 +2857,7 @@ function openTemplatePicker() {
     const overlay = document.getElementById('tpl-overlay');
     overlay.classList.add('show');
     document.getElementById('tpl-search-input').value = '';
-    loadTemplates().then(() => renderTemplateList());
+    loadTemplates(true).then(() => renderTemplateList());
     setTimeout(() => document.getElementById('tpl-search-input').focus(), 200);
 }
 
@@ -2881,11 +2886,14 @@ function renderTemplateList(filter = '') {
     items.forEach((t, idx) => {
         const preview = t.content.length > 100 ? t.content.substring(0, 100) + '…' : t.content;
         const mediaBadge = t.has_media ? `<span class="tpl-media-badge"><i class="bi bi-image"></i>Gambar</span>` : '';
+        const pkgBadge = t.package_name 
+            ? `<span class="badge" style="font-size:0.65rem; background-color:${t.package_color || '#3699FF'}; color:#fff; margin-left:6px; padding:2px 6px; border-radius:4px; font-weight:500;">${escHtml(t.package_name)}</span>` 
+            : '';
         const title = t.title ? `<div class="tpl-title">${escHtml(t.title)}</div>` : '';
         const div = document.createElement('div');
         div.className = 'tpl-item';
         div.dataset.idx = idx;
-        div.innerHTML = `<div><span class="tpl-code">${escHtml(t.code)}</span>${mediaBadge}</div>${title}<div class="tpl-preview">${escHtml(preview)}</div>`;
+        div.innerHTML = `<div><span class="tpl-code">${escHtml(t.code)}</span>${pkgBadge}${mediaBadge}</div>${title}<div class="tpl-preview">${escHtml(preview)}</div>`;
         div.addEventListener('click', () => {
             closeTemplatePicker();
             const input = document.getElementById('msg-input');

@@ -74,10 +74,36 @@ db.exec(`
         timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
+    -- Chat Template Packages Table
+    CREATE TABLE IF NOT EXISTS chat_template_packages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        description TEXT,
+        color TEXT DEFAULT '#009ef7',
+        priority INTEGER DEFAULT 0,
+        is_default INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    -- Session Template Packages (Many-to-Many)
+    CREATE TABLE IF NOT EXISTS session_template_packages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id TEXT NOT NULL,
+        package_id INTEGER NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(session_id, package_id),
+        FOREIGN KEY (package_id) REFERENCES chat_template_packages(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_session_template_packages_session ON session_template_packages(session_id);
+    CREATE INDEX IF NOT EXISTS idx_session_template_packages_package ON session_template_packages(package_id);
+
     -- Chat Templates Table
     CREATE TABLE IF NOT EXISTS chat_templates (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        code TEXT NOT NULL UNIQUE COLLATE NOCASE,
+        package_id INTEGER DEFAULT 1 REFERENCES chat_template_packages(id) ON DELETE SET NULL,
+        code TEXT NOT NULL COLLATE NOCASE,
         title TEXT,
         content TEXT NOT NULL,
         description TEXT,
@@ -86,7 +112,9 @@ db.exec(`
         media_filename TEXT,
         is_active INTEGER DEFAULT 1,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        user_id INTEGER,
+        UNIQUE(package_id, code COLLATE NOCASE)
     );
 
     -- Group Exports Table
@@ -322,6 +350,81 @@ try {
     console.error('⚠️ Migration error (may be safe to ignore):', migrationError)
 }
 
+// Migration: Ensure chat_template_packages, session_template_packages, and default package exist
+try {
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS chat_template_packages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            description TEXT,
+            color TEXT DEFAULT '#009ef7',
+            priority INTEGER DEFAULT 0,
+            is_default INTEGER DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS session_template_packages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT NOT NULL,
+            package_id INTEGER NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(session_id, package_id),
+            FOREIGN KEY (package_id) REFERENCES chat_template_packages(id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_session_template_packages_session ON session_template_packages(session_id);
+        CREATE INDEX IF NOT EXISTS idx_session_template_packages_package ON session_template_packages(package_id);
+    `);
+
+    // Ensure default package exists
+    const defaultPkg = db.prepare('SELECT id FROM chat_template_packages WHERE is_default = 1').get()
+    if (!defaultPkg) {
+        db.prepare(`
+            INSERT INTO chat_template_packages (id, name, description, color, priority, is_default)
+            VALUES (1, 'Umum / Default', 'Paket template bawaan', '#009ef7', 0, 1)
+        `).run()
+    }
+
+    const tableSql = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='chat_templates'").get() as any
+    if (tableSql && tableSql.sql && !tableSql.sql.includes('package_id')) {
+        console.log('🔄 Migrating chat_templates to support package_id and composite unique constraint...')
+        db.transaction(() => {
+            db.exec(`
+                CREATE TABLE IF NOT EXISTS chat_templates_v2 (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    package_id INTEGER DEFAULT 1 REFERENCES chat_template_packages(id) ON DELETE SET NULL,
+                    code TEXT NOT NULL COLLATE NOCASE,
+                    title TEXT,
+                    content TEXT NOT NULL,
+                    description TEXT,
+                    media_data TEXT,
+                    media_mimetype TEXT,
+                    media_filename TEXT,
+                    is_active INTEGER DEFAULT 1,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    user_id INTEGER,
+                    UNIQUE(package_id, code COLLATE NOCASE)
+                );
+
+                INSERT INTO chat_templates_v2 (id, package_id, code, title, content, description, media_data, media_mimetype, media_filename, is_active, created_at, updated_at, user_id)
+                SELECT id, 1, code, title, content, description, media_data, media_mimetype, media_filename, is_active, created_at, updated_at, user_id
+                FROM chat_templates;
+
+                DROP TABLE chat_templates;
+                ALTER TABLE chat_templates_v2 RENAME TO chat_templates;
+                CREATE INDEX IF NOT EXISTS idx_chat_templates_pkg ON chat_templates(package_id);
+                CREATE INDEX IF NOT EXISTS idx_chat_templates_user ON chat_templates(user_id);
+                CREATE INDEX IF NOT EXISTS idx_chat_templates_code ON chat_templates(code);
+            `)
+        })()
+        console.log('✅ chat_templates migration complete')
+    }
+} catch (pkgMigrationError) {
+    console.error('⚠️ Template packages migration error:', pkgMigrationError)
+}
+
 // Migration: Add user_id column for session isolation
 try {
     // Add user_id to chat_templates
@@ -475,9 +578,34 @@ export interface SessionLogEntry {
     timestamp?: string
 }
 
+// Chat Template Package Interface
+export interface ChatTemplatePackageEntry {
+    id?: number
+    name: string
+    description?: string
+    color?: string
+    priority?: number
+    is_default?: number
+    created_at?: string
+    updated_at?: string
+    template_count?: number
+    session_count?: number
+}
+
+// Session Template Package Interface
+export interface SessionTemplatePackageEntry {
+    id?: number
+    session_id: string
+    package_id: number
+    created_at?: string
+}
+
 // Chat Template Interface
 export interface ChatTemplateEntry {
     id?: number
+    package_id?: number | null
+    package_name?: string
+    package_color?: string
     code: string
     title?: string
     content: string
@@ -488,6 +616,7 @@ export interface ChatTemplateEntry {
     is_active?: number
     created_at?: string
     updated_at?: string
+    user_id?: number
 }
 
 // Message Log Functions
@@ -846,17 +975,214 @@ export const sessionLogDb = {
     }
 }
 
+// Chat Template Package Functions
+export const chatTemplatePackageDb = {
+    getAll: (): ChatTemplatePackageEntry[] => {
+        const stmt = db.prepare(`
+            SELECT p.*,
+                (SELECT COUNT(*) FROM chat_templates t WHERE t.package_id = p.id) as template_count,
+                (SELECT COUNT(*) FROM session_template_packages stp WHERE stp.package_id = p.id) as session_count
+            FROM chat_template_packages p
+            ORDER BY p.is_default DESC, p.priority DESC, p.name ASC
+        `)
+        return stmt.all() as ChatTemplatePackageEntry[]
+    },
+
+    getById: (id: number): ChatTemplatePackageEntry | undefined => {
+        const stmt = db.prepare(`
+            SELECT p.*,
+                (SELECT COUNT(*) FROM chat_templates t WHERE t.package_id = p.id) as template_count,
+                (SELECT COUNT(*) FROM session_template_packages stp WHERE stp.package_id = p.id) as session_count
+            FROM chat_template_packages p
+            WHERE p.id = ?
+        `)
+        return stmt.get(id) as ChatTemplatePackageEntry | undefined
+    },
+
+    create: (data: { name: string; description?: string; color?: string; priority?: number; is_default?: number }): { success: boolean; id?: number | bigint; error?: string } => {
+        try {
+            const name = data.name.trim()
+            if (!name) return { success: false, error: 'Nama package wajib diisi' }
+
+            if (data.is_default) {
+                db.prepare('UPDATE chat_template_packages SET is_default = 0').run()
+            }
+
+            const stmt = db.prepare(`
+                INSERT INTO chat_template_packages (name, description, color, priority, is_default, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+            `)
+            const res = stmt.run(
+                name,
+                data.description?.trim() || null,
+                data.color?.trim() || '#009ef7',
+                data.priority !== undefined ? Number(data.priority) : 0,
+                data.is_default ? 1 : 0
+            )
+            return { success: true, id: res.lastInsertRowid }
+        } catch (e: any) {
+            return { success: false, error: e.message }
+        }
+    },
+
+    update: (id: number, data: Partial<ChatTemplatePackageEntry>): { success: boolean; error?: string } => {
+        try {
+            const updates: string[] = []
+            const params: any[] = []
+
+            if (data.name !== undefined) {
+                updates.push('name = ?')
+                params.push(data.name.trim())
+            }
+            if (data.description !== undefined) {
+                updates.push('description = ?')
+                params.push(data.description.trim() || null)
+            }
+            if (data.color !== undefined) {
+                updates.push('color = ?')
+                params.push(data.color.trim())
+            }
+            if (data.priority !== undefined) {
+                updates.push('priority = ?')
+                params.push(Number(data.priority))
+            }
+            if (data.is_default !== undefined) {
+                if (data.is_default) {
+                    db.prepare('UPDATE chat_template_packages SET is_default = 0 WHERE id != ?').run(id)
+                }
+                updates.push('is_default = ?')
+                params.push(data.is_default ? 1 : 0)
+            }
+
+            if (updates.length === 0) return { success: true }
+
+            updates.push("updated_at = datetime('now')")
+            params.push(id)
+
+            db.prepare(`UPDATE chat_template_packages SET ${updates.join(', ')} WHERE id = ?`).run(...params)
+            return { success: true }
+        } catch (e: any) {
+            return { success: false, error: e.message }
+        }
+    },
+
+    delete: (id: number): { success: boolean; error?: string } => {
+        try {
+            const pkg = chatTemplatePackageDb.getById(id)
+            if (!pkg) return { success: false, error: 'Package tidak ditemukan' }
+            if (pkg.is_default) {
+                return { success: false, error: 'Package default tidak dapat dihapus' }
+            }
+
+            // Find default package to reassign templates to
+            const defaultPkg = db.prepare('SELECT id FROM chat_template_packages WHERE is_default = 1').get() as any
+            const fallbackId = defaultPkg ? defaultPkg.id : 1
+
+            db.transaction(() => {
+                // Move templates to fallback package
+                db.prepare('UPDATE chat_templates SET package_id = ? WHERE package_id = ?').run(fallbackId, id)
+                // Delete session assignments
+                db.prepare('DELETE FROM session_template_packages WHERE package_id = ?').run(id)
+                // Delete package
+                db.prepare('DELETE FROM chat_template_packages WHERE id = ?').run(id)
+            })()
+
+            return { success: true }
+        } catch (e: any) {
+            return { success: false, error: e.message }
+        }
+    },
+
+    getPackagesForSession: (sessionId: string): (ChatTemplatePackageEntry & { is_explicit?: boolean })[] => {
+        // Query explicitly assigned packages for this session
+        const explicitStmt = db.prepare(`
+            SELECT p.*,
+                (SELECT COUNT(*) FROM chat_templates t WHERE t.package_id = p.id) as template_count,
+                1 as is_explicit
+            FROM chat_template_packages p
+            JOIN session_template_packages stp ON stp.package_id = p.id
+            WHERE stp.session_id = ?
+            ORDER BY p.priority DESC, p.name ASC
+        `)
+        const explicit = explicitStmt.all(sessionId) as any[]
+
+        if (explicit.length > 0) {
+            return explicit
+        }
+
+        // Fallback to default packages (is_default = 1)
+        const defaultStmt = db.prepare(`
+            SELECT p.*,
+                (SELECT COUNT(*) FROM chat_templates t WHERE t.package_id = p.id) as template_count,
+                0 as is_explicit
+            FROM chat_template_packages p
+            WHERE p.is_default = 1
+            ORDER BY p.priority DESC, p.name ASC
+        `)
+        const defaults = defaultStmt.all() as any[]
+        if (defaults.length > 0) {
+            return defaults
+        }
+
+        // Absolute fallback: package id 1
+        const fallbackStmt = db.prepare(`
+            SELECT p.*,
+                (SELECT COUNT(*) FROM chat_templates t WHERE t.package_id = p.id) as template_count,
+                0 as is_explicit
+            FROM chat_template_packages p
+            LIMIT 1
+        `)
+        return fallbackStmt.all() as any[]
+    },
+
+    setPackagesForSession: (sessionId: string, packageIds: number[]): { success: boolean; error?: string } => {
+        try {
+            db.transaction(() => {
+                db.prepare('DELETE FROM session_template_packages WHERE session_id = ?').run(sessionId)
+                const insert = db.prepare('INSERT INTO session_template_packages (session_id, package_id) VALUES (?, ?)')
+                for (const pkgId of packageIds) {
+                    insert.run(sessionId, pkgId)
+                }
+            })()
+            return { success: true }
+        } catch (e: any) {
+            return { success: false, error: e.message }
+        }
+    },
+
+    getSessionsForPackage: (packageId: number): string[] => {
+        const rows = db.prepare('SELECT session_id FROM session_template_packages WHERE package_id = ?').all(packageId) as any[]
+        return rows.map(r => r.session_id)
+    },
+
+    setSessionsForPackage: (packageId: number, sessionIds: string[]): { success: boolean; error?: string } => {
+        try {
+            db.transaction(() => {
+                db.prepare('DELETE FROM session_template_packages WHERE package_id = ?').run(packageId)
+                const insert = db.prepare('INSERT INTO session_template_packages (session_id, package_id) VALUES (?, ?)')
+                for (const sid of sessionIds) {
+                    insert.run(sid, packageId)
+                }
+            })()
+            return { success: true }
+        } catch (e: any) {
+            return { success: false, error: e.message }
+        }
+    }
+}
+
 // Chat Template Functions
 export const chatTemplateDb = {
     // Create new template
     create: (template: ChatTemplateEntry): { success: boolean; id?: number | bigint; error?: string } => {
         try {
             const stmt = db.prepare(`
-                INSERT INTO chat_templates (code, title, content, description, media_data, media_mimetype, media_filename, is_active, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+                INSERT INTO chat_templates (package_id, code, title, content, description, media_data, media_mimetype, media_filename, is_active, user_id, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
             `)
             
             const result = stmt.run(
+                template.package_id || 1,
                 template.code.toUpperCase().trim(),
                 template.title || null,
                 template.content,
@@ -864,28 +1190,43 @@ export const chatTemplateDb = {
                 template.media_data || null,
                 template.media_mimetype || null,
                 template.media_filename || null,
-                template.is_active !== undefined ? template.is_active : 1
+                template.is_active !== undefined ? template.is_active : 1,
+                template.user_id || null
             )
             
             return { success: true, id: result.lastInsertRowid }
         } catch (error: any) {
             if (error.message.includes('UNIQUE constraint failed')) {
-                return { success: false, error: 'Template dengan kode tersebut sudah ada' }
+                return { success: false, error: 'Template dengan kode tersebut sudah ada dalam package ini' }
             }
             return { success: false, error: error.message }
         }
     },
 
     // Get all templates
-    getAll: (options: { activeOnly?: boolean; limit?: number; offset?: number } = {}): ChatTemplateEntry[] => {
-        let query = 'SELECT * FROM chat_templates'
+    getAll: (options: { activeOnly?: boolean; packageId?: number; sessionId?: string; limit?: number; offset?: number } = {}): ChatTemplateEntry[] => {
+        let query = 'SELECT t.*, p.name as package_name, p.color as package_color FROM chat_templates t LEFT JOIN chat_template_packages p ON t.package_id = p.id WHERE 1=1'
         const params: any[] = []
 
         if (options.activeOnly) {
             query += ' WHERE is_active = 1'
         }
 
-        query += ' ORDER BY code ASC'
+        if (options.packageId) {
+            query += ' AND t.package_id = ?'
+            params.push(options.packageId)
+        } else if (options.sessionId) {
+            const assigned = chatTemplatePackageDb.getPackagesForSession(options.sessionId)
+            const packageIds = assigned.map(pkg => pkg.id).filter(id => id !== undefined)
+            if (packageIds.length > 0) {
+                query += ` AND t.package_id IN (${packageIds.map(() => '?').join(', ')})`
+                params.push(...packageIds)
+            } else {
+                query += ' AND 1=0'
+            }
+        }
+
+        query += ' ORDER BY COALESCE(p.priority, 0) DESC, t.code ASC'
 
         if (options.limit) {
             query += ' LIMIT ?'
@@ -903,14 +1244,42 @@ export const chatTemplateDb = {
 
     // Get template by ID
     getById: (id: number): ChatTemplateEntry | undefined => {
-        const stmt = db.prepare('SELECT * FROM chat_templates WHERE id = ?')
+        const stmt = db.prepare('SELECT t.*, p.name as package_name, p.color as package_color FROM chat_templates t LEFT JOIN chat_template_packages p ON t.package_id = p.id WHERE t.id = ?')
         return stmt.get(id) as ChatTemplateEntry | undefined
     },
 
     // Get template by code (case-insensitive)
     getByCode: (code: string): ChatTemplateEntry | undefined => {
-        const stmt = db.prepare('SELECT * FROM chat_templates WHERE code = ? COLLATE NOCASE AND is_active = 1')
+        const stmt = db.prepare('SELECT t.*, p.name as package_name, p.color as package_color FROM chat_templates t LEFT JOIN chat_template_packages p ON t.package_id = p.id WHERE t.code = ? COLLATE NOCASE AND t.is_active = 1 ORDER BY COALESCE(p.priority, 0) DESC, t.id DESC LIMIT 1')
         return stmt.get(code.toUpperCase().trim()) as ChatTemplateEntry | undefined
+    },
+
+    // Get template by code for a specific session (respects session active packages, priority order)
+    getByCodeForSession: (sessionId: string, code: string): ChatTemplateEntry | undefined => {
+        if (!sessionId) {
+            return chatTemplateDb.getByCode(code)
+        }
+
+        const assigned = chatTemplatePackageDb.getPackagesForSession(sessionId)
+        const packageIds = assigned.map(pkg => pkg.id).filter(id => id !== undefined)
+
+        if (packageIds.length === 0) {
+            return undefined
+        }
+
+        const placeholders = packageIds.map(() => '?').join(', ')
+        const stmt = db.prepare(`
+            SELECT t.*, p.name as package_name, p.color as package_color, p.priority as package_priority
+            FROM chat_templates t
+            JOIN chat_template_packages p ON t.package_id = p.id
+            WHERE t.code = ? COLLATE NOCASE
+              AND t.is_active = 1
+              AND t.package_id IN (${placeholders})
+            ORDER BY p.priority DESC, t.id DESC
+            LIMIT 1
+        `)
+
+        return stmt.get(code.toUpperCase().trim(), ...packageIds) as ChatTemplateEntry | undefined
     },
 
     // Update template
@@ -919,6 +1288,10 @@ export const chatTemplateDb = {
             const updates: string[] = []
             const params: any[] = []
 
+            if (template.package_id !== undefined) {
+                updates.push('package_id = ?')
+                params.push(template.package_id)
+            }
             if (template.code !== undefined) {
                 updates.push('code = ?')
                 params.push(template.code.toUpperCase().trim())
@@ -1005,27 +1378,39 @@ export const chatTemplateDb = {
     // Search templates
     search: (query: string): ChatTemplateEntry[] => {
         const stmt = db.prepare(`
-            SELECT * FROM chat_templates 
-            WHERE (code LIKE ? OR title LIKE ? OR content LIKE ? OR description LIKE ?)
+            SELECT t.*, p.name as package_name, p.color as package_color FROM chat_templates t LEFT JOIN chat_template_packages p ON t.package_id = p.id 
+            WHERE (t.code LIKE ? OR t.title LIKE ? OR t.content LIKE ? OR t.description LIKE ? OR p.name LIKE ?)
             AND is_active = 1
-            ORDER BY code ASC
+            ORDER BY COALESCE(p.priority, 0) DESC, t.code ASC
         `)
         const pattern = `%${query}%`
-        return stmt.all(pattern, pattern, pattern, pattern) as ChatTemplateEntry[]
+        return stmt.all(pattern, pattern, pattern, pattern, pattern) as ChatTemplateEntry[]
     },
 
     // Get count
-    getCount: (activeOnly: boolean = false): number => {
-        let query = 'SELECT COUNT(*) as count FROM chat_templates'
+    getCount: (options: { activeOnly?: boolean; packageId?: number } | boolean = {}): number => {
+        const opts = typeof options === 'boolean' ? { activeOnly: options } : options
+        const activeOnly = opts.activeOnly
+        let query = 'SELECT COUNT(*) as count FROM chat_templates WHERE 1=1'
+        const params: any[] = []
         if (activeOnly) query += ' WHERE is_active = 1'
-        const result = db.prepare(query).get() as any
+        if (opts.packageId) {
+            query += ' AND package_id = ?'
+            params.push(opts.packageId)
+        }
+        const result = db.prepare(query).get(...params) as any
         return result?.count || 0
     },
 
     // Check if code exists
-    codeExists: (code: string, excludeId?: number): boolean => {
+    codeExists: (code: string, excludeId?: number, packageId?: number): boolean => {
         let query = 'SELECT 1 FROM chat_templates WHERE code = ? COLLATE NOCASE'
         const params: any[] = [code.toUpperCase().trim()]
+        
+        if (packageId) {
+            query += ' AND package_id = ?'
+            params.push(packageId)
+        }
         
         if (excludeId) {
             query += ' AND id != ?'
@@ -1044,17 +1429,24 @@ export const chatTemplateDb = {
         const errors: string[] = []
 
         const insertStmt = db.prepare(`
-            INSERT INTO chat_templates (code, title, content, description, media_data, media_mimetype, media_filename, is_active, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+            INSERT INTO chat_templates (package_id, code, title, content, description, media_data, media_mimetype, media_filename, is_active, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
         `)
 
         const updateStmt = db.prepare(`
             UPDATE chat_templates 
             SET title = ?, content = ?, description = ?, media_data = ?, media_mimetype = ?, media_filename = ?, is_active = ?, updated_at = datetime('now')
-            WHERE code = ? COLLATE NOCASE
+            WHERE package_id = ? AND code = ? COLLATE NOCASE
         `)
 
-        const checkStmt = db.prepare('SELECT id FROM chat_templates WHERE code = ? COLLATE NOCASE')
+        const checkStmt = db.prepare('SELECT id FROM chat_templates WHERE package_id = ? AND code = ? COLLATE NOCASE')
+        const getPkgByNameStmt = db.prepare('SELECT id FROM chat_template_packages WHERE name = ? COLLATE NOCASE')
+        const insertPkgStmt = db.prepare(`
+            INSERT INTO chat_template_packages (name, description, color, priority, is_default, created_at, updated_at)
+            VALUES (?, '', '#3699FF', 0, 0, datetime('now'), datetime('now'))
+        `)
+
+        const pkgCache = new Map<string, number>()
 
         const runImport = db.transaction((items: any[]) => {
             for (const item of items) {
@@ -1070,7 +1462,26 @@ export const chatTemplateDb = {
                     continue
                 }
 
-                const existing = checkStmt.get(cleanCode) as any
+                let targetPkgId = 1
+                if (item.package_name && typeof item.package_name === 'string' && item.package_name.trim()) {
+                    const pkgName = item.package_name.trim()
+                    if (pkgCache.has(pkgName.toLowerCase())) {
+                        targetPkgId = pkgCache.get(pkgName.toLowerCase())!
+                    } else {
+                        const existingPkg = getPkgByNameStmt.get(pkgName) as any
+                        if (existingPkg) {
+                            targetPkgId = Number(existingPkg.id)
+                        } else {
+                            const res = insertPkgStmt.run(pkgName)
+                            targetPkgId = Number(res.lastInsertRowid)
+                        }
+                        pkgCache.set(pkgName.toLowerCase(), targetPkgId)
+                    }
+                } else if (item.package_id) {
+                    targetPkgId = Number(item.package_id)
+                }
+
+                const existing = checkStmt.get(targetPkgId, cleanCode) as any
 
                 if (existing) {
                     if (overwrite) {
@@ -1082,6 +1493,7 @@ export const chatTemplateDb = {
                             item.media_mimetype || null,
                             item.media_filename || null,
                             item.is_active !== undefined ? (item.is_active ? 1 : 0) : 1,
+                            targetPkgId,
                             cleanCode
                         )
                         updated++
@@ -1090,6 +1502,7 @@ export const chatTemplateDb = {
                     }
                 } else {
                     insertStmt.run(
+                        targetPkgId,
                         cleanCode,
                         item.title || null,
                         item.content,
@@ -2819,7 +3232,7 @@ export const messageMutationDb = {
             params.push(direction)
         }
         if (participant) {
-            where += ' AND (participant = ? OR participant IS NULL OR participant = "")'
+            where += " AND (participant = ? OR participant IS NULL OR participant = '')"
             params.push(participant)
         }
 

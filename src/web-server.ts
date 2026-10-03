@@ -3,7 +3,7 @@ import { createServer } from 'http'
 import { Server as SocketIO } from 'socket.io'
 import { SessionManager } from './session-manager'
 import { logger as activityLogger } from './logger'
-import { messageLogDb, messageMutationDb, sessionLogDb, chatTemplateDb, groupExportDb, autoReplyDb, autoReplyLogDb, autoReplyCooldownDb, autoForwardConfigDb, autoForwardTokenDb, autoForwardLogDb, db, dbMaintenance, memberSessionDb, startMediaAutoCleanup, fcmTokenDb, notificationDb, appSettingDb } from './database.js'
+import { messageLogDb, messageMutationDb, sessionLogDb, chatTemplateDb, chatTemplatePackageDb, groupExportDb, autoReplyDb, autoReplyLogDb, autoReplyCooldownDb, autoForwardConfigDb, autoForwardTokenDb, autoForwardLogDb, db, dbMaintenance, memberSessionDb, startMediaAutoCleanup, fcmTokenDb, notificationDb, appSettingDb } from './database.js'
 import * as fs from 'fs'
 import * as path from 'path'
 import { fileURLToPath } from 'url'
@@ -1871,10 +1871,14 @@ app.post('/api/chat/unhide', authMiddleware, (req, res) => {
 
 app.get('/api/member/templates', authMiddleware, (req, res) => {
 	try {
-		const templates = chatTemplateDb.getAll({ activeOnly: true })
+		const sessionId = req.query.sessionId as string | undefined
+		const templates = chatTemplateDb.getAll({ activeOnly: true, sessionId })
 		// Strip media_data from list response to keep it lightweight
 		const lightweight = templates.map((t: any) => ({
 			id: t.id,
+			package_id: t.package_id,
+			package_name: t.package_name,
+			package_color: t.package_color,
 			code: t.code,
 			title: t.title,
 			content: t.content,
@@ -3448,7 +3452,7 @@ io.on('connection', (socket) => {
 				const pureNotFoundCodes: string[] = []
 
 				for (const code of uniqueCodes) {
-					const template = chatTemplateDb.getByCode(code)
+					const template = chatTemplateDb.getByCodeForSession(data.sessionId, code)
 					if (template) {
 						foundTemplates.push({ code, template })
 					} else {
@@ -3620,7 +3624,7 @@ io.on('connection', (socket) => {
 				const notFoundCodes: string[] = []
 				
 				for (const code of uniqueCodes) {
-					const template = chatTemplateDb.getByCode(code)
+					const template = chatTemplateDb.getByCodeForSession(data.sessionId, code)
 					
 					if (template) {
 						console.log(`✅ Template found: ${template.code} - "${template.title || 'No title'}"`)
@@ -4469,8 +4473,10 @@ app.post('/api/database/vacuum', (req, res) => {
 app.get('/api/templates', (req, res) => {
 	try {
 		const activeOnly = req.query.activeOnly === 'true'
-		const templates = chatTemplateDb.getAll({ activeOnly })
-		const count = chatTemplateDb.getCount(activeOnly)
+		const packageId = req.query.packageId ? Number(req.query.packageId) : undefined
+		const sessionId = req.query.sessionId as string | undefined
+		const templates = chatTemplateDb.getAll({ activeOnly, packageId, sessionId })
+		const count = templates.length
 		
 		res.json({
 			success: true,
@@ -4495,6 +4501,8 @@ app.get('/api/templates/export', (req, res) => {
 			total_templates: templates.length,
 			templates: templates.map(t => ({
 				code: t.code,
+				package_id: t.package_id,
+				package_name: t.package_name || 'Umum / Default',
 				title: t.title,
 				content: t.content,
 				description: t.description,
@@ -4583,7 +4591,7 @@ app.get('/api/templates/code/:code', (req, res) => {
 // Create new template
 app.post('/api/templates', (req, res) => {
 	try {
-		const { code, title, content, description, is_active, media_data, media_mimetype, media_filename } = req.body
+		const { code, title, content, description, is_active, media_data, media_mimetype, media_filename, package_id } = req.body
 		
 		// Validation
 		if (!code || !code.trim()) {
@@ -4602,15 +4610,18 @@ app.post('/api/templates', (req, res) => {
 			})
 		}
 		
-		// Check if code already exists
-		if (chatTemplateDb.codeExists(code)) {
+		const targetPackageId = package_id ? Number(package_id) : 1
+
+		// Check if code already exists in target package
+		if (chatTemplateDb.codeExists(code, undefined, targetPackageId)) {
 			return res.status(400).json({ 
 				success: false, 
-				error: 'Template dengan kode tersebut sudah ada' 
+				error: 'Template dengan kode tersebut sudah ada di paket ini' 
 			})
 		}
 		
 		const result = chatTemplateDb.create({
+			package_id: targetPackageId,
 			code: code.trim(),
 			title: title?.trim() || null,
 			content: content.trim(),
@@ -4641,7 +4652,7 @@ app.post('/api/templates', (req, res) => {
 app.put('/api/templates/:id', (req, res) => {
 	try {
 		const id = parseInt(req.params.id)
-		const { code, title, content, description, is_active, media_data, media_mimetype, media_filename } = req.body
+		const { code, title, content, description, is_active, media_data, media_mimetype, media_filename, package_id } = req.body
 		
 		// Check if template exists
 		const existing = chatTemplateDb.getById(id)
@@ -4666,15 +4677,18 @@ app.put('/api/templates/:id', (req, res) => {
 			})
 		}
 		
-		// Check if new code already exists (excluding current template)
-		if (code && chatTemplateDb.codeExists(code, id)) {
+		const targetPackageId = package_id !== undefined ? Number(package_id) : (existing.package_id || 1)
+
+		// Check if new code already exists in package (excluding current template)
+		if (code && chatTemplateDb.codeExists(code, id, targetPackageId)) {
 			return res.status(400).json({ 
 				success: false, 
-				error: 'Template dengan kode tersebut sudah ada' 
+				error: 'Template dengan kode tersebut sudah ada di paket ini' 
 			})
 		}
 		
 		const updateData: any = {}
+		if (package_id !== undefined) updateData.package_id = Number(package_id)
 		if (code !== undefined) updateData.code = code.trim()
 		if (title !== undefined) updateData.title = title?.trim() || null
 		if (content !== undefined) updateData.content = content.trim()
@@ -4765,6 +4779,168 @@ app.get('/api/templates/search/:query', (req, res) => {
 		})
 	} catch (error: any) {
 		console.error('Error searching templates:', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// ============================================
+// Chat Template Packages API Endpoints
+// ============================================
+
+// Get all template packages
+app.get('/api/template-packages', (req, res) => {
+	try {
+		const packages = chatTemplatePackageDb.getAll()
+		res.json({ success: true, packages })
+	} catch (error: any) {
+		console.error('Error getting template packages:', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Get single package by ID
+app.get('/api/template-packages/:id', (req, res) => {
+	try {
+		const id = parseInt(req.params.id)
+		const pkg = chatTemplatePackageDb.getById(id)
+		if (!pkg) {
+			return res.status(404).json({ success: false, error: 'Paket template tidak ditemukan' })
+		}
+		res.json({ success: true, package: pkg })
+	} catch (error: any) {
+		console.error('Error getting template package:', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Create template package
+app.post('/api/template-packages', (req, res) => {
+	try {
+		const { name, description, color, priority, is_default } = req.body
+		if (!name || !name.trim()) {
+			return res.status(400).json({ success: false, error: 'Nama paket template wajib diisi' })
+		}
+		const result = chatTemplatePackageDb.create({
+			name: name.trim(),
+			description: description?.trim() || null,
+			color: color?.trim() || '#3699FF',
+			priority: Number(priority || 0),
+			is_default: is_default ? 1 : 0
+		})
+		if (result.success) {
+			const pkg = chatTemplatePackageDb.getById(Number(result.id))
+			res.json({ success: true, message: 'Paket template berhasil dibuat', package: pkg })
+		} else {
+			res.status(400).json({ success: false, error: result.error })
+		}
+	} catch (error: any) {
+		console.error('Error creating template package:', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Update template package
+app.put('/api/template-packages/:id', (req, res) => {
+	try {
+		const id = parseInt(req.params.id)
+		const existing = chatTemplatePackageDb.getById(id)
+		if (!existing) {
+			return res.status(404).json({ success: false, error: 'Paket template tidak ditemukan' })
+		}
+		const { name, description, color, priority, is_default } = req.body
+		const updateData: any = {}
+		if (name !== undefined) updateData.name = name.trim()
+		if (description !== undefined) updateData.description = description?.trim() || null
+		if (color !== undefined) updateData.color = color?.trim() || '#3699FF'
+		if (priority !== undefined) updateData.priority = Number(priority || 0)
+		if (is_default !== undefined) updateData.is_default = is_default ? 1 : 0
+
+		const result = chatTemplatePackageDb.update(id, updateData)
+		if (result.success) {
+			const updated = chatTemplatePackageDb.getById(id)
+			res.json({ success: true, message: 'Paket template berhasil diperbarui', package: updated })
+		} else {
+			res.status(400).json({ success: false, error: result.error })
+		}
+	} catch (error: any) {
+		console.error('Error updating template package:', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Delete template package
+app.delete('/api/template-packages/:id', (req, res) => {
+	try {
+		const id = parseInt(req.params.id)
+		const result = chatTemplatePackageDb.delete(id)
+		if (result.success) {
+			res.json({ success: true, message: 'Paket template berhasil dihapus' })
+		} else {
+			res.status(400).json({ success: false, error: result.error })
+		}
+	} catch (error: any) {
+		console.error('Error deleting template package:', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Get assigned packages for a session
+app.get('/api/sessions/:sessionId/template-packages', (req, res) => {
+	try {
+		const sessionId = req.params.sessionId
+		const assignedPackages = chatTemplatePackageDb.getPackagesForSession(sessionId)
+		const allPackages = chatTemplatePackageDb.getAll()
+		res.json({
+			success: true,
+			assigned: assignedPackages,
+			all: allPackages
+		})
+	} catch (error: any) {
+		console.error('Error getting session template packages:', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Save assigned packages for a session
+app.post('/api/sessions/:sessionId/template-packages', (req, res) => {
+	try {
+		const sessionId = req.params.sessionId
+		const { package_ids } = req.body
+		if (!Array.isArray(package_ids)) {
+			return res.status(400).json({ success: false, error: 'package_ids harus berupa array' })
+		}
+		chatTemplatePackageDb.setPackagesForSession(sessionId, package_ids.map(Number))
+		res.json({ success: true, message: 'Paket template sesi berhasil disimpan' })
+	} catch (error: any) {
+		console.error('Error setting session template packages:', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Get sessions assigned to a package
+app.get('/api/template-packages/:id/sessions', (req, res) => {
+	try {
+		const id = parseInt(req.params.id)
+		const sessions = chatTemplatePackageDb.getSessionsForPackage(id)
+		res.json({ success: true, sessions })
+	} catch (error: any) {
+		console.error('Error getting sessions for package:', error)
+		res.status(500).json({ success: false, error: error.message })
+	}
+})
+
+// Set sessions assigned to a package
+app.post('/api/template-packages/:id/sessions', (req, res) => {
+	try {
+		const id = parseInt(req.params.id)
+		const { session_ids } = req.body
+		if (!Array.isArray(session_ids)) {
+			return res.status(400).json({ success: false, error: 'session_ids harus berupa array' })
+		}
+		chatTemplatePackageDb.setSessionsForPackage(id, session_ids)
+		res.json({ success: true, message: 'Sesi untuk paket template berhasil disimpan' })
+	} catch (error: any) {
+		console.error('Error setting sessions for package:', error)
 		res.status(500).json({ success: false, error: error.message })
 	}
 })

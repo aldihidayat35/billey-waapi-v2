@@ -275,6 +275,36 @@
                                                 </div>
                                             </div>
                         
+                                            <!-- Row 1.5: Paket Chat Template -->
+                                            <div class="card card-flush border border-gray-300 shadow-sm mb-5">
+                                                <div class="card-header min-h-50px px-5 pt-4 pb-2 d-flex align-items-center justify-content-between">
+                                                    <h5 class="card-title fw-bold text-gray-800 fs-7 mb-0 text-uppercase">
+                                                        <i class="bi bi-collection-play-fill text-primary me-2 fs-5"></i>Paket Chat Template
+                                                    </h5>
+                                                    <a href="templates.html" class="btn btn-xs btn-light-primary py-1 px-3" target="_blank">
+                                                        <i class="bi bi-box-arrow-up-right me-1"></i>Kelola Paket &amp; Template
+                                                    </a>
+                                                </div>
+                                                <div class="card-body py-4 px-5">
+                                                    <p class="text-muted fs-7 mb-3">
+                                                        Pilih kelompok/paket template yang aktif untuk session ini. CS atau pengirim pesan pada session ini hanya dapat menggunakan template dan kode trigger <code>#KODE</code> dari paket yang dicentang.
+                                                    </p>
+                                                    <div id="sessionTemplatePackagesContainer" class="row g-3 mb-2">
+                                                        <div class="col-12 text-muted fs-7">
+                                                            <span class="spinner-border spinner-border-sm me-2 text-primary"></span>Memuat paket template...
+                                                        </div>
+                                                    </div>
+                                                    <div class="d-flex align-items-center justify-content-between mt-3 pt-3 border-top flex-wrap gap-2">
+                                                        <small class="text-muted" id="sessionPackageStatusHint">
+                                                            <i class="bi bi-info-circle me-1"></i>Jika tidak ada paket yang dicentang, session otomatis menggunakan paket default (Umum).
+                                                        </small>
+                                                        <button type="button" class="btn btn-sm btn-primary fw-bold" id="btnSaveSessionPackages">
+                                                            <i class="bi bi-check2-circle me-1"></i>Simpan Paket Session
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+
                                             <!-- Row 2: API Key & Endpoint -->
                                             <div class="card card-flush border border-dashed border-warning mb-5">
                                                 <div class="card-header min-h-50px px-5 pt-4 pb-2">
